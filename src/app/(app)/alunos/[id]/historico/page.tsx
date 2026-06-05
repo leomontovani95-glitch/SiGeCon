@@ -1,0 +1,115 @@
+import { prisma } from "@/lib/db";
+import { verifySession } from "@/lib/dal";
+import { notFound } from "next/navigation";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import PrintLayout from "@/components/PrintLayout";
+import { calcularNota, faixaNota, STATUS_COM_PONTUACAO } from "@/lib/score";
+
+export default async function HistoricoAlunoPage({ params }: { params: Promise<{ id: string }> }) {
+  const session = await verifySession();
+  const { id } = await params;
+
+  const aluno = await prisma.student.findUnique({
+    where: { id },
+    include: {
+      course: true,
+      platoon: true,
+      communications: {
+        include: { type: true, decisions: { include: { authority: true } } },
+        orderBy: { factDate: "asc" },
+      },
+    },
+  });
+  if (!aluno) notFound();
+
+  if (session.role === "ALUNO" && aluno.email !== session.email) notFound();
+
+  const decididas = aluno.communications.filter(
+    (c) => (STATUS_COM_PONTUACAO as readonly string[]).includes(c.status) && c.finalScore != null
+  );
+  const nota = calcularNota(decididas);
+  const faixa = faixaNota(nota);
+
+  const desfavoravel = decididas.filter((c) => c.type.scoreNature === "DESFAVORAVEL").reduce((s, c) => s + (c.finalScore ?? 0), 0);
+  const favoravel = decididas.filter((c) => c.type.scoreNature === "FAVORAVEL").reduce((s, c) => s + (c.finalScore ?? 0), 0);
+
+  const STATUS_LABELS: Record<string, string> = {
+    REGISTRADA: "Registrada", AGUARDANDO_CIENCIA: "Ag. Ciência", AGUARDANDO_DEFESA: "Ag. Defesa",
+    JUSTIFICATIVA_APRESENTADA: "Defesa Apresentada", PRAZO_EXPIRADO: "Prazo Expirado",
+    AGUARDANDO_PARECER: "Ag. Parecer", AGUARDANDO_DECISAO: "Ag. Decisão",
+    DECIDIDA: "Decidida", ARQUIVADA: "Arquivada", PUBLICADA_CADERNO: "Pub. Caderno", FINALIZADA: "Finalizada",
+  };
+
+  return (
+    <PrintLayout title={`Histórico — ${aluno.warName}`}>
+      <div className="print-section">
+        <h2>Histórico do Aluno — Conduta Profissional</h2>
+        <div className="print-grid">
+          <div className="print-field"><label>Nome completo</label><span>{aluno.fullName}</span></div>
+          <div className="print-field"><label>Nome de guerra</label><span>{aluno.warName}</span></div>
+          <div className="print-field"><label>Curso</label><span>{aluno.course.name}</span></div>
+          <div className="print-field"><label>Nº de curso</label><span>{aluno.courseNumber}</span></div>
+          <div className="print-field"><label>Pelotão</label><span>{aluno.platoon?.name ?? "—"}</span></div>
+          <div className="print-field"><label>RG</label><span>{aluno.rg}</span></div>
+          <div className="print-field"><label>Situação</label><span>{aluno.status}</span></div>
+          <div className="print-field"><label>Gerado em</label><span>{format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span></div>
+        </div>
+      </div>
+
+      <div className="print-section">
+        <h2>Nota da Disciplina Conduta Profissional</h2>
+        <div style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ fontSize: "22pt", fontWeight: "bold", padding: "6px 16px", borderRadius: 6, background: nota >= 9 ? "#166534" : nota >= 8 ? "#15803d" : nota >= 7 ? "#b45309" : nota >= 6 ? "#b91c1c" : "#7f1d1d", color: "white" }}>
+            {nota.toFixed(2)}
+          </div>
+          <div>
+            <p style={{ margin: 0, fontSize: "10pt" }}>Pontuação desfavorável total: <strong style={{ color: "#b91c1c" }}>−{desfavoravel.toFixed(1)}</strong></p>
+            <p style={{ margin: 0, fontSize: "10pt" }}>Pontuação favorável total: <strong style={{ color: "#15803d" }}>+{favoravel.toFixed(1)}</strong></p>
+            <p style={{ margin: 0, fontSize: "9pt", color: "#555" }}>Nota base: 10,00 | Cálculo: 10 − desfavorável + favorável</p>
+            {nota < 6 && <p style={{ margin: 0, fontSize: "9pt", color: "#7f1d1d", fontWeight: "bold" }}>SITUAÇÃO: REPROVADO (nota abaixo de 6,0)</p>}
+            {nota >= 6 && nota < 7 && <p style={{ margin: 0, fontSize: "9pt", color: "#b91c1c", fontWeight: "bold" }}>ATENÇÃO: Zona de risco (nota abaixo de 7,0)</p>}
+          </div>
+        </div>
+      </div>
+
+      <div className="print-section">
+        <h2>Comunicações ({aluno.communications.length} total)</h2>
+        <table className="print-table">
+          <thead>
+            <tr>
+              <th>Protocolo</th>
+              <th>Tipo</th>
+              <th>Data do Fato</th>
+              <th>Status</th>
+              <th>Pontuação</th>
+              <th>Decisão</th>
+            </tr>
+          </thead>
+          <tbody>
+            {aluno.communications.map((c) => (
+              <tr key={c.id}>
+                <td style={{ fontFamily: "monospace", fontSize: "8pt" }}>{c.protocolNumber}</td>
+                <td>{c.type.name}</td>
+                <td>{format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
+                <td style={{ fontSize: "8pt" }}>{STATUS_LABELS[c.status] ?? c.status}</td>
+                <td style={{ textAlign: "right", fontWeight: "bold" }}>
+                  {c.finalScore != null ? (
+                    <span className={`print-badge ${c.type.scoreNature === "DESFAVORAVEL" ? "badge-desfav" : "badge-fav"}`}>
+                      {c.type.scoreNature === "DESFAVORAVEL" ? "−" : "+"}{c.finalScore.toFixed(1)}
+                    </span>
+                  ) : "—"}
+                </td>
+                <td style={{ fontSize: "8pt" }}>{c.decisions[0]?.decisionType ?? "—"}</td>
+              </tr>
+            ))}
+            {aluno.communications.length === 0 && (
+              <tr><td colSpan={6} style={{ textAlign: "center", color: "#888" }}>Nenhuma comunicação registrada.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+    </PrintLayout>
+  );
+}

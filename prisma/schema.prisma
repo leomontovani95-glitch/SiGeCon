@@ -1,0 +1,287 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id               String   @id @default(cuid())
+  fullName         String
+  warName          String
+  rank             String
+  rg               String   @unique
+  functionalNumber String   @unique
+  email            String   @unique
+  passwordHash     String
+  cpf              String?  @unique
+  escola           String   @default("TODAS")
+  role             String   @default("PROTOCOLO")
+  active           Boolean  @default(true)
+  mustChangePassword Boolean @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  opinions          Opinion[]
+  decisions         Decision[]
+  reportedComms     Communication[] @relation("Reporter")
+  auditLogs         AuditLog[]
+  disciplinaryBooks DisciplinaryBook[]
+  publishedBooks    DisciplinaryBook[] @relation("Publisher")
+  student           Student?
+}
+
+model Course {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  acronym     String
+  year        Int?
+  description String?
+  school      String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  platoons          Platoon[]
+  students          Student[]
+  communications    Communication[]
+  disciplinaryBooks DisciplinaryBook[]
+}
+
+model Platoon {
+  id        String   @id @default(cuid())
+  name      String
+  courseId  String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  course         Course          @relation(fields: [courseId], references: [id])
+  students       Student[]
+  communications Communication[]
+}
+
+model Student {
+  id               String   @id @default(cuid())
+  fullName         String
+  warName          String
+  courseId         String
+  courseNumber     String
+  platoonId        String?
+  cpf              String?  @unique
+  userId           String?  @unique
+  rg               String   @unique
+  functionalNumber String?
+  email            String?
+  status           String   @default("ATIVO")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  course                    Course                   @relation(fields: [courseId], references: [id])
+  platoon                   Platoon?                 @relation(fields: [platoonId], references: [id])
+  user                      User?                    @relation(fields: [userId], references: [id])
+  communications            Communication[]
+  acknowledgements          StudentAcknowledgement[]
+  defenses                  Defense[]
+  disciplinaryBookItems     DisciplinaryBookItem[]
+}
+
+model ManualRule {
+  id                      String   @id @default(cuid())
+  article                  String
+  item                     String?
+  letter                   String?
+  description              String
+  theme                    String?
+  defaultCommunicationType String?
+  defaultScore             Float?
+  active                   Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  communications Communication[]
+}
+
+model CommunicationType {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  score       Float
+  scoreNature String   @default("DESFAVORAVEL")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  communications Communication[]
+}
+
+model Communication {
+  id             String    @id @default(cuid())
+  protocolNumber String    @unique
+  typeId         String
+  studentId      String
+  courseId       String
+  courseNumber   String
+  platoonId      String?
+  reporterId     String
+  factDate       DateTime
+  factTime       String?
+  factPlace      String?
+  factDescription String
+  manualRuleId   String?
+  article        String?
+  item           String?
+  letter         String?
+  suggestedScore   Float?
+  finalScore       Float?
+  status           String    @default("REGISTRADA")
+  defenseDeadline  DateTime?
+  communicantName  String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  type                  CommunicationType        @relation(fields: [typeId], references: [id])
+  student               Student                  @relation(fields: [studentId], references: [id])
+  course                Course                   @relation(fields: [courseId], references: [id])
+  platoon               Platoon?                 @relation(fields: [platoonId], references: [id])
+  reporter              User                     @relation("Reporter", fields: [reporterId], references: [id])
+  manualRule            ManualRule?              @relation(fields: [manualRuleId], references: [id])
+  witnesses             Witness[]
+  attachments           Attachment[]
+  acknowledgements      StudentAcknowledgement[]
+  defenses              Defense[]
+  opinions              Opinion[]
+  decisions             Decision[]
+  disciplinaryBookItems DisciplinaryBookItem[]
+}
+
+model Witness {
+  id              String  @id @default(cuid())
+  communicationId String
+  name            String
+  rg              String?
+  functionalNumber String?
+  contact         String?
+  notes           String?
+
+  communication Communication @relation(fields: [communicationId], references: [id])
+}
+
+model Attachment {
+  id              String   @id @default(cuid())
+  communicationId String
+  fileName        String
+  filePath        String
+  fileType        String?
+  uploadedBy      String
+  createdAt       DateTime @default(now())
+
+  communication Communication @relation(fields: [communicationId], references: [id])
+  defenses      Defense[]
+}
+
+model StudentAcknowledgement {
+  id              String   @id @default(cuid())
+  communicationId String
+  studentId       String
+  acknowledgedAt  DateTime @default(now())
+  method          String?
+  notes           String?
+
+  communication Communication @relation(fields: [communicationId], references: [id])
+  student       Student       @relation(fields: [studentId], references: [id])
+}
+
+model Defense {
+  id              String   @id @default(cuid())
+  communicationId String
+  studentId       String
+  text            String
+  submittedAt     DateTime @default(now())
+  isLate          Boolean  @default(false)
+  attachmentId    String?
+
+  communication Communication @relation(fields: [communicationId], references: [id])
+  student       Student       @relation(fields: [studentId], references: [id])
+  attachment    Attachment?   @relation(fields: [attachmentId], references: [id])
+}
+
+model Opinion {
+  id              String   @id @default(cuid())
+  communicationId String
+  authorId        String
+  authorRole      String
+  text            String
+  recommendation  String?
+  createdAt       DateTime @default(now())
+
+  communication Communication @relation(fields: [communicationId], references: [id])
+  author        User          @relation(fields: [authorId], references: [id])
+}
+
+model Decision {
+  id              String   @id @default(cuid())
+  communicationId String
+  authorityId     String
+  decisionType    String
+  text            String
+  finalScore      Float?
+  decidedAt       DateTime @default(now())
+
+  communication Communication @relation(fields: [communicationId], references: [id])
+  authority     User          @relation(fields: [authorityId], references: [id])
+}
+
+model DisciplinaryBook {
+  id              String    @id @default(cuid())
+  number          Int
+  courseId        String?
+  school          String?
+  publicationDate DateTime?
+  status          String    @default("RASCUNHO")
+  createdById     String
+  publishedById   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  createdBy   User                   @relation(fields: [createdById], references: [id])
+  publishedBy User?                  @relation("Publisher", fields: [publishedById], references: [id])
+  course      Course?                @relation(fields: [courseId], references: [id])
+  items       DisciplinaryBookItem[]
+}
+
+model DisciplinaryBookItem {
+  id                  String  @id @default(cuid())
+  disciplinaryBookId  String
+  communicationId     String
+  studentId           String
+  courseId            String?
+  platoonId           String?
+  studentCourseNumber String
+  studentWarName      String
+  recordType          String
+  factDate            DateTime
+  decisionSummary     String
+  score               Float?
+  shortObservation    String?
+  originalArticle     String?
+  originalItem        String?
+  originalLetter      String?
+
+  disciplinaryBook DisciplinaryBook @relation(fields: [disciplinaryBookId], references: [id])
+  communication    Communication    @relation(fields: [communicationId], references: [id])
+  student          Student          @relation(fields: [studentId], references: [id])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  entity    String
+  entityId  String?
+  details   String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}

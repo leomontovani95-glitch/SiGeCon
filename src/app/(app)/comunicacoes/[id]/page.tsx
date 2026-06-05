@@ -1,0 +1,185 @@
+import { prisma } from "@/lib/db";
+import { verifySession, canEmitOpinion, canDecide } from "@/lib/dal";
+import { notFound } from "next/navigation";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import AcoesComm from "../_components/AcoesComm";
+import Link from "next/link";
+
+const STATUS_LABELS: Record<string, string> = {
+  REGISTRADA: "Registrada", AGUARDANDO_CIENCIA: "Aguardando Ciência do Aluno",
+  AGUARDANDO_DEFESA: "Aguardando Justificativa/Defesa", JUSTIFICATIVA_APRESENTADA: "Justificativa/Defesa Apresentada",
+  PRAZO_EXPIRADO: "Prazo Expirado", AGUARDANDO_PARECER: "Aguardando Parecer",
+  PARECER_EMITIDO: "Parecer Emitido", AGUARDANDO_DECISAO: "Aguardando Decisão do Comandante",
+  DECIDIDA: "Decidida", ARQUIVADA: "Arquivada", PUBLICADA_CADERNO: "Publicada em Caderno",
+  FINALIZADA: "Finalizada", DEVOLVIDA: "Devolvida para Complementação",
+};
+
+export default async function ComunicacaoPage({ params }: { params: Promise<{ id: string }> }) {
+  const session = await verifySession();
+  const { id } = await params;
+
+  const [manualRules, comm] = await Promise.all([
+    prisma.manualRule.findMany({ where: { active: true }, orderBy: [{ article: "asc" }, { item: "asc" }] }),
+    prisma.communication.findUnique({
+    where: { id },
+    include: {
+      type: true, student: { include: { course: true, platoon: true } },
+      reporter: true, manualRule: true,
+      witnesses: true, attachments: true,
+      acknowledgements: true, defenses: true,
+      opinions: { include: { author: true } },
+      decisions: { include: { authority: true } },
+    },
+  }),
+  ]);
+  if (!comm) notFound();
+
+  if (session.role === "ALUNO") {
+    const ehEsteAluno = comm.student.userId === session.userId || comm.student.email === session.email;
+    if (!ehEsteAluno) notFound();
+  }
+
+  // Busca o caderno em que foi publicada (se aplicável)
+  const cadernoPublicado = comm.status === "PUBLICADA_CADERNO"
+    ? await prisma.disciplinaryBook.findFirst({
+        where: { status: "PUBLICADO", items: { some: { communicationId: comm.id } } },
+        include: { course: true },
+      })
+    : null;
+
+  const alunoEhEssePerfil = session.role === "ALUNO" &&
+    (comm.student.userId === session.userId || comm.student.email === session.email);
+
+  return (
+    <div className="p-6 max-w-4xl">
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <p className="font-mono text-sm text-gray-500">{comm.protocolNumber}</p>
+          <h1 className="text-2xl font-bold text-gray-900">{comm.type.name}</h1>
+          <div className="flex flex-wrap gap-2 mt-1 items-center">
+            <span className="inline-block text-xs px-3 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+              {STATUS_LABELS[comm.status] ?? comm.status}
+            </span>
+            {cadernoPublicado && (
+              <span className="inline-block text-xs px-3 py-1 rounded-full bg-teal-100 text-teal-700 font-medium font-mono">
+                {cadernoPublicado.course
+                  ? `CD Nº ${String(cadernoPublicado.number).padStart(2, "0")} — ${cadernoPublicado.course.name}`
+                  : `CD-${String(cadernoPublicado.number).padStart(4, "0")}`}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex gap-2 flex-wrap justify-end">
+          <Link href={`/comunicacoes/${comm.id}/imprimir`} target="_blank" className="btn-secondary text-xs">
+            Gerar PDF
+          </Link>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Aluno / Comunicado</h2>
+          <p className="font-semibold text-gray-900">{comm.student.warName}</p>
+          <p className="text-sm text-gray-600">{comm.student.fullName}</p>
+          <p className="text-sm text-gray-500">{comm.student.course.name} — Nº {comm.courseNumber}</p>
+          {comm.student.platoon && <p className="text-sm text-gray-500">{comm.student.platoon.name}</p>}
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Dados do Fato</h2>
+          <p className="text-sm text-gray-700"><span className="font-medium">Data:</span> {format(new Date(comm.factDate), "dd/MM/yyyy", { locale: ptBR })}</p>
+          {comm.factTime && <p className="text-sm text-gray-700"><span className="font-medium">Hora:</span> {comm.factTime}</p>}
+          {comm.factPlace && <p className="text-sm text-gray-700"><span className="font-medium">Local:</span> {comm.factPlace}</p>}
+          <p className="text-sm text-gray-700"><span className="font-medium">Comunicante:</span> {comm.communicantName ?? comm.reporter.warName}</p>
+        </div>
+      </div>
+
+      {!["ALUNO"].includes(session.role) && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Descrição do Fato</h2>
+          <p className="text-sm text-gray-700 whitespace-pre-wrap">{comm.factDescription}</p>
+        </div>
+      )}
+
+      {comm.article && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Dispositivo Legal</h2>
+          <p className="text-sm font-mono text-gray-700">
+            Art. {comm.article}{comm.item ? ` — Inc. ${comm.item}` : ""}{comm.letter ? ` — Al. ${comm.letter}` : ""}
+          </p>
+          {comm.manualRule && <p className="text-sm text-gray-600 mt-1">{comm.manualRule.description}</p>}
+        </div>
+      )}
+
+      {comm.defenses.length > 0 && !["ALUNO"].includes(session.role) && (
+        <div className="bg-amber-50 rounded-xl border border-amber-200 p-4 mb-4">
+          <h2 className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">Justificativa/Defesa do Aluno</h2>
+          {comm.defenses.map((d) => (
+            <div key={d.id}>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{d.text}</p>
+              <p className="text-xs text-gray-400 mt-2">
+                Apresentada em {format(new Date(d.submittedAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                {d.isLate && <span className="ml-2 text-red-600 font-medium">(Fora do prazo)</span>}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {comm.opinions.length > 0 && (
+        <div className="bg-purple-50 rounded-xl border border-purple-200 p-4 mb-4">
+          <h2 className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-2">Parecer</h2>
+          {comm.opinions.map((o) => (
+            <div key={o.id}>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{o.text}</p>
+              {o.recommendation && <p className="text-sm font-medium text-purple-800 mt-2">Recomendação: {o.recommendation}</p>}
+              <p className="text-xs text-gray-400 mt-2">
+                {o.author.warName} ({o.authorRole.replace("_", " ")}) — {format(new Date(o.createdAt), "dd/MM/yyyy", { locale: ptBR })}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {comm.decisions.length > 0 && (
+        <div className="bg-green-50 rounded-xl border border-green-200 p-4 mb-4">
+          <h2 className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-2">Decisão do Comandante</h2>
+          {comm.decisions.map((d) => (
+            <div key={d.id}>
+              <p className="text-sm font-medium text-gray-900">{d.decisionType}</p>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap mt-1">{d.text}</p>
+              {d.finalScore != null && (
+                <p className="text-sm font-bold text-green-800 mt-2">Pontuação aplicada: {d.finalScore.toFixed(1)} pt</p>
+              )}
+              <p className="text-xs text-gray-400 mt-2">
+                {d.authority.warName} — {format(new Date(d.decidedAt), "dd/MM/yyyy", { locale: ptBR })}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <AcoesComm
+        comm={{
+          id: comm.id,
+          status: comm.status,
+          defenseDeadline: comm.defenseDeadline?.toISOString() ?? null,
+          studentId: comm.studentId,
+          finalScore: comm.finalScore,
+          suggestedScore: comm.suggestedScore,
+          opinions: comm.opinions.map((o) => ({ id: o.id })),
+        }}
+        session={{ role: session.role, userId: session.userId, email: session.email }}
+        studentEmail={comm.student.email ?? ""}
+        alunoEhEssePerfil={alunoEhEssePerfil}
+        manualRules={manualRules.map((r) => ({
+          id: r.id,
+          article: r.article,
+          item: r.item ?? null,
+          letter: r.letter ?? null,
+          description: r.description,
+        }))}
+      />
+    </div>
+  );
+}
