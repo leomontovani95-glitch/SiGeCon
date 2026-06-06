@@ -3,21 +3,67 @@ import { verifySession, getSchoolFilter } from "@/lib/dal";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import Link from "next/link";
+import RelatorioPDF, { type RelatorioItem, type RelatorioMeta } from "./_components/RelatorioPDF";
 
-export default async function RelatoriosPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
+function resolveStatusLabel(c: {
+  status: string;
+  decisions: { decisionType: string }[];
+  disciplinaryBookItems: { disciplinaryBook: { status: string } }[];
+}): string {
+  if (c.status === "DECIDIDA") {
+    const arq = c.decisions.some((d) => d.decisionType.toLowerCase().includes("arquiv"));
+    if (arq) return "Arquivada";
+    const pub = c.disciplinaryBookItems.some((i) => i.disciplinaryBook.status === "PUBLICADO");
+    return pub ? "Decidida/Publicada" : "Decidida/Não publicada";
+  }
+  const map: Record<string, string> = {
+    AGUARDANDO_CIENCIA:          "Ag. Ciência/Defesa",
+    AGUARDANDO_DEFESA:           "Ag. Ciência/Defesa",
+    PRAZO_EXPIRADO:              "Prazo Expirado",
+    JUSTIFICATIVA_APRESENTADA:   "Defesa Apresentada",
+    AGUARDANDO_PARECER:          "Ag. Parecer",
+    AGUARDANDO_DECISAO:          "Ag. Decisão",
+    ARQUIVADA:                   "Arquivada",
+  };
+  return map[c.status] ?? c.status.replace(/_/g, " ");
+}
+
+export default async function RelatoriosPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>;
+}) {
   const session = await verifySession();
   if (session.role === "ALUNO") redirect("/acesso-negado");
+
   const sp = await searchParams;
-  const tipo        = sp.tipo        ?? "";
-  const status      = sp.status      ?? "";
-  const dataInicio  = sp.dataInicio  ?? "";
-  const dataFim     = sp.dataFim     ?? "";
+  const cursoId    = sp.cursoId    ?? "";
+  const tipo       = sp.tipo       ?? "";
+  const status     = sp.status     ?? "";
+  const dataInicio = sp.dataInicio ?? "";
+  const dataFim    = sp.dataFim    ?? "";
 
   const school = getSchoolFilter(session.role, session.escola);
 
-  const where: Record<string, unknown> = {};
-  if (school) where.course = { school };
-  if (tipo)   where.type   = { name: tipo };
+  // Cursos disponíveis para o seletor
+  const cursosDisponiveis = await prisma.course.findMany({
+    where: { active: true, ...(school ? { school } : {}) },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
+
+  // Filtro de escola/curso
+  const cursoFilter = cursoId
+    ? { courseId: cursoId }
+    : school
+      ? { course: { school } }
+      : {};
+
+  const where: Record<string, unknown> = { ...cursoFilter };
+
+  if (tipo) where.type = { name: tipo };
+
   if (status) {
     switch (status) {
       case "DECIDIDA_PUBLICADA":
@@ -37,6 +83,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
         where.status = status;
     }
   }
+
   if (dataInicio || dataFim) {
     where.factDate = {};
     if (dataInicio) (where.factDate as Record<string, unknown>).gte = new Date(dataInicio);
@@ -48,7 +95,10 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
       where,
       orderBy: { createdAt: "desc" },
       include: {
-        type: true, student: { include: { course: true } }, reporter: true, decisions: true,
+        type: true,
+        student: { include: { course: true } },
+        reporter: true,
+        decisions: true,
         disciplinaryBookItems: { include: { disciplinaryBook: { select: { status: true } } } },
       },
       take: 200,
@@ -61,15 +111,94 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
   const favoraveis    = comunicacoes.filter((c) => c.type.scoreNature === "FAVORAVEL").length;
   const decididas     = comunicacoes.filter((c) => c.status === "DECIDIDA").length;
 
+  const cursoSelecionado = cursosDisponiveis.find((c) => c.id === cursoId);
+  const labelEscopo = school === "ESFAP" ? "Todos da EsFAP"
+    : school === "ESFO"  ? "Todos da EsFO"
+    : "Todos os cursos";
+
+  // URL dos pills preservando os filtros atuais
+  function pillHref(id: string) {
+    const p = new URLSearchParams();
+    if (id)          p.set("cursoId",    id);
+    if (tipo)        p.set("tipo",       tipo);
+    if (status)      p.set("status",     status);
+    if (dataInicio)  p.set("dataInicio", dataInicio);
+    if (dataFim)     p.set("dataFim",    dataFim);
+    const qs = p.toString();
+    return `/relatorios${qs ? `?${qs}` : ""}`;
+  }
+
+  // Dados para o PDF
+  const pdfItems: RelatorioItem[] = comunicacoes.map((c) => ({
+    protocolNumber: c.protocolNumber,
+    typeName:       c.type.name,
+    warName:        c.student.warName,
+    courseName:     c.student.course.name,
+    factDate:       format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR }),
+    statusLabel:    resolveStatusLabel(c),
+    finalScore:     c.finalScore,
+  }));
+
+  // Monta subtítulo do PDF com os filtros aplicados
+  const filtrosAtivos: string[] = [];
+  if (cursoSelecionado) filtrosAtivos.push(cursoSelecionado.name);
+  else filtrosAtivos.push(labelEscopo);
+  if (tipo)       filtrosAtivos.push(`Tipo: ${tipo}`);
+  if (status)     filtrosAtivos.push(`Status: ${status}`);
+  if (dataInicio) filtrosAtivos.push(`De: ${dataInicio}`);
+  if (dataFim)    filtrosAtivos.push(`Até: ${dataFim}`);
+
+  const pdfMeta: RelatorioMeta = {
+    titulo:    "Relatório de Comunicações",
+    subtitulo: filtrosAtivos.join("  ·  "),
+    total, desfav: desfavoraveis, fav: favoraveis, decididas,
+  };
+
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Relatórios</h1>
-        <p className="text-sm text-gray-500">Para o ranking de conduta, acesse o menu <strong>Ranking de Conduta</strong>.</p>
+      {/* Título */}
+      <div className="flex items-start justify-between mb-5 flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Relatórios</h1>
+          <p className="text-sm text-gray-500">
+            {cursoSelecionado ? cursoSelecionado.name : labelEscopo}
+            {" · "}{total} resultado(s)
+          </p>
+        </div>
+        <RelatorioPDF items={pdfItems} meta={pdfMeta} />
       </div>
+
+      {/* Seletor de cursos */}
+      {cursosDisponiveis.length > 1 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-5">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Filtrar por curso</p>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={pillHref("")}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                !cursoId ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              {labelEscopo}
+            </Link>
+            {cursosDisponiveis.map((curso) => (
+              <Link
+                key={curso.id}
+                href={pillHref(curso.id)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  cursoId === curso.id ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                {curso.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filtros */}
       <form method="GET" className="bg-white rounded-xl border border-gray-200 p-5 mb-6 flex flex-wrap gap-4">
+        {cursoId && <input type="hidden" name="cursoId" value={cursoId} />}
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
           <select name="tipo" defaultValue={tipo} className="input text-sm">
@@ -105,7 +234,7 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
       </form>
 
       {/* Cards resumo */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         {[
           { label: "Total",          value: total,         color: "bg-blue-600" },
           { label: "Desfavoráveis",  value: desfavoraveis, color: "bg-red-600" },
@@ -119,42 +248,42 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
         ))}
       </div>
 
-      {/* Tabela de comunicações */}
+      {/* Tabela */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="text-left px-4 py-3 font-medium text-gray-700">Protocolo</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-700">Tipo</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-700">Aluno</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-700">Curso</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-700">Data</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-700">Status</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-700">Pont.</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-700 text-xs whitespace-nowrap">Protocolo</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-700 text-xs whitespace-nowrap">Tipo</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-700 text-xs whitespace-nowrap">Aluno</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-700 text-xs whitespace-nowrap">Curso</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-700 text-xs whitespace-nowrap">Data</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-700 text-xs whitespace-nowrap">Status</th>
+              <th className="text-left px-3 py-2.5 font-medium text-gray-700 text-xs whitespace-nowrap">Pont.</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {comunicacoes.map((c) => (
               <tr key={c.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-mono text-xs">{c.protocolNumber}</td>
-                <td className="px-4 py-3 text-xs">{c.type.name}</td>
-                <td className="px-4 py-3 font-medium text-gray-900">{c.student.warName}</td>
-                <td className="px-4 py-3 text-xs text-gray-500">{c.student.course.name}</td>
-                <td className="px-4 py-3 text-xs text-gray-500">{format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
-                <td className="px-4 py-3 text-xs">{(() => {
-                  if (c.status === "DECIDIDA") {
-                    const arq = c.decisions.some((d) => d.decisionType.toLowerCase().includes("arquiv"));
-                    if (arq) return "Arquivada";
-                    const pub = c.disciplinaryBookItems.some((i) => i.disciplinaryBook.status === "PUBLICADO");
-                    return pub ? "Decidida/Publicada" : "Decidida/Não publicada";
-                  }
-                  return c.status.replace(/_/g, " ");
-                })()}</td>
-                <td className="px-4 py-3 text-xs font-bold">{c.finalScore != null ? c.finalScore.toFixed(1) : "—"}</td>
+                <td className="px-3 py-2.5 font-mono text-xs text-gray-700 whitespace-nowrap">{c.protocolNumber}</td>
+                <td className="px-3 py-2.5 text-xs text-gray-600 whitespace-nowrap">{c.type.name}</td>
+                <td className="px-3 py-2.5 text-xs font-medium text-gray-900 whitespace-nowrap">{c.student.warName}</td>
+                <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{c.student.course.name}</td>
+                <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">
+                  {format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}
+                </td>
+                <td className="px-3 py-2.5 text-xs whitespace-nowrap">{resolveStatusLabel(c)}</td>
+                <td className="px-3 py-2.5 text-xs font-bold whitespace-nowrap">
+                  {c.finalScore != null ? c.finalScore.toFixed(1) : "—"}
+                </td>
               </tr>
             ))}
             {comunicacoes.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Nenhuma comunicação encontrada.</td></tr>
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
+                  Nenhuma comunicação encontrada.
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
