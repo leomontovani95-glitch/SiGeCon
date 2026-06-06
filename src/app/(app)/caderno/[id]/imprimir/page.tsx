@@ -5,10 +5,9 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import PrintLayout from "@/components/PrintLayout";
 
-export default async function ImprimirCadernoPage({ params }: { params: Promise<{ id: string }> }) {
-  await verifySession();
-  const { id } = await params;
+type Item = Awaited<ReturnType<typeof fetchCaderno>>["items"][number];
 
+async function fetchCaderno(id: string) {
   const caderno = await prisma.disciplinaryBook.findUnique({
     where: { id },
     include: {
@@ -25,8 +24,98 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
     },
   });
   if (!caderno) notFound();
+  return caderno;
+}
 
-  // Busca o comandante da escola do caderno para usar como assinante
+function fmtEnq(art: string | null, inc: string | null, al: string | null) {
+  if (!art) return "—";
+  let s = `Art. ${art}`;
+  if (inc) s += `, Inc. ${inc}`;
+  if (al)  s += `, Al. ${al}`;
+  return s;
+}
+
+// Definição dos grupos na ordem de exibição
+const GRUPOS: { label: string; filter: (i: Item) => boolean }[] = [
+  { label: "CPI Grau 3",               filter: (i) => i.recordType === "CPI 3"                && i.decisionSummary !== "Reenquadrar artigo" },
+  { label: "CPI Grau 2",               filter: (i) => i.recordType === "CPI 2"                && i.decisionSummary !== "Reenquadrar artigo" },
+  { label: "CPI Grau 1",               filter: (i) => i.recordType === "CPI 1"                && i.decisionSummary !== "Reenquadrar artigo" },
+  { label: "CPI Grau 0",               filter: (i) => i.recordType === "CPI 0"                && i.decisionSummary !== "Reenquadrar artigo" },
+  { label: "Referências Elogiosas",    filter: (i) => i.recordType === "Referência Elogiosa"  },
+  { label: "Elogios publicados em BI", filter: (i) => i.recordType === "Elogio publicado em BI" },
+  { label: "Reenquadramentos",         filter: (i) => i.decisionSummary === "Reenquadrar artigo" },
+  { label: "Arquivamentos",            filter: (i) => i.recordType === "Arquivamento" || (i.decisionSummary ?? "").toLowerCase().includes("arquiv") },
+];
+
+function TabelaTipo({ items, label }: { items: Item[]; label: string }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="print-section" style={{ marginTop: 24, pageBreakInside: "avoid" }}>
+      <h3 style={{
+        fontSize: "8.5pt", fontWeight: "bold", color: "#1e3a5f",
+        textTransform: "uppercase", letterSpacing: "0.05em",
+        borderBottom: "1.5px solid #1e3a5f", paddingBottom: 3, marginBottom: 6,
+      }}>
+        {label} <span style={{ fontWeight: "normal", color: "#6b7280" }}>({items.length})</span>
+      </h3>
+      <table className="cd-table">
+        <colgroup>
+          <col className="cd-col-proto" />
+          <col className="cd-col-enq" />
+          <col className="cd-col-pel" />
+          <col className="cd-col-num" />
+          <col className="cd-col-nome" />
+          <col className="cd-col-data" />
+          <col className="cd-col-dec" />
+          <col className="cd-col-obs" />
+          <col className="cd-col-pont" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th className="cd-col-proto">Protocolo</th>
+            <th className="cd-col-enq">Enquadramento</th>
+            <th className="cd-col-pel">Pelotão</th>
+            <th className="cd-col-num">Nº</th>
+            <th className="cd-col-nome">Nome de Guerra</th>
+            <th className="cd-col-data">Data</th>
+            <th className="cd-col-dec">Decisão</th>
+            <th className="cd-col-obs">Obs.</th>
+            <th className="cd-col-pont" style={{ textAlign: "right" }}>Pont.</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <tr key={item.id}>
+              <td className="cd-col-proto" style={{ fontFamily: "monospace", fontSize: "7pt" }}>
+                {item.communication.protocolNumber}
+              </td>
+              <td className="cd-col-enq" style={{ color: "#1e3a8a", fontSize: "7pt" }}>
+                {fmtEnq(item.communication.article, item.communication.item, item.communication.letter)}
+              </td>
+              <td className="cd-col-pel">{item.student.platoon?.name ?? "—"}</td>
+              <td className="cd-col-num" style={{ fontFamily: "monospace", textAlign: "center" }}>
+                {item.studentCourseNumber}
+              </td>
+              <td className="cd-col-nome" style={{ fontWeight: "bold" }}>{item.studentWarName}</td>
+              <td className="cd-col-data">{format(new Date(item.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
+              <td className="cd-col-dec">{item.decisionSummary}</td>
+              <td className="cd-col-obs" style={{ fontSize: "7pt", color: "#666" }}>{item.shortObservation ?? "—"}</td>
+              <td className="cd-col-pont" style={{ textAlign: "right", fontWeight: "bold" }}>
+                {item.score != null ? (item.score > 0 ? `+${item.score.toFixed(1)}` : item.score.toFixed(1)) : "—"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export default async function ImprimirCadernoPage({ params }: { params: Promise<{ id: string }> }) {
+  await verifySession();
+  const { id } = await params;
+  const caderno = await fetchCaderno(id);
+
   const schoolRole = caderno.school === "ESFAP" ? "COMANDANTE_ESFAP"
     : caderno.school === "ESFO" ? "COMANDANTE_ESFO"
     : null;
@@ -42,17 +131,14 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
     ? `CD Nº ${String(caderno.number).padStart(2, "0")} — ${caderno.course.name}`
     : `CD-${String(caderno.number).padStart(4, "0")}`;
 
-  function fmtEnq(art: string | null, inc: string | null, al: string | null) {
-    if (!art) return "—";
-    let s = `Art. ${art}`;
-    if (inc) s += `, Inc. ${inc}`;
-    if (al) s += `, Al. ${al}`;
-    return s;
-  }
+  const itens = caderno.items;
+
+  // Conta total por grupo para o resumo
+  const grupos = GRUPOS.map((g) => ({ ...g, itens: itens.filter(g.filter) }));
+  const totalRegistros = itens.length;
 
   return (
     <PrintLayout title={`Caderno Disciplinar ${numero}`}>
-      {/* Força orientação paisagem e fonte compacta para a tabela */}
       <style>{`
         @media print {
           @page { size: A4 landscape; margin: 12mm 12mm 12mm 15mm; }
@@ -67,28 +153,27 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
         }
         .cd-table th {
           background: #1e3a5f; color: white;
-          padding: 5px 5px; font-size: 7pt; text-align: left;
+          padding: 4px 5px; font-size: 7pt; text-align: left;
           overflow: hidden; white-space: nowrap;
         }
         .cd-table td {
-          padding: 4px 5px; border-bottom: 1px solid #e5e7eb;
+          padding: 3.5px 5px; border-bottom: 1px solid #e5e7eb;
           overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
           vertical-align: middle;
         }
         .cd-table tr:nth-child(even) td { background: #f9fafb; }
-        /* Larguras fixas por coluna */
-        .cd-col-proto   { width: 13%; }
-        .cd-col-enq     { width: 14%; }
-        .cd-col-pel     { width: 8%; }
-        .cd-col-num     { width: 5%; }
-        .cd-col-nome    { width: 10%; }
-        .cd-col-tipo    { width: 12%; }
-        .cd-col-data    { width: 8%; }
-        .cd-col-dec     { width: 20%; white-space: normal !important; }
-        .cd-col-obs     { width: 5%; }
-        .cd-col-pont    { width: 5%; text-align: right; }
+        .cd-col-proto { width: 14%; }
+        .cd-col-enq   { width: 14%; }
+        .cd-col-pel   { width: 8%; }
+        .cd-col-num   { width: 4%; }
+        .cd-col-nome  { width: 10%; }
+        .cd-col-data  { width: 7%; }
+        .cd-col-dec   { width: 30%; white-space: normal !important; }
+        .cd-col-obs   { width: 5%; }
+        .cd-col-pont  { width: 5%; text-align: right; }
       `}</style>
 
+      {/* Cabeçalho */}
       <div className="print-section">
         <h2>Caderno Disciplinar — {numero}</h2>
         <div className="print-grid">
@@ -103,68 +188,20 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
               <span>{caderno.publishedBy.rank} {caderno.publishedBy.warName}</span>
             </div>
           )}
-          <div className="print-field"><label>Total de registros</label><span>{caderno.items.length}</span></div>
+          <div className="print-field"><label>Total de registros</label><span>{totalRegistros}</span></div>
         </div>
       </div>
 
-      <div className="print-section">
-        <h2>Registros</h2>
-        <table className="cd-table">
-          <colgroup>
-            <col className="cd-col-proto" />
-            <col className="cd-col-enq" />
-            <col className="cd-col-pel" />
-            <col className="cd-col-num" />
-            <col className="cd-col-nome" />
-            <col className="cd-col-tipo" />
-            <col className="cd-col-data" />
-            <col className="cd-col-dec" />
-            <col className="cd-col-obs" />
-            <col className="cd-col-pont" />
-          </colgroup>
-          <thead>
-            <tr>
-              <th className="cd-col-proto">Protocolo</th>
-              <th className="cd-col-enq">Enquadramento</th>
-              <th className="cd-col-pel">Pelotão</th>
-              <th className="cd-col-num">Nº</th>
-              <th className="cd-col-nome">Nome de Guerra</th>
-              <th className="cd-col-tipo">Tipo</th>
-              <th className="cd-col-data">Data</th>
-              <th className="cd-col-dec">Decisão</th>
-              <th className="cd-col-obs">Obs.</th>
-              <th className="cd-col-pont" style={{ textAlign: "right" }}>Pont.</th>
-            </tr>
-          </thead>
-          <tbody>
-            {caderno.items.map((item) => (
-              <tr key={item.id}>
-                <td className="cd-col-proto" style={{ fontFamily: "monospace", fontSize: "7pt" }}>
-                  {item.communication.protocolNumber}
-                </td>
-                <td className="cd-col-enq" style={{ color: "#1e3a8a", fontSize: "7pt" }}>
-                  {fmtEnq(item.communication.article, item.communication.item, item.communication.letter)}
-                </td>
-                <td className="cd-col-pel">{item.student.platoon?.name ?? "—"}</td>
-                <td className="cd-col-num" style={{ fontFamily: "monospace", textAlign: "center" }}>
-                  {item.studentCourseNumber}
-                </td>
-                <td className="cd-col-nome" style={{ fontWeight: "bold" }}>{item.studentWarName}</td>
-                <td className="cd-col-tipo">{item.recordType}</td>
-                <td className="cd-col-data">{format(new Date(item.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
-                <td className="cd-col-dec">{item.decisionSummary}</td>
-                <td className="cd-col-obs" style={{ fontSize: "7pt", color: "#666" }}>{item.shortObservation ?? "—"}</td>
-                <td className="cd-col-pont" style={{ textAlign: "right", fontWeight: "bold" }}>
-                  {item.score != null ? item.score.toFixed(1) : "—"}
-                </td>
-              </tr>
-            ))}
-            {caderno.items.length === 0 && (
-              <tr><td colSpan={10} style={{ textAlign: "center", color: "#888", padding: "16px" }}>Nenhum registro.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {/* Tabelas separadas por tipo */}
+      {grupos.map((g) => (
+        <TabelaTipo key={g.label} label={g.label} items={g.itens} />
+      ))}
+
+      {totalRegistros === 0 && (
+        <div className="print-section">
+          <p style={{ textAlign: "center", color: "#9ca3af", fontSize: "9pt" }}>Nenhum registro neste caderno.</p>
+        </div>
+      )}
 
       {comandante && (
         <div className="print-signatures" style={{ marginTop: 48 }}>

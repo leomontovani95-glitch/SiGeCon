@@ -52,10 +52,22 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
 
   const comunicacoes = await prisma.communication.findMany({
     where,
-    orderBy: { createdAt: "desc" },
-    include: { type: true, student: true, reporter: true },
-    take: 100,
+    orderBy: [{ courseId: "asc" }, { createdAt: "desc" }],
+    include: { type: true, student: true, reporter: true, course: true },
+    take: 200,
   });
+
+  // Agrupa por curso mantendo a ordem dos cursos
+  const cursosOrdem: string[] = [];
+  const porCurso = new Map<string, { nome: string; itens: typeof comunicacoes }>();
+  for (const c of comunicacoes) {
+    const cid = c.courseId;
+    if (!porCurso.has(cid)) {
+      cursosOrdem.push(cid);
+      porCurso.set(cid, { nome: c.course.name, itens: [] });
+    }
+    porCurso.get(cid)!.itens.push(c);
+  }
 
   const canCreate = session.role !== "ALUNO";
 
@@ -75,7 +87,7 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
         )}
       </div>
 
-      <form method="GET" className="flex gap-3 mb-4 flex-wrap">
+      <form method="GET" className="flex gap-3 mb-6 flex-wrap">
         <input name="busca" defaultValue={busca} placeholder="Protocolo, nome de guerra..." className="input max-w-xs" />
         <select name="status" defaultValue={status} className="input max-w-xs">
           <option value="">Todos os status</option>
@@ -84,41 +96,63 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
         <button type="submit" className="btn-primary px-6">Filtrar</button>
       </form>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="text-left px-4 py-3 font-medium text-gray-700">Protocolo</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-700">Tipo</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-700">Aluno</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-700">Data do Fato</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-700">Status</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-700">Ações</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {comunicacoes.map((c) => (
-              <tr key={c.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-mono text-xs text-gray-700">{c.protocolNumber}</td>
-                <td className="px-4 py-3 text-gray-600">{c.type.name}</td>
-                <td className="px-4 py-3 font-medium text-gray-900">{c.student.warName}</td>
-                <td className="px-4 py-3 text-gray-500">{format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
-                <td className="px-4 py-3">
-                  <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${STATUS_COLORS[c.status] ?? "bg-gray-100 text-gray-700"}`}>
-                    {STATUS_LABELS[c.status] ?? c.status}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <Link href={`/comunicacoes/${c.id}`} className="text-xs text-[#1e3a5f] hover:underline">Detalhes</Link>
-                </td>
-              </tr>
-            ))}
-            {comunicacoes.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">Nenhuma comunicação encontrada.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {comunicacoes.length === 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 px-6 py-10 text-center text-gray-400">
+          Nenhuma comunicação encontrada.
+        </div>
+      )}
+
+      {cursosOrdem.map((cid) => {
+        const grupo = porCurso.get(cid)!;
+        return (
+          <div key={cid} className="mb-8">
+            {/* Cabeçalho do curso */}
+            <div className="flex items-center gap-3 mb-2">
+              <h2 className="text-base font-bold text-[#1e3a5f] uppercase tracking-wide">
+                {grupo.nome}
+              </h2>
+              <span className="text-xs text-gray-400 font-normal">
+                {grupo.itens.length} registro(s)
+              </span>
+            </div>
+
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left px-3 py-2.5 font-medium text-gray-600 text-xs whitespace-nowrap">Protocolo</th>
+                    <th className="text-left px-3 py-2.5 font-medium text-gray-600 text-xs whitespace-nowrap">Tipo</th>
+                    <th className="text-left px-3 py-2.5 font-medium text-gray-600 text-xs whitespace-nowrap">Nº</th>
+                    <th className="text-left px-3 py-2.5 font-medium text-gray-600 text-xs whitespace-nowrap">Aluno</th>
+                    <th className="text-left px-3 py-2.5 font-medium text-gray-600 text-xs whitespace-nowrap">Data do Fato</th>
+                    <th className="text-left px-3 py-2.5 font-medium text-gray-600 text-xs whitespace-nowrap">Status</th>
+                    <th className="px-3 py-2.5"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {grupo.itens.map((c) => (
+                    <tr key={c.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2.5 font-mono text-xs text-gray-600 whitespace-nowrap">{c.protocolNumber}</td>
+                      <td className="px-3 py-2.5 text-xs text-gray-600 whitespace-nowrap">{c.type.name}</td>
+                      <td className="px-3 py-2.5 font-mono text-xs text-gray-500 whitespace-nowrap text-center">{c.courseNumber}</td>
+                      <td className="px-3 py-2.5 font-medium text-gray-900 text-xs whitespace-nowrap">{c.student.warName}</td>
+                      <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[c.status] ?? "bg-gray-100 text-gray-700"}`}>
+                          {STATUS_LABELS[c.status] ?? c.status}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
+                        <Link href={`/comunicacoes/${c.id}`} className="text-xs text-[#1e3a5f] hover:underline font-medium">Ver</Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
