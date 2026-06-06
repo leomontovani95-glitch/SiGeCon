@@ -5,8 +5,10 @@ import { ptBR } from "date-fns/locale";
 import Link from "next/link";
 
 const STATUS_LABELS: Record<string, string> = {
-  REGISTRADA: "Registrada", AGUARDANDO_CIENCIA: "Ag. Ciência",
-  AGUARDANDO_DEFESA: "Ag. Defesa", JUSTIFICATIVA_APRESENTADA: "Defesa Apresentada",
+  REGISTRADA: "Registrada",
+  AGUARDANDO_CIENCIA: "Ag. Ciência/Defesa",
+  AGUARDANDO_DEFESA: "Ag. Ciência/Defesa",
+  JUSTIFICATIVA_APRESENTADA: "Defesa Apresentada",
   PRAZO_EXPIRADO: "Prazo Expirado", AGUARDANDO_PARECER: "Ag. Parecer",
   PARECER_EMITIDO: "Parecer Emitido", AGUARDANDO_DECISAO: "Ag. Decisão",
   DECIDIDA: "Decidida", ARQUIVADA: "Arquivada", PUBLICADA_CADERNO: "Pub. Caderno",
@@ -16,7 +18,7 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_COLORS: Record<string, string> = {
   REGISTRADA: "bg-blue-100 text-blue-700",
   AGUARDANDO_CIENCIA: "bg-yellow-100 text-yellow-700",
-  AGUARDANDO_DEFESA: "bg-orange-100 text-orange-700",
+  AGUARDANDO_DEFESA: "bg-yellow-100 text-yellow-700",
   PRAZO_EXPIRADO: "bg-red-100 text-red-700",
   AGUARDANDO_PARECER: "bg-purple-100 text-purple-700",
   AGUARDANDO_DECISAO: "bg-indigo-100 text-indigo-700",
@@ -91,7 +93,13 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
         <input name="busca" defaultValue={busca} placeholder="Protocolo, nome de guerra..." className="input max-w-xs" />
         <select name="status" defaultValue={status} className="input max-w-xs">
           <option value="">Todos os status</option>
-          {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          <option value="AGUARDANDO_CIENCIA">Ag. Ciência/Defesa</option>
+          <option value="PRAZO_EXPIRADO">Prazo Expirado</option>
+          <option value="JUSTIFICATIVA_APRESENTADA">Defesa Apresentada</option>
+          <option value="AGUARDANDO_PARECER">Ag. Parecer</option>
+          <option value="AGUARDANDO_DECISAO">Ag. Decisão</option>
+          <option value="DECIDIDA">Decidida</option>
+          <option value="ARQUIVADA">Arquivada</option>
         </select>
         <button type="submit" className="btn-primary px-6">Filtrar</button>
       </form>
@@ -116,8 +124,8 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
               </span>
             </div>
 
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <table className="w-full text-sm">
+            <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+              <table className="w-full text-sm min-w-max">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="text-left px-3 py-2.5 font-medium text-gray-600 text-xs whitespace-nowrap">Protocolo</th>

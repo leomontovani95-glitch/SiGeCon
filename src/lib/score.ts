@@ -1,8 +1,30 @@
-// Status que têm pontuação aplicada — usados para filtrar comunicações antes de calcular a nota
+// Mantido por compatibilidade com código legado
 export const STATUS_COM_PONTUACAO = [
   "PUBLICADA_CADERNO",
   "FINALIZADA",
 ] as const;
+
+// Calcula a nota a partir de itens de cadernos PUBLICADOS.
+// score positivo = favorável (RE, EBI), negativo = desfavorável (CPI).
+// Alunos podem ultrapassar 10 com registros elogiosos.
+export function calcularNotaPublicada(
+  items: Array<{
+    score: number | null;
+    communication: { type: { scoreNature: string } };
+  }>
+): number {
+  let nota = 10;
+  for (const item of items) {
+    if (item.score == null) continue;
+    const magnitude = Math.abs(item.score);
+    if (item.communication.type.scoreNature === "DESFAVORAVEL") {
+      nota -= magnitude;
+    } else {
+      nota += magnitude;
+    }
+  }
+  return Math.round(nota * 100) / 100;
+}
 
 export function calcularNota(
   comunicacoesDecididas: Array<{

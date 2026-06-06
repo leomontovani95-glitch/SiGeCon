@@ -23,8 +23,10 @@ export default async function CadernoPage() {
       orderBy: [{ courseId: "asc" }, { number: "asc" }],
       include: { createdBy: true, publishedBy: true, course: true, _count: { select: { items: true } } },
     }),
-    // Conta registros decididos ainda não publicados em caderno (todos, sem filtro de escola)
-    prisma.communication.count({ where: { status: "DECIDIDA" } }),
+    // Conta registros DECIDIDA que ainda não foram inseridos em nenhum caderno
+    prisma.communication.count({
+      where: { status: "DECIDIDA", disciplinaryBookItems: { none: {} } },
+    }),
   ]);
 
   return (

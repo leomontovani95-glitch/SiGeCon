@@ -4,9 +4,10 @@ import { useEffect } from "react";
 type Props = {
   title: string;
   children: React.ReactNode;
+  extraStyles?: string;
 };
 
-export default function PrintLayout({ title, children }: Props) {
+export default function PrintLayout({ title, children, extraStyles }: Props) {
   useEffect(() => {
     document.title = title;
   }, [title]);
@@ -57,10 +58,11 @@ export default function PrintLayout({ title, children }: Props) {
           gap: 8px;
         }
         .print-header-logo {
-          height: 56pt;
-          width: auto;
+          height: 60pt;
+          width: 60pt;
           object-fit: contain;
           flex-shrink: 0;
+          display: block;
         }
         .print-header-text {
           flex: 1;
@@ -120,24 +122,26 @@ export default function PrintLayout({ title, children }: Props) {
         <button onClick={() => window.history.back()}>Voltar</button>
       </div>
 
+      {extraStyles && <style>{extraStyles}</style>}
+
       <div className="print-page">
         {/* Cabeçalho institucional com logos */}
         <div className="print-header">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-pmes.png" alt="PMES" className="print-header-logo" />
+          <img src="/logo-pmes.png" alt="PMES" className="print-header-logo" width={68} height={68} loading="eager" />
           <div className="print-header-text">
             <p className="linha1">Governo do Estado do Espírito Santo</p>
             <p className="linha2">Polícia Militar</p>
             <p className="linha3">Academia de Polícia Militar</p>
           </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brasao-apm.png" alt="APM/ES" className="print-header-logo" />
+          <img src="/brasao-apm.png" alt="APM/ES" className="print-header-logo" width={68} height={68} loading="eager" />
         </div>
 
         {children}
 
         <div className="print-footer">
-          <span>SiGeCon — Documento gerado em {new Date().toLocaleString("pt-BR")}</span>
+          <span suppressHydrationWarning>SiGeCon — Documento gerado em {new Date().toLocaleString("pt-BR")}</span>
           <span>Documento de uso interno — APM/ES</span>
         </div>
       </div>

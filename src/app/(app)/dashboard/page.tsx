@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
-import { calcularNota, faixaNota, zonaDeRisco, STATUS_COM_PONTUACAO } from "@/lib/score";
+import { calcularNotaPublicada, faixaNota, zonaDeRisco } from "@/lib/score";
 import Link from "next/link";
 
 // ── Dashboard do ALUNO ────────────────────────────────────────────────────
@@ -18,20 +18,23 @@ async function getDashboardAluno(email: string) {
   });
   if (!aluno) return null;
 
+  const pubItems = await prisma.disciplinaryBookItem.findMany({
+    where: { studentId: aluno.id, disciplinaryBook: { status: "PUBLICADO" } },
+    include: { communication: { include: { type: { select: { scoreNature: true } } } } },
+  });
+
   const comms = aluno.communications;
-  const comPontuacao = comms.filter(
-    (c) => (STATUS_COM_PONTUACAO as readonly string[]).includes(c.status) && c.finalScore != null
-  );
+  const favoraveisPublicados = pubItems.filter((i) => i.communication.type.scoreNature === "FAVORAVEL").length;
 
   return {
     aluno,
-    nota: calcularNota(comPontuacao),
-    pendenteCiencia: comms.filter((c) => c.status === "AGUARDANDO_CIENCIA").length,
-    aguardandoDefesa: comms.filter((c) => c.status === "AGUARDANDO_DEFESA").length,
+    nota: calcularNotaPublicada(pubItems),
+    pendenteCiencia: comms.filter((c) => c.status === "AGUARDANDO_CIENCIA" || c.status === "AGUARDANDO_DEFESA").length,
+    aguardandoDefesa: 0,
     prazoVencido: comms.filter((c) => c.status === "PRAZO_EXPIRADO").length,
-    decididas: comPontuacao.length,
-    favoraveis: comPontuacao.filter((c) => c.type.scoreNature === "FAVORAVEL").length,
-    publicadas: comms.filter((c) => c.status === "PUBLICADA_CADERNO").length,
+    decididas: pubItems.length,
+    favoraveis: favoraveisPublicados,
+    publicadas: pubItems.length,
     totalCPIs: comms.filter((c) => c.type.name.startsWith("CPI")).length,
     pendentes: comms.filter((c) =>
       ["AGUARDANDO_CIENCIA", "AGUARDANDO_DEFESA", "PRAZO_EXPIRADO"].includes(c.status)
@@ -65,23 +68,27 @@ async function getDashboardGeral(role: string, userId: string) {
     prisma.communication.count({ where: { ...filtroReporter, status: "PUBLICADA_CADERNO" } }),
   ]);
 
-  const students = await prisma.student.findMany({
-    where: { status: "ATIVO" },
-    include: {
-      communications: {
-        where: { status: { in: [...STATUS_COM_PONTUACAO] }, finalScore: { not: null } },
-        include: { type: true },
-      },
-    },
-  });
+  const [students, allPubItems] = await Promise.all([
+    prisma.student.findMany({ where: { status: "ATIVO" } }),
+    prisma.disciplinaryBookItem.findMany({
+      where: { disciplinaryBook: { status: "PUBLICADO" } },
+      include: { communication: { include: { type: { select: { scoreNature: true } } } } },
+    }),
+  ]);
+
+  const pubPorAluno = new Map<string, typeof allPubItems>();
+  for (const item of allPubItems) {
+    if (!pubPorAluno.has(item.studentId)) pubPorAluno.set(item.studentId, []);
+    pubPorAluno.get(item.studentId)!.push(item);
+  }
 
   const studentsWithNota = students.map((s) => ({
     ...s,
-    nota: calcularNota(s.communications),
+    nota: calcularNotaPublicada(pubPorAluno.get(s.id) ?? []),
   }));
 
   return {
-    cards: { totalCPIs, aguardandoCiencia, aguardandoDefesa, prazoVencido, aguardandoParecer, aguardandoDecisao, decididas, referencias, publicadas },
+    cards: { totalCPIs, aguardandoCienciaDefesa: aguardandoCiencia + aguardandoDefesa, prazoVencido, aguardandoParecer, aguardandoDecisao, decididas, referencias, publicadas },
     zonaRisco: studentsWithNota.filter((s) => zonaDeRisco(s.nota)),
   };
 }
@@ -144,8 +151,7 @@ export default async function DashboardPage() {
         {/* Cards pessoais */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
           {[
-            { label: "Aguardando minha ciência", value: pendenteCiencia, color: "bg-yellow-500", urgent: pendenteCiencia > 0 },
-            { label: "Aguardando minha defesa", value: aguardandoDefesa, color: "bg-orange-500", urgent: aguardandoDefesa > 0 },
+            { label: "Aguardando minha ciência/defesa", value: pendenteCiencia, color: "bg-yellow-500", urgent: pendenteCiencia > 0 },
             { label: "Prazo de defesa vencido", value: prazoVencido, color: "bg-red-600", urgent: prazoVencido > 0 },
             { label: "Registros decididos", value: decididas, color: "bg-green-600", urgent: false },
             { label: "Registros favoráveis", value: favoraveis, color: "bg-teal-600", urgent: false },
@@ -174,13 +180,11 @@ export default async function DashboardPage() {
                     <p className="text-xs text-gray-500">{c.type.name}</p>
                   </div>
                   <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                    c.status === "AGUARDANDO_CIENCIA" ? "bg-yellow-200 text-yellow-900" :
                     c.status === "PRAZO_EXPIRADO" ? "bg-red-200 text-red-900" :
                     "bg-orange-200 text-orange-900"
                   }`}>
-                    {c.status === "AGUARDANDO_CIENCIA" ? "Aguardando sua ciência" :
-                     c.status === "AGUARDANDO_DEFESA" ? "Aguardando sua defesa" :
-                     "Prazo de defesa vencido"}
+                    {c.status === "PRAZO_EXPIRADO" ? "Prazo de defesa vencido" :
+                     "Aguardando sua ciência/defesa"}
                   </span>
                 </Link>
               ))}
@@ -202,8 +206,7 @@ export default async function DashboardPage() {
 
   const cards = [
     { label: "CPIs Registradas", value: data.cards.totalCPIs, color: "bg-blue-600" },
-    { label: "Aguardando Ciência", value: data.cards.aguardandoCiencia, color: "bg-yellow-500" },
-    { label: "Aguardando Defesa", value: data.cards.aguardandoDefesa, color: "bg-orange-500" },
+    { label: "Ag. Ciência/Defesa do Aluno", value: data.cards.aguardandoCienciaDefesa, color: "bg-yellow-500" },
     { label: "Prazo Vencido", value: data.cards.prazoVencido, color: "bg-red-600" },
     { label: "Aguardando Parecer", value: data.cards.aguardandoParecer, color: "bg-purple-600" },
     { label: "Aguardando Decisão", value: data.cards.aguardandoDecisao, color: "bg-indigo-600" },

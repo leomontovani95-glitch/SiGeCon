@@ -7,8 +7,10 @@ import AcoesComm from "../_components/AcoesComm";
 import Link from "next/link";
 
 const STATUS_LABELS: Record<string, string> = {
-  REGISTRADA: "Registrada", AGUARDANDO_CIENCIA: "Aguardando Ciência do Aluno",
-  AGUARDANDO_DEFESA: "Aguardando Justificativa/Defesa", JUSTIFICATIVA_APRESENTADA: "Justificativa/Defesa Apresentada",
+  REGISTRADA: "Registrada",
+  AGUARDANDO_CIENCIA: "Aguardando Ciência/Defesa do Aluno",
+  AGUARDANDO_DEFESA: "Aguardando Ciência/Defesa do Aluno",
+  JUSTIFICATIVA_APRESENTADA: "Justificativa/Defesa Apresentada",
   PRAZO_EXPIRADO: "Prazo Expirado", AGUARDANDO_PARECER: "Aguardando Parecer",
   PARECER_EMITIDO: "Parecer Emitido", AGUARDANDO_DECISAO: "Aguardando Decisão do Comandante",
   DECIDIDA: "Decidida", ARQUIVADA: "Arquivada", PUBLICADA_CADERNO: "Publicada em Caderno",

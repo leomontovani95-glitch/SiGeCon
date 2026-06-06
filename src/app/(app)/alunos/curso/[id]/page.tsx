@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { verifySession, getSchoolFilter } from "@/lib/dal";
 import { redirect, notFound } from "next/navigation";
-import { calcularNota, faixaNota, STATUS_COM_PONTUACAO } from "@/lib/score";
+import { calcularNotaPublicada, faixaNota } from "@/lib/score";
 import Link from "next/link";
 import { Suspense } from "react";
 import SortableHeader from "../../_components/SortableHeader";
@@ -68,25 +68,32 @@ export default async function CursoAlunosPage({
     } : {}),
   };
 
-  // Busca todos os alunos (necessário para ordenação JS e contagem total)
-  const allStudents = await prisma.student.findMany({
-    where,
-    orderBy: JS_SORT.includes(sortBy) ? { warName: "asc" } : buildOrderBy(sortBy, sortDir),
-    include: {
-      platoon: true,
-      communications: {
-        where: { status: { in: [...STATUS_COM_PONTUACAO] }, finalScore: { not: null } },
-        include: { type: true },
-      },
-    },
-  });
+  // Busca alunos e itens de cadernos publicados em paralelo
+  const [allStudents, publishedItems] = await Promise.all([
+    prisma.student.findMany({
+      where,
+      orderBy: JS_SORT.includes(sortBy) ? { warName: "asc" } : buildOrderBy(sortBy, sortDir),
+      include: { platoon: true },
+    }),
+    prisma.disciplinaryBookItem.findMany({
+      where: { courseId: id, disciplinaryBook: { status: "PUBLICADO" } },
+      include: { communication: { include: { type: { select: { scoreNature: true } } } } },
+    }),
+  ]);
+
+  // Agrupa itens publicados por aluno
+  const pubPorAluno = new Map<string, typeof publishedItems>();
+  for (const item of publishedItems) {
+    if (!pubPorAluno.has(item.studentId)) pubPorAluno.set(item.studentId, []);
+    pubPorAluno.get(item.studentId)!.push(item);
+  }
 
   // Ordenação numérica/calculada em JS
   const sorted = JS_SORT.includes(sortBy)
     ? [...allStudents].sort((a, b) => {
         const diff = sortBy === "courseNumber"
           ? (parseInt(a.courseNumber, 10) || 0) - (parseInt(b.courseNumber, 10) || 0)
-          : calcularNota(a.communications) - calcularNota(b.communications);
+          : calcularNotaPublicada(pubPorAluno.get(a.id) ?? []) - calcularNotaPublicada(pubPorAluno.get(b.id) ?? []);
         return sortDir === "asc" ? diff : -diff;
       })
     : allStudents;
@@ -158,7 +165,7 @@ export default async function CursoAlunosPage({
           </thead>
           <tbody className="divide-y divide-gray-100">
             {paginated.map((a) => {
-              const nota  = calcularNota(a.communications);
+              const nota  = calcularNotaPublicada(pubPorAluno.get(a.id) ?? []);
               const faixa = faixaNota(nota);
               return (
                 <tr key={a.id} className="hover:bg-gray-50">

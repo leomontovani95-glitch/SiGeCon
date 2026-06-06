@@ -137,41 +137,29 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
   const grupos = GRUPOS.map((g) => ({ ...g, itens: itens.filter(g.filter) }));
   const totalRegistros = itens.length;
 
+  const extraStyles = `
+    @media print {
+      @page { size: A4 landscape; margin: 12mm 12mm 12mm 15mm; }
+      .print-page { padding: 0 !important; box-shadow: none !important; width: auto !important; }
+    }
+    @media screen { .print-page { width: 270mm !important; } }
+    .cd-table { width: 100%; border-collapse: collapse; font-size: 7.5pt; table-layout: fixed; }
+    .cd-table th { background: #1e3a5f; color: white; padding: 4px 5px; font-size: 7pt; text-align: left; overflow: hidden; white-space: nowrap; }
+    .cd-table td { padding: 3.5px 5px; border-bottom: 1px solid #e5e7eb; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+    .cd-table tr:nth-child(even) td { background: #f9fafb; }
+    .cd-col-proto { width: 16%; }
+    .cd-col-enq   { width: 11%; }
+    .cd-col-pel   { width: 9%; }
+    .cd-col-num   { width: 4%; }
+    .cd-col-nome  { width: 10%; }
+    .cd-col-data  { width: 9%; }
+    .cd-col-dec   { width: 26%; white-space: normal !important; }
+    .cd-col-obs   { width: 8%; }
+    .cd-col-pont  { width: 5%; text-align: right; }
+  `;
+
   return (
-    <PrintLayout title={`Caderno Disciplinar ${numero}`}>
-      <style>{`
-        @media print {
-          @page { size: A4 landscape; margin: 12mm 12mm 12mm 15mm; }
-          .print-page { padding: 0 !important; box-shadow: none !important; width: auto !important; }
-        }
-        @media screen {
-          .print-page { width: 270mm !important; }
-        }
-        .cd-table {
-          width: 100%; border-collapse: collapse; font-size: 7.5pt;
-          table-layout: fixed;
-        }
-        .cd-table th {
-          background: #1e3a5f; color: white;
-          padding: 4px 5px; font-size: 7pt; text-align: left;
-          overflow: hidden; white-space: nowrap;
-        }
-        .cd-table td {
-          padding: 3.5px 5px; border-bottom: 1px solid #e5e7eb;
-          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-          vertical-align: middle;
-        }
-        .cd-table tr:nth-child(even) td { background: #f9fafb; }
-        .cd-col-proto { width: 14%; }
-        .cd-col-enq   { width: 14%; }
-        .cd-col-pel   { width: 8%; }
-        .cd-col-num   { width: 4%; }
-        .cd-col-nome  { width: 10%; }
-        .cd-col-data  { width: 7%; }
-        .cd-col-dec   { width: 30%; white-space: normal !important; }
-        .cd-col-obs   { width: 5%; }
-        .cd-col-pont  { width: 5%; text-align: right; }
-      `}</style>
+    <PrintLayout title={`Caderno Disciplinar ${numero}`} extraStyles={extraStyles}>
 
       {/* Cabeçalho */}
       <div className="print-section">

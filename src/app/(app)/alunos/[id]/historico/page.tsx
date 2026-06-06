@@ -4,38 +4,43 @@ import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import PrintLayout from "@/components/PrintLayout";
-import { calcularNota, faixaNota, STATUS_COM_PONTUACAO } from "@/lib/score";
+import { calcularNotaPublicada, faixaNota } from "@/lib/score";
 
 export default async function HistoricoAlunoPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await verifySession();
   const { id } = await params;
 
-  const aluno = await prisma.student.findUnique({
-    where: { id },
-    include: {
-      course: true,
-      platoon: true,
-      communications: {
-        include: { type: true, decisions: { include: { authority: true } } },
-        orderBy: { factDate: "asc" },
+  const [aluno, pubItems] = await Promise.all([
+    prisma.student.findUnique({
+      where: { id },
+      include: {
+        course: true,
+        platoon: true,
+        communications: {
+          include: { type: true, decisions: { include: { authority: true } } },
+          orderBy: { factDate: "asc" },
+        },
       },
-    },
-  });
+    }),
+    prisma.disciplinaryBookItem.findMany({
+      where: { studentId: id, disciplinaryBook: { status: "PUBLICADO" } },
+      include: { communication: { include: { type: { select: { scoreNature: true } } } } },
+    }),
+  ]);
   if (!aluno) notFound();
 
   if (session.role === "ALUNO" && aluno.email !== session.email) notFound();
 
-  const decididas = aluno.communications.filter(
-    (c) => (STATUS_COM_PONTUACAO as readonly string[]).includes(c.status) && c.finalScore != null
-  );
-  const nota = calcularNota(decididas);
+  const nota  = calcularNotaPublicada(pubItems);
   const faixa = faixaNota(nota);
 
-  const desfavoravel = decididas.filter((c) => c.type.scoreNature === "DESFAVORAVEL").reduce((s, c) => s + (c.finalScore ?? 0), 0);
-  const favoravel = decididas.filter((c) => c.type.scoreNature === "FAVORAVEL").reduce((s, c) => s + (c.finalScore ?? 0), 0);
+  const desfavoravel = pubItems.filter((i) => i.communication.type.scoreNature === "DESFAVORAVEL").reduce((s, i) => s + Math.abs(i.score ?? 0), 0);
+  const favoravel    = pubItems.filter((i) => i.communication.type.scoreNature === "FAVORAVEL").reduce((s, i) => s + Math.abs(i.score ?? 0), 0);
 
   const STATUS_LABELS: Record<string, string> = {
-    REGISTRADA: "Registrada", AGUARDANDO_CIENCIA: "Ag. Ciência", AGUARDANDO_DEFESA: "Ag. Defesa",
+    REGISTRADA: "Registrada",
+    AGUARDANDO_CIENCIA: "Ag. Ciência/Defesa",
+    AGUARDANDO_DEFESA: "Ag. Ciência/Defesa",
     JUSTIFICATIVA_APRESENTADA: "Defesa Apresentada", PRAZO_EXPIRADO: "Prazo Expirado",
     AGUARDANDO_PARECER: "Ag. Parecer", AGUARDANDO_DECISAO: "Ag. Decisão",
     DECIDIDA: "Decidida", ARQUIVADA: "Arquivada", PUBLICADA_CADERNO: "Pub. Caderno", FINALIZADA: "Finalizada",

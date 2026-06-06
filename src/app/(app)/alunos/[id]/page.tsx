@@ -1,14 +1,16 @@
 import { prisma } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
-import { calcularNota, faixaNota, zonaDeRisco, STATUS_COM_PONTUACAO } from "@/lib/score";
+import { calcularNotaPublicada, faixaNota, zonaDeRisco } from "@/lib/score";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 const STATUS_MAP: Record<string, string> = {
-  REGISTRADA: "Registrada", AGUARDANDO_CIENCIA: "Ag. Ciência",
-  AGUARDANDO_DEFESA: "Ag. Defesa", PRAZO_EXPIRADO: "Prazo Expirado",
+  REGISTRADA: "Registrada",
+  AGUARDANDO_CIENCIA: "Ag. Ciência/Defesa",
+  AGUARDANDO_DEFESA: "Ag. Ciência/Defesa",
+  PRAZO_EXPIRADO: "Prazo Expirado",
   AGUARDANDO_PARECER: "Ag. Parecer", AGUARDANDO_DECISAO: "Ag. Decisão",
   DECIDIDA: "Decidida", ARQUIVADA: "Arquivada",
   PUBLICADA_CADERNO: "Publicada em Caderno", FINALIZADA: "Finalizada",
@@ -23,32 +25,35 @@ export default async function AlunoPage({ params }: { params: Promise<{ id: stri
     if (!aluno) notFound();
   }
 
-  const aluno = await prisma.student.findUnique({
-    where: { id },
-    include: {
-      course: true,
-      platoon: true,
-      communications: {
-        include: { type: true, decisions: { include: { authority: true } } },
-        orderBy: { createdAt: "desc" },
+  const [aluno, pubItems] = await Promise.all([
+    prisma.student.findUnique({
+      where: { id },
+      include: {
+        course: true,
+        platoon: true,
+        communications: {
+          include: { type: true, decisions: { include: { authority: true } } },
+          orderBy: { createdAt: "desc" },
+        },
       },
-    },
-  });
+    }),
+    prisma.disciplinaryBookItem.findMany({
+      where: { studentId: id, disciplinaryBook: { status: "PUBLICADO" } },
+      include: { communication: { include: { type: { select: { scoreNature: true } } } } },
+    }),
+  ]);
   if (!aluno) notFound();
 
-  const decididas = aluno.communications.filter(
-    (c) => (STATUS_COM_PONTUACAO as readonly string[]).includes(c.status) && c.finalScore != null
-  );
-  const nota = calcularNota(decididas);
+  const nota  = calcularNotaPublicada(pubItems);
   const faixa = faixaNota(nota);
   const risco = zonaDeRisco(nota);
 
-  const totalDesfavoravel = decididas
-    .filter((c) => c.type.scoreNature === "DESFAVORAVEL")
-    .reduce((s, c) => s + (c.finalScore ?? 0), 0);
-  const totalFavoravel = decididas
-    .filter((c) => c.type.scoreNature === "FAVORAVEL")
-    .reduce((s, c) => s + (c.finalScore ?? 0), 0);
+  const totalDesfavoravel = pubItems
+    .filter((i) => i.communication.type.scoreNature === "DESFAVORAVEL")
+    .reduce((s, i) => s + Math.abs(i.score ?? 0), 0);
+  const totalFavoravel = pubItems
+    .filter((i) => i.communication.type.scoreNature === "FAVORAVEL")
+    .reduce((s, i) => s + Math.abs(i.score ?? 0), 0);
 
   return (
     <div className="p-6 max-w-4xl">
