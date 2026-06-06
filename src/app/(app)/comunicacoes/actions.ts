@@ -48,6 +48,7 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
   if (!aluno) return { error: "Aluno não encontrado." };
 
   const protocolNumber = await gerarProtocolo(tipo.name, aluno.course.name);
+  let commId: string;
   try {
     const comm = await prisma.communication.create({
       data: {
@@ -63,11 +64,12 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
         status: "AGUARDANDO_CIENCIA",
       },
     });
-    await auditLog(session.userId, "CREATE", "Communication", comm.id, `Protocolo: ${protocolNumber}`);
-    redirect(`/comunicacoes/${comm.id}`);
+    commId = comm.id;
   } catch {
     return { error: "Erro ao registrar comunicação." };
   }
+  try { await auditLog(session.userId, "CREATE", "Communication", commId, `Protocolo: ${protocolNumber}`); } catch {}
+  redirect(`/comunicacoes/${commId}`);
 }
 
 // ── Tomar ciência e apresentar defesa (formulário único) ─────────────────

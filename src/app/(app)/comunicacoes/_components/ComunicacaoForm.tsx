@@ -12,8 +12,9 @@ type AlunoInfo = {
   id: string; warName: string; fullName: string;
   courseNumber: string; course: string; platoon: string | null;
 };
+type Curso = { id: string; name: string };
 
-type Props = { tipos: Tipo[]; regras: Regra[] };
+type Props = { tipos: Tipo[]; regras: Regra[]; cursos?: Curso[] };
 
 // ── helpers de cascata ────────────────────────────────────────────────────
 function artigos(regras: Regra[]) {
@@ -43,8 +44,11 @@ function alineas(regras: Regra[], article: string, item: string) {
 }
 
 // ── componente ────────────────────────────────────────────────────────────
-export default function ComunicacaoForm({ tipos, regras }: Props) {
+export default function ComunicacaoForm({ tipos, regras, cursos }: Props) {
   const [state, formAction, pending] = useActionState(registrarComunicacao, undefined);
+
+  // Curso selecionado (quando lista é fornecida)
+  const [cursoSelecionadoId, setCursoSelecionadoId] = useState("");
 
   // Aluno
   const [numCurso, setNumCurso] = useState("");
@@ -99,13 +103,15 @@ export default function ComunicacaoForm({ tipos, regras }: Props) {
     if (!num.trim()) { setAluno(null); setErroAluno(""); return; }
     setBuscando(true); setErroAluno("");
     try {
-      const res = await fetch(`/api/alunos/por-numero?q=${encodeURIComponent(num.trim())}`);
+      const params = new URLSearchParams({ q: num.trim() });
+      if (cursoSelecionadoId) params.set("courseId", cursoSelecionadoId);
+      const res = await fetch(`/api/alunos/por-numero?${params}`);
       const data = await res.json();
       if (data.aluno) { setAluno(data.aluno); setErroAluno(""); }
       else { setAluno(null); setErroAluno("Nenhum aluno encontrado com este número de curso."); }
     } catch { setErroAluno("Erro ao buscar aluno."); }
     finally { setBuscando(false); }
-  }, []);
+  }, [cursoSelecionadoId]);
 
   function handleNumChange(val: string) {
     setNumCurso(val);
@@ -115,11 +121,41 @@ export default function ComunicacaoForm({ tipos, regras }: Props) {
 
   const dispositivoCompleto = !!ruleId;
 
+  const cursoObrigatorio = cursos && cursos.length > 0;
+  const cursoOk = !cursoObrigatorio || !!cursoSelecionadoId;
+
   return (
     <form action={formAction} className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
 
+      {/* ── SELEÇÃO DO CURSO ──────────────────────────────────────── */}
+      {cursoObrigatorio && (
+        <fieldset className="border border-indigo-200 rounded-lg p-4 bg-indigo-50">
+          <legend className="text-sm font-semibold text-indigo-800 px-2">Curso</legend>
+          <div className="mt-2">
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Selecione o curso do aluno <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={cursoSelecionadoId}
+              onChange={(e) => {
+                setCursoSelecionadoId(e.target.value);
+                setAluno(null);
+                setNumCurso("");
+                setErroAluno("");
+              }}
+              className="input"
+            >
+              <option value="">— Selecione o curso —</option>
+              {cursos!.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+        </fieldset>
+      )}
+
       {/* ── IDENTIFICAÇÃO DO ALUNO ─────────────────────────────────── */}
-      <fieldset className="border border-blue-200 rounded-lg p-4 bg-blue-50">
+      <fieldset className={`border rounded-lg p-4 ${cursoOk ? "border-blue-200 bg-blue-50" : "border-gray-200 bg-gray-50 opacity-60"}`}>
         <legend className="text-sm font-semibold text-blue-800 px-2">Identificação do Aluno</legend>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
           <div>
@@ -127,8 +163,10 @@ export default function ComunicacaoForm({ tipos, regras }: Props) {
             <input
               value={numCurso}
               onChange={(e) => handleNumChange(e.target.value)}
-              placeholder="Digite o número (ex: 001)"
-              className="input" autoComplete="off"
+              placeholder={cursoOk ? "Digite o número (ex: 001)" : "Selecione o curso primeiro"}
+              disabled={!cursoOk}
+              className="input disabled:cursor-not-allowed"
+              autoComplete="off"
             />
             {buscando && <p className="text-xs text-blue-600 mt-1">Buscando...</p>}
             {erroAluno && <p className="text-xs text-red-600 mt-1">{erroAluno}</p>}
@@ -317,16 +355,17 @@ export default function ComunicacaoForm({ tipos, regras }: Props) {
       <div className="flex gap-3 pt-2">
         <button
           type="submit"
-          disabled={pending || !aluno || !dispositivoCompleto}
+          disabled={pending || !cursoOk || !aluno || !dispositivoCompleto}
           className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {pending ? "Registrando..." : "Registrar Comunicação"}
         </button>
         <a href="/comunicacoes" className="btn-secondary">Cancelar</a>
       </div>
-      {(!aluno || !dispositivoCompleto) && (
+      {(!cursoOk || !aluno || !dispositivoCompleto) && (
         <p className="text-xs text-gray-400">
-          {!aluno ? "Localize o aluno pelo número de curso. " : ""}
+          {!cursoOk ? "Selecione o curso antes de localizar o aluno. " : ""}
+          {cursoOk && !aluno ? "Localize o aluno pelo número de curso. " : ""}
           {!dispositivoCompleto ? "Selecione o dispositivo legal completo." : ""}
         </p>
       )}

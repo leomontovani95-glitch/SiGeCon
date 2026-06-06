@@ -28,3 +28,9 @@ npm-debug.log*
 # Editor
 .vscode/
 .idea/
+
+# Build info / cache
+tsconfig.tsbuildinfo
+
+# Claude Code local settings
+.claude/

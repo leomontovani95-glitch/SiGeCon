@@ -4,7 +4,7 @@ import ComunicacaoForm from "../../_components/ComunicacaoForm";
 
 export default async function NovaCPIPage() {
   await verifyStaff();
-  const [tipos, regras] = await Promise.all([
+  const [tipos, regras, cursos] = await Promise.all([
     prisma.communicationType.findMany({
       where: { active: true, name: { in: ["CPI 0", "CPI 1", "CPI 2", "CPI 3"] } },
       orderBy: { name: "asc" },
@@ -17,11 +17,15 @@ export default async function NovaCPIPage() {
       },
       orderBy: [{ article: "asc" }, { item: "asc" }, { letter: "asc" }],
     }),
+    prisma.course.findMany({
+      where: { active: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
   return (
     <div className="p-6 max-w-3xl">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Nova CPI</h1>
-      <ComunicacaoForm tipos={tipos} regras={regras} />
+      <ComunicacaoForm tipos={tipos} regras={regras} cursos={cursos} />
     </div>
   );
 }
