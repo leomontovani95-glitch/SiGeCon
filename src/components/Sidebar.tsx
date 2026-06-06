@@ -51,6 +51,7 @@ const nav: NavItem[] = [
   { href: "/despachos",    label: "Despachos",            icon: "📨", roles: DESPACHOS_ROLES, hasBadge: true },
   { href: "/alunos",       label: "Alunos",               icon: "👤", roles: STAFF },
   { href: "/caderno",      label: "Caderno Disciplinar",  icon: "📖", roles: STAFF },
+  { href: "/ranking",      label: "Ranking de Conduta",   icon: "🏆", roles: STAFF },
   { href: "/relatorios",   label: "Relatórios",           icon: "📈", roles: STAFF },
   { href: "/usuarios",     label: "Usuários",             icon: "👥", roles: COMANDANTES },
   { href: "/cursos",       label: "Cursos",               icon: "🎓", roles: COMANDANTES },

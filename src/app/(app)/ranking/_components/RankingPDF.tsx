@@ -11,7 +11,7 @@ export type RankingItem = {
   nota: number;
 };
 
-export default function RankingPDF({ ranking }: { ranking: RankingItem[] }) {
+export default function RankingPDF({ ranking, label }: { ranking: RankingItem[]; label?: string }) {
   const gerarPDF = useCallback(async () => {
     const { default: jsPDF } = await import("jspdf");
     const { default: autoTable } = await import("jspdf-autotable");
@@ -21,7 +21,7 @@ export default function RankingPDF({ ranking }: { ranking: RankingItem[] }) {
 
     doc.setFontSize(13);
     doc.setTextColor(30, 58, 95);
-    doc.text("SiGeCon — Ranking de Conduta", 14, 14);
+    doc.text(`SiGeCon — Ranking de Conduta${label ? ` — ${label}` : ""}`, 14, 14);
     doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
     doc.text(
@@ -56,11 +56,11 @@ export default function RankingPDF({ ranking }: { ranking: RankingItem[] }) {
         if (data.column.index === 6 && data.section === "body") {
           const nota = parseFloat(String(data.cell.raw));
           if (!isNaN(nota)) {
-            if (nota >= 9) data.cell.styles.textColor = [21, 128, 61];
+            if (nota >= 9)      data.cell.styles.textColor = [21, 128, 61];
             else if (nota >= 8) data.cell.styles.textColor = [22, 163, 74];
             else if (nota >= 7) data.cell.styles.textColor = [161, 98, 7];
             else if (nota >= 6) data.cell.styles.textColor = [220, 38, 38];
-            else data.cell.styles.textColor = [153, 27, 27];
+            else                data.cell.styles.textColor = [153, 27, 27];
           }
         }
       },
@@ -71,18 +71,23 @@ export default function RankingPDF({ ranking }: { ranking: RankingItem[] }) {
       doc.setPage(i);
       doc.setFontSize(7);
       doc.setTextColor(150);
-      doc.text(`Página ${i} de ${pageCount}`, doc.internal.pageSize.getWidth() - 14, doc.internal.pageSize.getHeight() - 8, { align: "right" });
+      doc.text(
+        `Página ${i} de ${pageCount}`,
+        doc.internal.pageSize.getWidth() - 14,
+        doc.internal.pageSize.getHeight() - 8,
+        { align: "right" }
+      );
     }
 
     doc.save(`ranking-conduta-${agora.toISOString().split("T")[0]}.pdf`);
-  }, [ranking]);
+  }, [ranking, label]);
 
   return (
     <button
       onClick={gerarPDF}
       className="bg-[#1e3a5f] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#16304f] transition-colors flex items-center gap-2"
     >
-      <span>📄</span> Gerar PDF do Ranking
+      <span>📄</span> Exportar PDF
     </button>
   );
 }

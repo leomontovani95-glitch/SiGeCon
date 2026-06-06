@@ -90,8 +90,20 @@ function buildStatusWhere(status: string): Record<string, unknown> | null {
 export default async function ComunicacoesPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const session = await verifySession();
   const sp = await searchParams;
-  const busca  = sp.busca  ?? "";
-  const status = sp.status ?? "";
+  const busca   = sp.busca   ?? "";
+  const status  = sp.status  ?? "";
+  const cursoId = sp.cursoId ?? "";
+
+  const school = getSchoolFilter(session.role, session.escola);
+
+  // Cursos disponíveis para o seletor (limitados pela escola do usuário)
+  const cursosDisponiveis = session.role !== "ALUNO"
+    ? await prisma.course.findMany({
+        where: { active: true, ...(school ? { school } : {}) },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+      })
+    : [];
 
   const where: Record<string, unknown> = {};
 
@@ -106,8 +118,12 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
     ];
   }
 
-  const school = getSchoolFilter(session.role, session.escola);
-  if (school) where.course = { school };
+  // Filtro de escola/curso: curso selecionado tem precedência
+  if (cursoId) {
+    where.courseId = cursoId;
+  } else if (school) {
+    where.course = { school };
+  }
 
   if (session.role === "ALUNO") {
     const aluno = await prisma.student.findFirst({ where: { email: session.email } });
@@ -138,13 +154,30 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
   }
 
   const canCreate = session.role !== "ALUNO";
+  const cursoSelecionado = cursosDisponiveis.find((c) => c.id === cursoId);
+  const labelEscopo = school === "ESFAP" ? "Todos da EsFAP"
+    : school === "ESFO"  ? "Todos da EsFO"
+    : "Todos os cursos";
+
+  // Monta URL para os pills preservando busca e status atuais
+  function pillHref(novoCursoId: string) {
+    const p = new URLSearchParams();
+    if (novoCursoId) p.set("cursoId", novoCursoId);
+    if (busca)  p.set("busca",  busca);
+    if (status) p.set("status", status);
+    const qs = p.toString();
+    return `/comunicacoes${qs ? `?${qs}` : ""}`;
+  }
 
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Comunicações</h1>
-          <p className="text-sm text-gray-500">{comunicacoes.length} resultado(s)</p>
+          <p className="text-sm text-gray-500">
+            {cursoSelecionado ? cursoSelecionado.name : labelEscopo}
+            {" · "}{comunicacoes.length} resultado(s)
+          </p>
         </div>
         {canCreate && (
           <div className="flex gap-2 flex-wrap">
@@ -155,7 +188,32 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
         )}
       </div>
 
+      {/* Seletor de cursos */}
+      {cursosDisponiveis.length > 1 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-5">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Filtrar por curso</p>
+          <div className="flex flex-wrap gap-2">
+            <Link href={pillHref("")}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                !cursoId ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}>
+              {labelEscopo}
+            </Link>
+            {cursosDisponiveis.map((curso) => (
+              <Link key={curso.id} href={pillHref(curso.id)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  cursoId === curso.id ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}>
+                {curso.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Filtros de busca e status */}
       <form method="GET" className="flex gap-3 mb-6 flex-wrap">
+        {cursoId && <input type="hidden" name="cursoId" value={cursoId} />}
         <input name="busca" defaultValue={busca} placeholder="Protocolo, nome de guerra..." className="input max-w-xs" />
         <select name="status" defaultValue={status} className="input max-w-xs">
           {FILTER_OPTIONS.map((o) => (
@@ -175,14 +233,13 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
         const grupo = porCurso.get(cid)!;
         return (
           <div key={cid} className="mb-8">
-            <div className="flex items-center gap-3 mb-2">
-              <h2 className="text-base font-bold text-[#1e3a5f] uppercase tracking-wide">
-                {grupo.nome}
-              </h2>
-              <span className="text-xs text-gray-400 font-normal">
-                {grupo.itens.length} registro(s)
-              </span>
-            </div>
+            {/* Cabeçalho do grupo só aparece quando há mais de um curso no resultado */}
+            {cursosOrdem.length > 1 && (
+              <div className="flex items-center gap-3 mb-2">
+                <h2 className="text-base font-bold text-[#1e3a5f] uppercase tracking-wide">{grupo.nome}</h2>
+                <span className="text-xs text-gray-400 font-normal">{grupo.itens.length} registro(s)</span>
+              </div>
+            )}
 
             <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
               <table className="w-full text-sm min-w-max">
@@ -208,9 +265,7 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
                         <td className="px-3 py-2.5 font-medium text-gray-900 text-xs whitespace-nowrap">{c.student.warName}</td>
                         <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
                         <td className="px-3 py-2.5 whitespace-nowrap">
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ds.color}`}>
-                            {ds.label}
-                          </span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ds.color}`}>{ds.label}</span>
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap">
                           <Link href={`/comunicacoes/${c.id}`} className="text-xs text-[#1e3a5f] hover:underline font-medium">Ver</Link>
