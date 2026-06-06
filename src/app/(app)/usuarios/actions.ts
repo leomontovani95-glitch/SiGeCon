@@ -20,6 +20,9 @@ export async function salvarUsuario(id: string | null, _prev: State, formData: F
   const email = String(formData.get("email") ?? "").trim().toLowerCase() || null;
   const password = String(formData.get("password") ?? "");
   const role = String(formData.get("role") ?? "PROTOCOLO");
+  const additionalRoles = (formData.getAll("additionalRoles") as string[])
+    .filter((r) => r && r !== role)
+    .join(",");
   const active = formData.get("active") === "true";
 
   if (!fullName || !warName || !rank || !rg || !functionalNumber || !cpf) {
@@ -29,7 +32,7 @@ export async function salvarUsuario(id: string | null, _prev: State, formData: F
 
   // Senha inicial = número funcional se não informada
   const senhaEfetiva = password || (!id ? functionalNumber : "");
-  const data: Record<string, unknown> = { fullName, warName, rank, rg, cpf, escola, functionalNumber, email, role, active };
+  const data: Record<string, unknown> = { fullName, warName, rank, rg, cpf, escola, functionalNumber, email, role, additionalRoles, active };
   if (senhaEfetiva) data.passwordHash = await bcrypt.hash(senhaEfetiva, 10);
 
   try {
@@ -41,9 +44,12 @@ export async function salvarUsuario(id: string | null, _prev: State, formData: F
       await auditLog(session.userId, "CREATE", "User", user.id, `Criado: ${fullName}`);
     }
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "";
-    if (msg.includes("Unique")) return { error: "E-mail, RG ou número funcional já cadastrado." };
-    return { error: "Erro ao salvar usuário." };
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[salvarUsuario]", msg);
+    const isUnique = msg.toLowerCase().includes("unique") ||
+      (e as { code?: string })?.code === "P2002";
+    if (isUnique) return { error: "E-mail, RG ou número funcional já cadastrado em outro usuário." };
+    return { error: `Erro ao salvar: ${msg.slice(0, 120)}` };
   }
 
   redirect("/usuarios");

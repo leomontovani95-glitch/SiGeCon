@@ -33,6 +33,12 @@ export const PARECERISTAS: UserRole[] = [
   "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
 ];
 
+// Retorna todos os roles efetivos de uma session (primário + adicionais)
+export function effectiveRoles(session: { role: string; additionalRoles?: string }): string[] {
+  const extras = (session.additionalRoles ?? "").split(",").map((r) => r.trim()).filter(Boolean);
+  return [session.role, ...extras];
+}
+
 export const verifySession = cache(async () => {
   const session = await getSession();
   if (!session?.userId) redirect("/login");
@@ -41,17 +47,20 @@ export const verifySession = cache(async () => {
 
 export const verifyRole = cache(async (...roles: UserRole[]) => {
   const session = await verifySession();
-  const isSuperuser = (SUPERUSERS as string[]).includes(session.role);
-  if (!isSuperuser && !roles.includes(session.role as UserRole)) redirect("/acesso-negado");
+  const allRoles = effectiveRoles(session);
+  const isSuperuser = allRoles.some((r) => (SUPERUSERS as string[]).includes(r));
+  if (!isSuperuser && !allRoles.some((r) => roles.includes(r as UserRole))) redirect("/acesso-negado");
   return session;
 });
 
-export function canEmitOpinion(role: string) {
-  return (PARECERISTAS as string[]).includes(role);
+export function canEmitOpinion(role: string, additionalRoles?: string) {
+  const all = effectiveRoles({ role, additionalRoles });
+  return all.some((r) => (PARECERISTAS as string[]).includes(r));
 }
 
-export function canDecide(role: string) {
-  return (COMANDANTES as string[]).includes(role);
+export function canDecide(role: string, additionalRoles?: string) {
+  const all = effectiveRoles({ role, additionalRoles });
+  return all.some((r) => (COMANDANTES as string[]).includes(r));
 }
 
 export const verifyStaff = cache(async () => {

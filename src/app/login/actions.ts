@@ -34,7 +34,8 @@ export async function login(
   await createSession({
     userId: user.id,
     role: user.role,
-    email: user.email,
+    additionalRoles: user.additionalRoles ?? "",
+    email: user.email ?? "",
     warName: user.warName,
     escola: user.escola ?? "TODAS",
     mustChangePassword: user.mustChangePassword,

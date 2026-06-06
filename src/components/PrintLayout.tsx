@@ -41,8 +41,18 @@ export default function PrintLayout({ title, children, extraStyles }: Props) {
         }
         @media print {
           .no-print-bar { display: none !important; }
+          /* Oculta todo o shell da aplicação (sidebar, header, etc.) */
+          body * { visibility: hidden; }
+          .print-page, .print-page * { visibility: visible; }
           body { background: white; margin: 0; padding: 0; }
-          .print-page { box-shadow: none; margin: 0; padding: 12mm 15mm 15mm 18mm; width: auto; }
+          .print-page {
+            position: absolute !important;
+            top: 0 !important; left: 0 !important; right: 0 !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+            padding: 12mm 15mm 15mm 18mm !important;
+            width: auto !important;
+          }
           * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }

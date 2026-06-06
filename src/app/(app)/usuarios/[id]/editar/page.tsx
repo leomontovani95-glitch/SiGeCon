@@ -27,10 +27,11 @@ export default async function EditarUsuarioPage({ params }: { params: Promise<{ 
           cpf: usuario.cpf ?? "",
           escola: usuario.escola ?? "TODAS",
           functionalNumber: usuario.functionalNumber,
-          email: usuario.email,
+          email: usuario.email ?? "",
           role: usuario.role,
           active: String(usuario.active),
         }}
+        additionalRolesDefault={(usuario.additionalRoles ?? "").split(",").filter(Boolean)}
       />
       {podeResetar && <ResetarSenhaBtn userId={usuario.id} />}
     </div>

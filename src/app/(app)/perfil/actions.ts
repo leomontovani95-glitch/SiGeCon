@@ -38,6 +38,7 @@ export async function trocarSenha(_prev: State, formData: FormData): Promise<Sta
   await createSession({
     userId: session.userId,
     role: session.role,
+    additionalRoles: session.additionalRoles ?? "",
     email: session.email,
     warName: session.warName,
     escola: session.escola,

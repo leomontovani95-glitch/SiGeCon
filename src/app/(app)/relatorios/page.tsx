@@ -23,7 +23,25 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
   const where: Record<string, unknown> = {};
   if (school) where.course = { school };
   if (tipo)   where.type   = { name: tipo };
-  if (status) where.status = status;
+  if (status) {
+    switch (status) {
+      case "DECIDIDA_PUBLICADA":
+        Object.assign(where, { status: "DECIDIDA", disciplinaryBookItems: { some: { disciplinaryBook: { status: "PUBLICADO" } } } });
+        break;
+      case "DECIDIDA_NAO_PUBLICADA":
+        Object.assign(where, {
+          status: "DECIDIDA",
+          disciplinaryBookItems: { none: { disciplinaryBook: { status: "PUBLICADO" } } },
+          decisions: { none: { decisionType: { contains: "rquiv" } } },
+        });
+        break;
+      case "ARQUIVADA_DEC":
+        Object.assign(where, { status: "DECIDIDA", decisions: { some: { decisionType: { contains: "rquiv" } } } });
+        break;
+      default:
+        where.status = status;
+    }
+  }
   if (dataInicio || dataFim) {
     where.factDate = {};
     if (dataInicio) (where.factDate as Record<string, unknown>).gte = new Date(dataInicio);
@@ -40,7 +58,10 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
     prisma.communication.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      include: { type: true, student: { include: { course: true } }, reporter: true, decisions: true },
+      include: {
+        type: true, student: { include: { course: true } }, reporter: true, decisions: true,
+        disciplinaryBookItems: { include: { disciplinaryBook: { select: { status: true } } } },
+      },
       take: 200,
     }),
     prisma.course.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
@@ -122,10 +143,12 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
             <option value="">Todos</option>
             <option value="AGUARDANDO_CIENCIA">Ag. Ciência/Defesa</option>
             <option value="PRAZO_EXPIRADO">Prazo Expirado</option>
+            <option value="JUSTIFICATIVA_APRESENTADA">Defesa Apresentada</option>
             <option value="AGUARDANDO_PARECER">Ag. Parecer</option>
             <option value="AGUARDANDO_DECISAO">Ag. Decisão</option>
-            <option value="DECIDIDA">Decidida</option>
-            <option value="ARQUIVADA">Arquivada</option>
+            <option value="DECIDIDA_PUBLICADA">Decidida/Publicada</option>
+            <option value="DECIDIDA_NAO_PUBLICADA">Decidida/Não publicada</option>
+            <option value="ARQUIVADA_DEC">Arquivada</option>
           </select>
         </div>
         <div>
@@ -181,7 +204,15 @@ export default async function RelatoriosPage({ searchParams }: { searchParams: P
                 <td className="px-4 py-3 font-medium text-gray-900">{c.student.warName}</td>
                 <td className="px-4 py-3 text-xs text-gray-500">{c.student.course.name}</td>
                 <td className="px-4 py-3 text-xs text-gray-500">{format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
-                <td className="px-4 py-3 text-xs">{c.status.replace(/_/g, " ")}</td>
+                <td className="px-4 py-3 text-xs">{(() => {
+                  if (c.status === "DECIDIDA") {
+                    const arq = c.decisions.some((d) => d.decisionType.toLowerCase().includes("arquiv"));
+                    if (arq) return "Arquivada";
+                    const pub = c.disciplinaryBookItems.some((i) => i.disciplinaryBook.status === "PUBLICADO");
+                    return pub ? "Decidida/Publicada" : "Decidida/Não publicada";
+                  }
+                  return c.status.replace(/_/g, " ");
+                })()}</td>
                 <td className="px-4 py-3 text-xs font-bold">{c.finalScore != null ? c.finalScore.toFixed(1) : "—"}</td>
               </tr>
             ))}

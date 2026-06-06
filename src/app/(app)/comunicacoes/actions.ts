@@ -170,7 +170,7 @@ export async function tomarCienciaSemDefesa(_prev: State, formData: FormData): P
 // ── Emitir parecer (Subcomandante / Oficial) ──────────────────────────────
 export async function emitirParecer(_prev: State, formData: FormData): Promise<State> {
   const session = await verifySession();
-  if (!canEmitOpinion(session.role)) return { error: "Sem permissão para emitir parecer." };
+  if (!canEmitOpinion(session.role, session.additionalRoles)) return { error: "Sem permissão para emitir parecer." };
 
   const communicationId = String(formData.get("communicationId") ?? "");
   const text = String(formData.get("text") ?? "").trim();
@@ -195,7 +195,7 @@ export async function emitirParecer(_prev: State, formData: FormData): Promise<S
 // ── Proferir decisão (Comandante) ─────────────────────────────────────────
 export async function proferirDecisao(_prev: State, formData: FormData): Promise<State> {
   const session = await verifySession();
-  if (!canDecide(session.role)) return { error: "Sem permissão para proferir decisão." };
+  if (!canDecide(session.role, session.additionalRoles)) return { error: "Sem permissão para proferir decisão." };
 
   const communicationId = String(formData.get("communicationId") ?? "");
   const decisionType = String(formData.get("decisionType") ?? "");

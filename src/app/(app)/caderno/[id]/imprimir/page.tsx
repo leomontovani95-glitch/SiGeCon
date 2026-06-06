@@ -36,15 +36,19 @@ function fmtEnq(art: string | null, inc: string | null, al: string | null) {
 }
 
 // Definição dos grupos na ordem de exibição
+const isArquivadoPDF = (i: Item) =>
+  i.recordType === "Arquivamento" ||
+  (i.decisionSummary ?? "").toLowerCase().includes("arquiv");
+
 const GRUPOS: { label: string; filter: (i: Item) => boolean }[] = [
-  { label: "CPI Grau 3",               filter: (i) => i.recordType === "CPI 3"                && i.decisionSummary !== "Reenquadrar artigo" },
-  { label: "CPI Grau 2",               filter: (i) => i.recordType === "CPI 2"                && i.decisionSummary !== "Reenquadrar artigo" },
-  { label: "CPI Grau 1",               filter: (i) => i.recordType === "CPI 1"                && i.decisionSummary !== "Reenquadrar artigo" },
-  { label: "CPI Grau 0",               filter: (i) => i.recordType === "CPI 0"                && i.decisionSummary !== "Reenquadrar artigo" },
-  { label: "Referências Elogiosas",    filter: (i) => i.recordType === "Referência Elogiosa"  },
-  { label: "Elogios publicados em BI", filter: (i) => i.recordType === "Elogio publicado em BI" },
-  { label: "Reenquadramentos",         filter: (i) => i.decisionSummary === "Reenquadrar artigo" },
-  { label: "Arquivamentos",            filter: (i) => i.recordType === "Arquivamento" || (i.decisionSummary ?? "").toLowerCase().includes("arquiv") },
+  { label: "CPI 3",                     filter: (i) => i.recordType === "CPI 3"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
+  { label: "CPI 2",                     filter: (i) => i.recordType === "CPI 2"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
+  { label: "CPI 1",                     filter: (i) => i.recordType === "CPI 1"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
+  { label: "CPI 0",                     filter: (i) => i.recordType === "CPI 0"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
+  { label: "Referências Elogiosas",     filter: (i) => i.recordType === "Referência Elogiosa"   && !isArquivadoPDF(i) },
+  { label: "Elogios publicados em BI",  filter: (i) => i.recordType === "Elogio publicado em BI" && !isArquivadoPDF(i) },
+  { label: "Reenquadramentos",          filter: (i) => i.decisionSummary === "Reenquadrar artigo" },
+  { label: "Arquivamentos",             filter: (i) => isArquivadoPDF(i) },
 ];
 
 function TabelaTipo({ items, label }: { items: Item[]; label: string }) {

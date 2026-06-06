@@ -80,7 +80,7 @@ export default function Sidebar({
           <img src="/brasao-apm.png" alt="APM/ES" style={{ height: 38, width: "auto", objectFit: "contain", flexShrink: 0 }} />
           <div>
             <h1 className="text-white font-bold text-lg leading-tight">SiGeCon</h1>
-            <p className="text-blue-300 text-xs leading-tight">Gestão de Conduta</p>
+            <p className="text-blue-300 text-xs leading-tight">Sistema de Gestão de Conduta</p>
           </div>
         </div>
       </div>

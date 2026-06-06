@@ -13,11 +13,12 @@ model User {
   rank             String
   rg               String   @unique
   functionalNumber String   @unique
-  email            String   @unique
+  email            String?  @unique
   passwordHash     String
   cpf              String?  @unique
   escola           String   @default("TODAS")
   role             String   @default("PROTOCOLO")
+  additionalRoles  String   @default("")
   active           Boolean  @default(true)
   mustChangePassword Boolean @default(false)
   createdAt        DateTime @default(now())

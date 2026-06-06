@@ -20,15 +20,22 @@ const ROLES = [
 
 type Props = {
   defaultValues?: Record<string, string>;
+  additionalRolesDefault?: string[];
   id?: string;
 };
 
-export default function UsuarioForm({ defaultValues, id }: Props) {
+export default function UsuarioForm({ defaultValues, additionalRolesDefault = [], id }: Props) {
   const action = salvarUsuario.bind(null, id ?? null);
   const [state, formAction, pending] = useActionState(action, undefined);
 
   return (
-    <form action={formAction} className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+    <>
+    {/* Campo dummy oculto para enganar o auto-fill do browser */}
+    <div aria-hidden style={{ position: "absolute", opacity: 0, pointerEvents: "none", height: 0, overflow: "hidden" }}>
+      <input type="text" name="_u" autoComplete="username" tabIndex={-1} />
+      <input type="password" name="_p" autoComplete="current-password" tabIndex={-1} />
+    </div>
+    <form action={formAction} className="bg-white rounded-xl border border-gray-200 p-6 space-y-5" autoComplete="off">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Nome completo *</label>
@@ -71,16 +78,28 @@ export default function UsuarioForm({ defaultValues, id }: Props) {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
-          <input name="email" type="email" defaultValue={defaultValues?.email} className="input" />
+          <input
+            name="email"
+            type="email"
+            defaultValue={defaultValues?.email ?? ""}
+            className="input"
+            autoComplete="off"
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
             Senha{id ? " (deixe em branco para manter)" : " (deixe em branco para usar o nº funcional)"}
           </label>
-          <input name="password" type="password" className="input" />
+          <input
+            name="password"
+            type="password"
+            defaultValue=""
+            className="input"
+            autoComplete="new-password"
+          />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Função *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Função principal *</label>
           <select name="role" defaultValue={defaultValues?.role ?? "PROTOCOLO"} className="input">
             {ROLES.map((r) => (
               <option key={r.value} value={r.value}>{r.label}</option>
@@ -104,6 +123,28 @@ export default function UsuarioForm({ defaultValues, id }: Props) {
         </div>
       </div>
 
+      {/* Funções adicionais */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Funções adicionais
+          <span className="text-xs text-gray-400 font-normal ml-2">(para militares com mais de uma função no sistema)</span>
+        </label>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {ROLES.map((r) => (
+            <label key={r.value} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input
+                type="checkbox"
+                name="additionalRoles"
+                value={r.value}
+                defaultChecked={additionalRolesDefault.includes(r.value)}
+                className="rounded border-gray-300 text-[#1e3a5f]"
+              />
+              {r.label}
+            </label>
+          ))}
+        </div>
+      </div>
+
       {state?.error && (
         <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
           {state.error}
@@ -117,5 +158,6 @@ export default function UsuarioForm({ defaultValues, id }: Props) {
         <a href="/usuarios" className="btn-secondary">Cancelar</a>
       </div>
     </form>
+    </>
   );
 }

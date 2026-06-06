@@ -4,18 +4,23 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import Link from "next/link";
 
-const STATUS_LABELS: Record<string, string> = {
+// ── Status base (DB) ─────────────────────────────────────────────────────────
+const STATUS_LABELS_BASE: Record<string, string> = {
   REGISTRADA: "Registrada",
   AGUARDANDO_CIENCIA: "Ag. Ciência/Defesa",
   AGUARDANDO_DEFESA: "Ag. Ciência/Defesa",
   JUSTIFICATIVA_APRESENTADA: "Defesa Apresentada",
-  PRAZO_EXPIRADO: "Prazo Expirado", AGUARDANDO_PARECER: "Ag. Parecer",
-  PARECER_EMITIDO: "Parecer Emitido", AGUARDANDO_DECISAO: "Ag. Decisão",
-  DECIDIDA: "Decidida", ARQUIVADA: "Arquivada", PUBLICADA_CADERNO: "Pub. Caderno",
-  FINALIZADA: "Finalizada", DEVOLVIDA: "Devolvida",
+  PRAZO_EXPIRADO: "Prazo Expirado",
+  AGUARDANDO_PARECER: "Ag. Parecer",
+  PARECER_EMITIDO: "Parecer Emitido",
+  AGUARDANDO_DECISAO: "Ag. Decisão",
+  DECIDIDA: "Decidida",
+  ARQUIVADA: "Arquivada",
+  PUBLICADA_CADERNO: "Pub. Caderno",
+  FINALIZADA: "Finalizada",
 };
 
-const STATUS_COLORS: Record<string, string> = {
+const STATUS_COLORS_BASE: Record<string, string> = {
   REGISTRADA: "bg-blue-100 text-blue-700",
   AGUARDANDO_CIENCIA: "bg-yellow-100 text-yellow-700",
   AGUARDANDO_DEFESA: "bg-yellow-100 text-yellow-700",
@@ -28,14 +33,71 @@ const STATUS_COLORS: Record<string, string> = {
   FINALIZADA: "bg-green-200 text-green-900",
 };
 
+// ── Status derivado (calculado com base em decisões e cadernos) ───────────────
+type CommItem = {
+  status: string;
+  decisions: { decisionType: string }[];
+  disciplinaryBookItems: { disciplinaryBook: { status: string } }[];
+};
+
+function derivedStatus(c: CommItem): { key: string; label: string; color: string } {
+  if (c.status === "DECIDIDA") {
+    const arquivada = c.decisions.some((d) => d.decisionType.toLowerCase().includes("arquiv"));
+    if (arquivada) return { key: "ARQUIVADA_DEC", label: "Arquivada", color: "bg-gray-100 text-gray-700" };
+    const publicada = c.disciplinaryBookItems.some((i) => i.disciplinaryBook.status === "PUBLICADO");
+    if (publicada) return { key: "DECIDIDA_PUBLICADA", label: "Decidida/Publicada", color: "bg-teal-100 text-teal-700" };
+    return { key: "DECIDIDA_NAO_PUBLICADA", label: "Decidida/Não publicada", color: "bg-green-100 text-green-700" };
+  }
+  return {
+    key: c.status,
+    label: STATUS_LABELS_BASE[c.status] ?? c.status,
+    color: STATUS_COLORS_BASE[c.status] ?? "bg-gray-100 text-gray-700",
+  };
+}
+
+// ── Opções do filtro de status ────────────────────────────────────────────────
+const FILTER_OPTIONS = [
+  { value: "",                    label: "Todos os status" },
+  { value: "AGUARDANDO_CIENCIA",  label: "Ag. Ciência/Defesa" },
+  { value: "PRAZO_EXPIRADO",      label: "Prazo Expirado" },
+  { value: "JUSTIFICATIVA_APRESENTADA", label: "Defesa Apresentada" },
+  { value: "AGUARDANDO_PARECER",  label: "Ag. Parecer" },
+  { value: "AGUARDANDO_DECISAO",  label: "Ag. Decisão" },
+  { value: "DECIDIDA_PUBLICADA",  label: "Decidida/Publicada" },
+  { value: "DECIDIDA_NAO_PUBLICADA", label: "Decidida/Não publicada" },
+  { value: "ARQUIVADA_DEC",       label: "Arquivada" },
+];
+
+// Mapeia filtros derivados para where do Prisma
+function buildStatusWhere(status: string): Record<string, unknown> | null {
+  if (!status) return null;
+  switch (status) {
+    case "DECIDIDA_PUBLICADA":
+      return { status: "DECIDIDA", disciplinaryBookItems: { some: { disciplinaryBook: { status: "PUBLICADO" } } } };
+    case "DECIDIDA_NAO_PUBLICADA":
+      return {
+        status: "DECIDIDA",
+        disciplinaryBookItems: { none: { disciplinaryBook: { status: "PUBLICADO" } } },
+        decisions: { none: { decisionType: { contains: "rquiv" } } },
+      };
+    case "ARQUIVADA_DEC":
+      return { status: "DECIDIDA", decisions: { some: { decisionType: { contains: "rquiv" } } } };
+    default:
+      return { status };
+  }
+}
+
 export default async function ComunicacoesPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const session = await verifySession();
   const sp = await searchParams;
-  const busca = sp.busca ?? "";
+  const busca  = sp.busca  ?? "";
   const status = sp.status ?? "";
 
   const where: Record<string, unknown> = {};
-  if (status) where.status = status;
+
+  const statusWhere = buildStatusWhere(status);
+  if (statusWhere) Object.assign(where, statusWhere);
+
   if (busca) {
     where.OR = [
       { protocolNumber: { contains: busca } },
@@ -55,7 +117,11 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
   const comunicacoes = await prisma.communication.findMany({
     where,
     orderBy: [{ courseId: "asc" }, { createdAt: "desc" }],
-    include: { type: true, student: true, reporter: true, course: true },
+    include: {
+      type: true, student: true, reporter: true, course: true,
+      decisions: { select: { decisionType: true } },
+      disciplinaryBookItems: { include: { disciplinaryBook: { select: { status: true } } } },
+    },
     take: 200,
   });
 
@@ -92,14 +158,9 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
       <form method="GET" className="flex gap-3 mb-6 flex-wrap">
         <input name="busca" defaultValue={busca} placeholder="Protocolo, nome de guerra..." className="input max-w-xs" />
         <select name="status" defaultValue={status} className="input max-w-xs">
-          <option value="">Todos os status</option>
-          <option value="AGUARDANDO_CIENCIA">Ag. Ciência/Defesa</option>
-          <option value="PRAZO_EXPIRADO">Prazo Expirado</option>
-          <option value="JUSTIFICATIVA_APRESENTADA">Defesa Apresentada</option>
-          <option value="AGUARDANDO_PARECER">Ag. Parecer</option>
-          <option value="AGUARDANDO_DECISAO">Ag. Decisão</option>
-          <option value="DECIDIDA">Decidida</option>
-          <option value="ARQUIVADA">Arquivada</option>
+          {FILTER_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
         </select>
         <button type="submit" className="btn-primary px-6">Filtrar</button>
       </form>
@@ -114,7 +175,6 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
         const grupo = porCurso.get(cid)!;
         return (
           <div key={cid} className="mb-8">
-            {/* Cabeçalho do curso */}
             <div className="flex items-center gap-3 mb-2">
               <h2 className="text-base font-bold text-[#1e3a5f] uppercase tracking-wide">
                 {grupo.nome}
@@ -138,23 +198,26 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {grupo.itens.map((c) => (
-                    <tr key={c.id} className="hover:bg-gray-50">
-                      <td className="px-3 py-2.5 font-mono text-xs text-gray-600 whitespace-nowrap">{c.protocolNumber}</td>
-                      <td className="px-3 py-2.5 text-xs text-gray-600 whitespace-nowrap">{c.type.name}</td>
-                      <td className="px-3 py-2.5 font-mono text-xs text-gray-500 whitespace-nowrap text-center">{c.courseNumber}</td>
-                      <td className="px-3 py-2.5 font-medium text-gray-900 text-xs whitespace-nowrap">{c.student.warName}</td>
-                      <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
-                      <td className="px-3 py-2.5 whitespace-nowrap">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[c.status] ?? "bg-gray-100 text-gray-700"}`}>
-                          {STATUS_LABELS[c.status] ?? c.status}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 whitespace-nowrap">
-                        <Link href={`/comunicacoes/${c.id}`} className="text-xs text-[#1e3a5f] hover:underline font-medium">Ver</Link>
-                      </td>
-                    </tr>
-                  ))}
+                  {grupo.itens.map((c) => {
+                    const ds = derivedStatus(c);
+                    return (
+                      <tr key={c.id} className="hover:bg-gray-50">
+                        <td className="px-3 py-2.5 font-mono text-xs text-gray-600 whitespace-nowrap">{c.protocolNumber}</td>
+                        <td className="px-3 py-2.5 text-xs text-gray-600 whitespace-nowrap">{c.type.name}</td>
+                        <td className="px-3 py-2.5 font-mono text-xs text-gray-500 whitespace-nowrap text-center">{c.courseNumber}</td>
+                        <td className="px-3 py-2.5 font-medium text-gray-900 text-xs whitespace-nowrap">{c.student.warName}</td>
+                        <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
+                        <td className="px-3 py-2.5 whitespace-nowrap">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ds.color}`}>
+                            {ds.label}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap">
+                          <Link href={`/comunicacoes/${c.id}`} className="text-xs text-[#1e3a5f] hover:underline font-medium">Ver</Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

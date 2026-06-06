@@ -13,10 +13,15 @@ function fmtEnq(art: string | null, inc: string | null, al: string | null) {
   return s;
 }
 
-const TIPO_ORDER = [
-  "CPI 0", "CPI 1", "CPI 2", "CPI 3",
-  "Referência Elogiosa", "Elogio publicado em BI", "Arquivamento",
-];
+const CPI_ORDER    = ["CPI 0", "CPI 1", "CPI 2", "CPI 3"];
+const ELOGIO_ORDER = ["Referência Elogiosa", "Elogio publicado em BI"];
+const TIPO_ORDER   = [...CPI_ORDER, ...ELOGIO_ORDER, "Arquivamento"];
+
+const CPI0_NOTE = "CPI de Grau 0 — sanção equivalente à metade da CPI 1 (−0,1 pt)";
+
+const TIPO_NOTE: Record<string, string> = {
+  "CPI 0": CPI0_NOTE,
+};
 
 const TIPOS_FAVORAVEIS = new Set(["Referência Elogiosa", "Elogio publicado em BI"]);
 
@@ -27,9 +32,66 @@ function scoreDisplay(score: number | null, recordType: string) {
   return { fav, text: `${fav ? "+" : "−"}${mag.toFixed(1)}` };
 }
 
+function decisaoLabel(decisionSummary: string, recordType: string): string {
+  if (decisionSummary === "Reenquadrar artigo") return "Reenquadrar";
+  if (decisionSummary.toLowerCase().includes("arquiv") || recordType === "Arquivamento") return "Arquivar";
+  if (TIPOS_FAVORAVEIS.has(recordType)) return "Deferir";
+  return "Sanção";
+}
+
 function sortByNum<T extends { studentCourseNumber: string }>(items: T[]): T[] {
   return [...items].sort((a, b) =>
     (parseInt(a.studentCourseNumber, 10) || 0) - (parseInt(b.studentCourseNumber, 10) || 0)
+  );
+}
+
+type GrupoItem = {
+  id: string; communicationId: string; score: number | null; recordType: string;
+  decisionSummary: string; studentCourseNumber: string; studentWarName: string;
+  factDate: Date; student: { platoon: { name: string } | null };
+  communication: { protocolNumber: string; article: string | null; item: string | null; letter: string | null };
+};
+
+function TabelaGrupo({ items, thBase, tdBase }: { items: GrupoItem[]; thBase: string; tdBase: string }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="bg-[#1e3a5f] text-white">
+          <tr>
+            <th className={thBase}>Protocolo</th>
+            <th className={thBase}>Enquadramento</th>
+            <th className={thBase}>Pelotão</th>
+            <th className={thBase}>Nº</th>
+            <th className={thBase}>Nome de Guerra</th>
+            <th className={thBase}>Tipo</th>
+            <th className={thBase}>Data</th>
+            <th className={thBase}>Decisão</th>
+            <th className={`${thBase} text-right`}>Pont.</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {items.map((item, idx) => (
+            <tr key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+              <td className={`${tdBase} font-mono whitespace-nowrap`}>
+                <a href={`/comunicacoes/${item.communicationId}`} className="text-blue-700 hover:underline">
+                  {item.communication.protocolNumber}
+                </a>
+              </td>
+              <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{fmtEnq(item.communication.article, item.communication.item, item.communication.letter)}</td>
+              <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{item.student.platoon?.name ?? "—"}</td>
+              <td className={`${tdBase} font-mono text-gray-700 whitespace-nowrap`}>{item.studentCourseNumber}</td>
+              <td className={`${tdBase} font-semibold text-gray-900 whitespace-nowrap`}>{item.studentWarName}</td>
+              <td className={`${tdBase} text-gray-700 whitespace-nowrap`}>{item.recordType}</td>
+              <td className={`${tdBase} text-gray-500 whitespace-nowrap`}>{new Date(item.factDate).toLocaleDateString("pt-BR")}</td>
+              <td className={`${tdBase} text-gray-700 whitespace-nowrap font-medium`}>{decisaoLabel(item.decisionSummary, item.recordType)}</td>
+              <td className={`${tdBase} text-right font-bold`}>
+                {(() => { const sd = scoreDisplay(item.score, item.recordType); return sd ? <span className={sd.fav ? "text-green-600" : "text-red-600"}>{sd.text}</span> : <span className="text-gray-400">—</span>; })()}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -59,9 +121,14 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
   const canEdit = ["ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA"].includes(session.role)
     && caderno.status !== "PUBLICADO";
 
-  // Separa reenquadramentos e agrupa o restante por tipo
+  const isArquivado = (i: { decisionSummary: string; recordType: string }) =>
+    i.recordType === "Arquivamento" ||
+    (i.decisionSummary ?? "").toLowerCase().includes("arquiv");
+
+  // Separa: reenquadramentos, arquivamentos (independente do tipo) e demais
   const reenquadrados = sortByNum(caderno.items.filter(i => i.decisionSummary === "Reenquadrar artigo"));
-  const demais       = caderno.items.filter(i => i.decisionSummary !== "Reenquadrar artigo");
+  const arquivados    = sortByNum(caderno.items.filter(i => i.decisionSummary !== "Reenquadrar artigo" && isArquivado(i)));
+  const demais        = caderno.items.filter(i => i.decisionSummary !== "Reenquadrar artigo" && !isArquivado(i));
 
   const grupos = new Map<string, typeof caderno.items>();
   for (const item of demais) {
@@ -72,14 +139,16 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
     (parseInt(a.studentCourseNumber, 10) || 0) - (parseInt(b.studentCourseNumber, 10) || 0)
   );
 
-  const gruposOrdenados = [
-    ...TIPO_ORDER.filter(t => grupos.has(t)).map(t => ({ tipo: t, items: grupos.get(t)! })),
-    ...[...grupos.entries()].filter(([t]) => !TIPO_ORDER.includes(t)).map(([t, items]) => ({ tipo: t, items })),
+  const mkGrupo = (order: string[]) => [
+    ...order.filter(t => grupos.has(t)).map(t => ({ tipo: t, items: grupos.get(t)! })),
+    ...[...grupos.entries()]
+      .filter(([t]) => !TIPO_ORDER.includes(t) && order === CPI_ORDER)
+      .map(([t, items]) => ({ tipo: t, items })),
   ];
 
-  const totalFav = caderno.items
-    .filter((i) => TIPOS_FAVORAVEIS.has(i.recordType))
-    .reduce((s, i) => s + Math.abs(i.score ?? 0), 0);
+  const gruposCPI    = mkGrupo(CPI_ORDER);
+  const gruposElogio = mkGrupo(ELOGIO_ORDER);
+
   const totalReenquadrados = reenquadrados.length;
 
   // Colunas base compartilhadas
@@ -119,7 +188,7 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
           <p className="text-xs opacity-90 mt-1">Favoráveis</p>
         </div>
         <div className="bg-gray-500 rounded-xl p-4 text-white">
-          <p className="text-3xl font-bold">{caderno.items.filter(i => !i.score).length}</p>
+          <p className="text-3xl font-bold">{arquivados.length}</p>
           <p className="text-xs opacity-90 mt-1">Arquivamentos</p>
         </div>
         <div className="bg-orange-100 rounded-xl p-4 text-orange-800">
@@ -128,63 +197,25 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
         </div>
       </div>
 
-      {/* Seções por tipo */}
+      {/* Seções na ordem: CPI 0 → CPI 1 → CPI 2 → CPI 3 → Reenquadramento → RE → EBI → Arquivamentos */}
       <div className="space-y-8">
-        {gruposOrdenados.map(({ tipo, items }) => (
+
+        {/* CPIs */}
+        {gruposCPI.map(({ tipo, items }) => (
           <div key={tipo}>
-            <h2 className="text-base font-bold text-gray-800 mb-2 flex items-center gap-2">
+            <h2 className="text-base font-bold text-gray-800 mb-1 flex items-center gap-2">
               <span className="inline-block w-2 h-2 rounded-full bg-[#1e3a5f]" />
               {tipo}
               <span className="text-xs font-normal text-gray-400">({items.length} registro{items.length !== 1 ? "s" : ""})</span>
             </h2>
-            <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-[#1e3a5f] text-white">
-                  <tr>
-                    <th className={thBase}>Protocolo</th>
-                    <th className={thBase}>Enquadramento</th>
-                    <th className={thBase}>Curso</th>
-                    <th className={thBase}>Pelotão</th>
-                    <th className={thBase}>Nº</th>
-                    <th className={thBase}>Nome de Guerra</th>
-                    <th className={thBase}>Tipo</th>
-                    <th className={thBase}>Data Fato</th>
-                    <th className={thBase}>Decisão</th>
-                    <th className={`${thBase} text-right`}>Pont.</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {items.map((item, idx) => (
-                    <tr key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                      <td className={`${tdBase} font-mono`}>
-                        <Link href={`/comunicacoes/${item.communicationId}`} className="text-blue-700 hover:underline">
-                          {item.communication.protocolNumber}
-                        </Link>
-                      </td>
-                      <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>
-                        {fmtEnq(item.communication.article, item.communication.item, item.communication.letter)}
-                      </td>
-                      <td className={`${tdBase} text-gray-700`}>{item.student.course.name}</td>
-                      <td className={`${tdBase} text-gray-600`}>{item.student.platoon?.name ?? "—"}</td>
-                      <td className={`${tdBase} font-mono text-gray-700`}>{item.studentCourseNumber}</td>
-                      <td className={`${tdBase} font-semibold text-gray-900`}>{item.studentWarName}</td>
-                      <td className={`${tdBase} text-gray-700`}>{item.recordType}</td>
-                      <td className={`${tdBase} text-gray-500 whitespace-nowrap`}>
-                        {format(new Date(item.factDate), "dd/MM/yyyy", { locale: ptBR })}
-                      </td>
-                      <td className={`${tdBase} text-gray-700`}>{item.decisionSummary}</td>
-                      <td className={`${tdBase} text-right font-bold`}>
-                        {(() => { const sd = scoreDisplay(item.score, item.recordType); return sd ? <span className={sd.fav ? "text-green-600" : "text-red-600"}>{sd.text}</span> : <span className="text-gray-400">—</span>; })()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            {TIPO_NOTE[tipo] && (
+              <p className="text-xs text-gray-500 mb-2 ml-4 italic">{TIPO_NOTE[tipo]}</p>
+            )}
+            <TabelaGrupo items={items} thBase={thBase} tdBase={tdBase} />
           </div>
         ))}
 
-        {/* Grupo Reenquadramento */}
+        {/* Reenquadramentos */}
         {reenquadrados.length > 0 && (
           <div>
             <h2 className="text-base font-bold text-orange-700 mb-2 flex items-center gap-2">
@@ -199,40 +230,89 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
                     <th className={thBase}>Protocolo</th>
                     <th className={thBase}>Enquadramento original</th>
                     <th className={thBase}>Reenquadrado para</th>
-                    <th className={thBase}>Curso</th>
                     <th className={thBase}>Pelotão</th>
                     <th className={thBase}>Nº</th>
                     <th className={thBase}>Nome de Guerra</th>
                     <th className={thBase}>Tipo</th>
-                    <th className={thBase}>Data Fato</th>
+                    <th className={thBase}>Data</th>
                     <th className={`${thBase} text-right`}>Pont.</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {reenquadrados.map((item, idx) => (
                     <tr key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-orange-50"}>
-                      <td className={`${tdBase} font-mono`}>
+                      <td className={`${tdBase} font-mono whitespace-nowrap`}>
                         <Link href={`/comunicacoes/${item.communicationId}`} className="text-blue-700 hover:underline">
                           {item.communication.protocolNumber}
                         </Link>
                       </td>
-                      <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>
-                        {fmtEnq(item.originalArticle, item.originalItem, item.originalLetter)}
-                      </td>
-                      <td className={`${tdBase} font-semibold text-orange-700 whitespace-nowrap`}>
-                        {fmtEnq(item.communication.article, item.communication.item, item.communication.letter)}
-                      </td>
-                      <td className={`${tdBase} text-gray-700`}>{item.student.course.name}</td>
-                      <td className={`${tdBase} text-gray-600`}>{item.student.platoon?.name ?? "—"}</td>
-                      <td className={`${tdBase} font-mono text-gray-700`}>{item.studentCourseNumber}</td>
-                      <td className={`${tdBase} font-semibold text-gray-900`}>{item.studentWarName}</td>
-                      <td className={`${tdBase} text-gray-700`}>{item.recordType}</td>
-                      <td className={`${tdBase} text-gray-500 whitespace-nowrap`}>
-                        {format(new Date(item.factDate), "dd/MM/yyyy", { locale: ptBR })}
-                      </td>
+                      <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{fmtEnq(item.originalArticle, item.originalItem, item.originalLetter)}</td>
+                      <td className={`${tdBase} font-semibold text-orange-700 whitespace-nowrap`}>{fmtEnq(item.communication.article, item.communication.item, item.communication.letter)}</td>
+                      <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{item.student.platoon?.name ?? "—"}</td>
+                      <td className={`${tdBase} font-mono text-gray-700 whitespace-nowrap`}>{item.studentCourseNumber}</td>
+                      <td className={`${tdBase} font-semibold text-gray-900 whitespace-nowrap`}>{item.studentWarName}</td>
+                      <td className={`${tdBase} text-gray-700 whitespace-nowrap`}>{item.recordType}</td>
+                      <td className={`${tdBase} text-gray-500 whitespace-nowrap`}>{format(new Date(item.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
                       <td className={`${tdBase} text-right font-bold`}>
                         {(() => { const sd = scoreDisplay(item.score, item.recordType); return sd ? <span className={sd.fav ? "text-green-600" : "text-red-600"}>{sd.text}</span> : <span className="text-gray-400">—</span>; })()}
                       </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Referências Elogiosas e Elogios em BI */}
+        {gruposElogio.map(({ tipo, items }) => (
+          <div key={tipo}>
+            <h2 className="text-base font-bold text-gray-800 mb-1 flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-[#1e3a5f]" />
+              {tipo}
+              <span className="text-xs font-normal text-gray-400">({items.length} registro{items.length !== 1 ? "s" : ""})</span>
+            </h2>
+            <TabelaGrupo items={items} thBase={thBase} tdBase={tdBase} />
+          </div>
+        ))}
+
+        {/* Arquivamentos */}
+        {arquivados.length > 0 && (
+          <div>
+            <h2 className="text-base font-bold text-gray-600 mb-2 flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-gray-400" />
+              Arquivamentos
+              <span className="text-xs font-normal text-gray-400">({arquivados.length} registro{arquivados.length !== 1 ? "s" : ""})</span>
+            </h2>
+            <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100 text-gray-700">
+                  <tr>
+                    <th className={thBase}>Protocolo</th>
+                    <th className={thBase}>Enquadramento</th>
+                    <th className={thBase}>Pelotão</th>
+                    <th className={thBase}>Nº</th>
+                    <th className={thBase}>Nome de Guerra</th>
+                    <th className={thBase}>Tipo original</th>
+                    <th className={thBase}>Data</th>
+                    <th className={thBase}>Decisão</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {arquivados.map((item, idx) => (
+                    <tr key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                      <td className={`${tdBase} font-mono whitespace-nowrap`}>
+                        <Link href={`/comunicacoes/${item.communicationId}`} className="text-blue-700 hover:underline">
+                          {item.communication.protocolNumber}
+                        </Link>
+                      </td>
+                      <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{fmtEnq(item.communication.article, item.communication.item, item.communication.letter)}</td>
+                      <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{item.student.platoon?.name ?? "—"}</td>
+                      <td className={`${tdBase} font-mono text-gray-700 whitespace-nowrap`}>{item.studentCourseNumber}</td>
+                      <td className={`${tdBase} font-semibold text-gray-900 whitespace-nowrap`}>{item.studentWarName}</td>
+                      <td className={`${tdBase} text-gray-500 whitespace-nowrap`}>{item.recordType}</td>
+                      <td className={`${tdBase} text-gray-500 whitespace-nowrap`}>{format(new Date(item.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
+                      <td className={`${tdBase} text-gray-500 whitespace-nowrap font-medium`}>Arquivar</td>
                     </tr>
                   ))}
                 </tbody>
@@ -249,9 +329,8 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
       </div>
 
       {/* Rodapé */}
-      <div className="mt-4 text-xs text-gray-500 flex gap-6">
+      <div className="mt-4 text-xs text-gray-500">
         <span>{caderno.items.length} registro(s) total</span>
-        {totalFav > 0 && <span className="text-green-600">Total favorável publicado: +{totalFav.toFixed(1)} pt</span>}
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 export type SessionPayload = {
   userId: string;
   role: string;
+  additionalRoles: string; // funções adicionais separadas por vírgula
   email: string;
   warName: string;
   escola: string;
