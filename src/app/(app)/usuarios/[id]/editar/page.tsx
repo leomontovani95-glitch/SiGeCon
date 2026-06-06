@@ -4,10 +4,17 @@ import { notFound } from "next/navigation";
 import UsuarioForm from "../../_components/UsuarioForm";
 import ResetarSenhaBtn from "../../_components/ResetarSenhaBtn";
 
-const PODE_RESETAR = ["ADMINISTRADOR", "CHEFE_DIVISAO_ACADEMICA", "COMANDANTE_ESFAP", "COMANDANTE_ESFO"];
+const PODE_RESETAR = [
+  "ADMINISTRADOR", "CHEFE_DIVISAO_ACADEMICA",
+  "COMANDANTE_ESFAP", "COMANDANTE_ESFO",
+  "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
+];
 
 export default async function EditarUsuarioPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await verifyRole("ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO");
+  const session = await verifyRole(
+    "ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO",
+    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
+  );
   const { id } = await params;
   const usuario = await prisma.user.findUnique({ where: { id } });
   if (!usuario) notFound();

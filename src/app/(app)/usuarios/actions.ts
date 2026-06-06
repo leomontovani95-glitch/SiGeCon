@@ -8,7 +8,10 @@ import { auditLog } from "@/lib/audit";
 type State = { error: string } | undefined;
 
 export async function salvarUsuario(id: string | null, _prev: State, formData: FormData): Promise<State> {
-  const session = await verifyRole("ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO");
+  const session = await verifyRole(
+    "ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO",
+    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
+  );
 
   const fullName = String(formData.get("fullName") ?? "").trim();
   const warName = String(formData.get("warName") ?? "").trim();
@@ -58,7 +61,10 @@ export async function salvarUsuario(id: string | null, _prev: State, formData: F
 type ResetState = { error?: string; success?: string } | undefined;
 
 export async function resetarSenha(userId: string, _prev: ResetState, _fd: FormData): Promise<ResetState> {
-  await verifyRole("ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO");
+  await verifyRole(
+    "ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO",
+    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
+  );
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return { error: "Usuário não encontrado." };
   if (!user.functionalNumber) return { error: "Número Funcional não cadastrado. Não é possível redefinir a senha automaticamente." };
@@ -70,7 +76,10 @@ export async function resetarSenha(userId: string, _prev: ResetState, _fd: FormD
 }
 
 export async function excluirUsuario(id: string, _prev: { error: string } | undefined, _fd: FormData): Promise<{ error: string } | undefined> {
-  const session = await verifyRole("ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO");
+  const session = await verifyRole(
+    "ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO",
+    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
+  );
   if (session.userId === id) return { error: "Não é possível excluir o próprio usuário." };
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) return { error: "Usuário não encontrado." };

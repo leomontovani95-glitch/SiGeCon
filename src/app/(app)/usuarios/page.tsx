@@ -20,7 +20,10 @@ const ROLES: Record<string, string> = {
 };
 
 export default async function UsuariosPage() {
-  const session = await verifyRole("ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO");
+  const session = await verifyRole(
+    "ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO",
+    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
+  );
   // Alunos ficam apenas na aba Alunos — usuários são apenas o efetivo formado
   const usuarios = await prisma.user.findMany({ where: { role: { not: "ALUNO" } }, orderBy: { fullName: "asc" } });
 

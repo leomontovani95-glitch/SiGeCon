@@ -5,7 +5,10 @@ import { verifyRole } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
 
 export async function criarCaderno() {
-  const session = await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA");
+  const session = await verifyRole(
+    "ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA",
+    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
+  );
 
   // Busca todas as comunicações DECIDIDAS, agrupa por curso
   const decididas = await prisma.communication.findMany({
@@ -74,7 +77,10 @@ export async function criarCaderno() {
 }
 
 export async function publicarCaderno(id: string) {
-  const session = await verifyRole("COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA", "ADMINISTRADOR");
+  const session = await verifyRole(
+    "ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA",
+    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
+  );
 
   const caderno = await prisma.disciplinaryBook.findUnique({
     where: { id },
@@ -101,7 +107,10 @@ export async function publicarCaderno(id: string) {
 }
 
 export async function adicionarItem(cadernoId: string, communicationId: string) {
-  const session = await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA");
+  const session = await verifyRole(
+    "ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA",
+    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
+  );
   const comm = await prisma.communication.findUnique({
     where: { id: communicationId },
     include: { student: true, type: true, decisions: true },

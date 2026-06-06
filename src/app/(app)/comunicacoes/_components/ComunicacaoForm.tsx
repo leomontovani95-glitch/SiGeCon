@@ -1,5 +1,12 @@
 "use client";
 import { useActionState, useState, useRef, useCallback, useMemo } from "react";
+
+const POSTOS = [
+  "CEL", "TEN CEL", "MAJ", "CAP", "1º TEN", "2º TEN", "ASP OF",
+  "AL OF 1º ANO", "AL OF 2º ANO", "AL OF 3º ANO",
+  "SUBTEN", "1º SGT", "2º SGT", "3º SGT", "CB", "SD", "AL SD",
+  "OUTRO (CIVIL)",
+];
 import { registrarComunicacao } from "../actions";
 
 type Tipo  = { id: string; name: string; score: number };
@@ -65,6 +72,14 @@ export default function ComunicacaoForm({ tipos, regras, cursos }: Props) {
   // Tipo e pontuação (controlados para auto-fill)
   const [typeId, setTypeId] = useState("");
   const [score, setScore] = useState("");
+
+  // Testemunhas
+  const [testemunhas, setTestemunhas] = useState<{ rank: string; name: string }[]>([]);
+  function addTestemunha() { setTestemunhas((t) => [...t, { rank: "", name: "" }]); }
+  function removeTestemunha(i: number) { setTestemunhas((t) => t.filter((_, idx) => idx !== i)); }
+  function updateTestemunha(i: number, field: "rank" | "name", val: string) {
+    setTestemunhas((t) => t.map((w, idx) => idx === i ? { ...w, [field]: val } : w));
+  }
 
   // Lookup: nome do tipo → id
   const tipoByName = useMemo(
@@ -338,13 +353,80 @@ export default function ComunicacaoForm({ tipos, regras, cursos }: Props) {
           placeholder="Descreva o fato ocorrido..." />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+      {/* ── TESTEMUNHA(S) ─────────────────────────────────────────── */}
+      <fieldset className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+        <legend className="text-sm font-semibold text-gray-700 px-2">Testemunha(s)</legend>
+        <div className="space-y-3 mt-2">
+          {testemunhas.length === 0 && (
+            <p className="text-xs text-gray-400">Nenhuma testemunha adicionada.</p>
+          )}
+          {testemunhas.map((w, i) => (
+            <div key={i} className="grid grid-cols-1 sm:grid-cols-[180px_1fr_auto] gap-2 items-end">
+              <div>
+                {i === 0 && <label className="block text-xs font-medium text-gray-600 mb-1">Posto/Graduação</label>}
+                <select
+                  name="witnessRank"
+                  value={w.rank}
+                  onChange={(e) => updateTestemunha(i, "rank", e.target.value)}
+                  className="input text-sm"
+                >
+                  <option value="">Selecione</option>
+                  {POSTOS.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              <div>
+                {i === 0 && <label className="block text-xs font-medium text-gray-600 mb-1">Nome</label>}
+                <input
+                  name="witnessName"
+                  value={w.name}
+                  onChange={(e) => updateTestemunha(i, "name", e.target.value)}
+                  placeholder="Nome completo ou de guerra"
+                  className="input text-sm"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => removeTestemunha(i)}
+                className="text-red-500 hover:text-red-700 text-xs font-medium px-2 py-2 whitespace-nowrap"
+              >
+                Remover
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={addTestemunha}
+            className="text-xs text-[#1e3a5f] border border-[#1e3a5f] rounded-lg px-3 py-1.5 hover:bg-blue-50 transition-colors"
+          >
+            + Adicionar testemunha
+          </button>
+        </div>
+      </fieldset>
+
+      {/* ── COMUNICANTE ───────────────────────────────────────────── */}
+      <fieldset className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+        <legend className="text-sm font-semibold text-gray-700 px-2">
           Comunicante <span className="text-red-500">*</span>
-        </label>
-        <input name="communicantName" required className="input"
-          placeholder="Nome de quem verificou a transgressão ou propõe o registro" />
-      </div>
+        </legend>
+        <div className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-3 mt-2">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Posto/Graduação *</label>
+            <select name="communicantRank" required className="input text-sm">
+              <option value="">Selecione</option>
+              {POSTOS.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Nome *</label>
+            <input
+              name="communicantName"
+              required
+              className="input text-sm"
+              placeholder="Nome de quem verificou a transgressão ou propõe o registro"
+            />
+          </div>
+        </div>
+      </fieldset>
 
       {state?.error && (
         <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">

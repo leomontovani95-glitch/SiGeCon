@@ -118,8 +118,11 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
     ? `CD Nº ${String(caderno.number).padStart(2, "0")} — ${caderno.course.name}`
     : `CD-${String(caderno.number).padStart(4, "0")}`;
 
-  const canEdit = ["ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA"].includes(session.role)
-    && caderno.status !== "PUBLICADO";
+  const canEdit = [
+    "ADMINISTRADOR", "PROTOCOLO",
+    "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA",
+    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
+  ].includes(session.role) && caderno.status !== "PUBLICADO";
 
   const isArquivado = (i: { decisionSummary: string; recordType: string }) =>
     i.recordType === "Arquivamento" ||

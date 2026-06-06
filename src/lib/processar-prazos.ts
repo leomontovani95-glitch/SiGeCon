@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 
 const NOTA_AUTO =
   "Prazo de 2 dias úteis encerrado sem que o aluno tomasse ciência ou apresentasse defesa. " +
-  "Comunicação encaminhada automaticamente para decisão do Comandante da Escola.";
+  "Comunicação encaminhada automaticamente ao Subcomandante/Oficial da Escola para emissão de parecer.";
 
 export async function processarPrazosExpirados(): Promise<number> {
   const agora = new Date();
@@ -35,10 +35,10 @@ export async function processarPrazosExpirados(): Promise<number> {
           notes: NOTA_AUTO,
         },
       }),
-      // Encaminha direto para decisão do Comandante
+      // Encaminha para parecer do Subcomandante/Oficial
       prisma.communication.update({
         where: { id: comm.id },
-        data: { status: "AGUARDANDO_DECISAO" },
+        data: { status: "AGUARDANDO_PARECER" },
       }),
     ]);
 

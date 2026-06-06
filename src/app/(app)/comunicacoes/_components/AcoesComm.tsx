@@ -5,7 +5,6 @@ import {
   tomarCienciaSemDefesa,
   emitirParecer,
   proferirDecisao,
-  encaminharParaParecer,
 } from "../actions";
 
 type Sugestao = { titulo: string; texto: string };
@@ -131,19 +130,17 @@ export default function AcoesComm({
   const [semDefState, semDefAction, semDefPending] = useActionState(tomarCienciaSemDefesa, undefined);
   const [parecerState, parecerAction, parecerPending] = useActionState(emitirParecer, undefined);
   const [decisaoState, decisaoAction, decisaoPending] = useActionState(proferirDecisao, undefined);
-  const [encState, encAction, encPending] = useActionState(encaminharParaParecer, undefined);
 
+  // Apenas o aluno pode tomar ciência/defesa
   const canTakeAck = alunoEhEssePerfil && comm.status === "AGUARDANDO_CIENCIA";
+  // Subcomandante/Oficial emitem parecer assim que o aluno toma ciência (status AGUARDANDO_PARECER)
   const canEmitParecer =
     ["SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO"].includes(session.role) &&
-    ["AGUARDANDO_PARECER", "JUSTIFICATIVA_APRESENTADA"].includes(comm.status) &&
+    comm.status === "AGUARDANDO_PARECER" &&
     comm.opinions.length === 0;
   const canDecide =
     ["ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA"].includes(session.role) &&
     comm.status === "AGUARDANDO_DECISAO";
-  const canEncaminhar =
-    ["ADMINISTRADOR", "PROTOCOLO"].includes(session.role) &&
-    ["AGUARDANDO_CIENCIA", "AGUARDANDO_DEFESA", "PRAZO_EXPIRADO", "JUSTIFICATIVA_APRESENTADA"].includes(comm.status);
 
   function validarArquivo(file: File | null) {
     if (!file) { setArquivoErro(""); setArquivo(null); return; }
@@ -198,8 +195,7 @@ export default function AcoesComm({
           </div>
 
           <p className="text-xs text-gray-500 mt-3">
-            <strong>Atenção:</strong> se optar por apresentar defesa, ela deve ser enviada neste momento.
-            Se apenas tomar ciência, a comunicação será encaminhada diretamente ao Comandante da Escola para decisão final.
+            <strong>Atenção:</strong> em ambos os casos, a comunicação será encaminhada automaticamente ao Subcomandante ou Oficial da Escola para emissão de parecer.
           </p>
         </div>
       )}
@@ -459,22 +455,6 @@ export default function AcoesComm({
         </div>
       )}
 
-      {/* ── ENCAMINHAR PARA PARECER (Protocolo / Admin) ─────── */}
-      {canEncaminhar && (
-        <div className="bg-gray-50 border border-gray-200 rounded-xl p-5">
-          <h3 className="font-semibold text-gray-900 mb-2">Encaminhar para Parecer</h3>
-          <p className="text-xs text-gray-500 mb-3">
-            Encaminha a comunicação ao Subcomandante ou Oficial da Escola para emissão de parecer.
-          </p>
-          <form action={encAction}>
-            <input type="hidden" name="communicationId" value={comm.id} />
-            <button type="submit" disabled={encPending} className="btn-secondary text-sm">
-              {encPending ? "Encaminhando..." : "Encaminhar ao Subcomandante / Oficial"}
-            </button>
-          </form>
-          {encState?.error && <p className="text-sm text-red-600 mt-1">{encState.error}</p>}
-        </div>
-      )}
     </div>
   );
 }

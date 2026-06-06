@@ -9,6 +9,7 @@ import CriarCadernoBtn from "./_components/CriarCadernoBtn";
 const CADERNO_MANAGERS = [
   "ADMINISTRADOR", "PROTOCOLO",
   "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA",
+  "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
 ];
 
 export default async function CadernoPage() {

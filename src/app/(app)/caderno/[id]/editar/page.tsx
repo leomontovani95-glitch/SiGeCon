@@ -8,7 +8,10 @@ import PublicarBtn from "../../_components/PublicarBtn";
 import Link from "next/link";
 
 export default async function EditarCadernoPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA");
+  const session = await verifyRole(
+    "ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA",
+    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
+  );
   const { id } = await params;
 
   const [caderno, decididas] = await Promise.all([

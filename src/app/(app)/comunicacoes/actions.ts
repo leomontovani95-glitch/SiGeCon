@@ -26,7 +26,11 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
   const factDescription = String(formData.get("factDescription") ?? "").trim();
   const manualRuleId    = String(formData.get("manualRuleId") ?? "").trim();
   const suggestedScore  = formData.get("suggestedScore") ? Number(formData.get("suggestedScore")) : null;
-  const communicantName = String(formData.get("communicantName") ?? "").trim() || null;
+  const communicantRank = String(formData.get("communicantRank") ?? "").trim();
+  const communicantNameRaw = String(formData.get("communicantName") ?? "").trim();
+  const communicantName = communicantRank
+    ? `${communicantRank} ${communicantNameRaw}`.trim()
+    : communicantNameRaw || null;
 
   // Validações obrigatórias
   if (!studentId)       return { error: "Localize e selecione o aluno pelo número de curso." };
@@ -48,6 +52,13 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
   if (!aluno) return { error: "Aluno não encontrado." };
 
   const protocolNumber = await gerarProtocolo(tipo.name, aluno.course.name);
+  // Testemunhas
+  const witnessRanks = formData.getAll("witnessRank") as string[];
+  const witnessNames = formData.getAll("witnessName") as string[];
+  const testemunhas = witnessRanks
+    .map((rank, i) => ({ rank: rank.trim(), name: (witnessNames[i] ?? "").trim() }))
+    .filter((w) => w.name);
+
   let commId: string;
   try {
     const comm = await prisma.communication.create({
@@ -69,6 +80,19 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
   } catch {
     return { error: "Erro ao registrar comunicação." };
   }
+
+  // Salvar testemunhas (best-effort)
+  if (testemunhas.length > 0) {
+    try {
+      await prisma.witness.createMany({
+        data: testemunhas.map((w) => ({
+          communicationId: commId,
+          name: w.rank ? `${w.rank} ${w.name}` : w.name,
+        })),
+      });
+    } catch { /* não bloqueia o fluxo */ }
+  }
+
   try { await auditLog(session.userId, "CREATE", "Communication", commId, `Protocolo: ${protocolNumber}`); } catch {}
   redirect(`/comunicacoes/${commId}`);
 }
@@ -133,10 +157,10 @@ export async function tomarCienciaComDefesa(_prev: State, formData: FormData): P
   });
   await prisma.communication.update({
     where: { id: communicationId },
-    data: { status: "JUSTIFICATIVA_APRESENTADA", defenseDeadline: prazo },
+    data: { status: "AGUARDANDO_PARECER", defenseDeadline: prazo },
   });
   await auditLog(session.userId, "CIENCIA_COM_DEFESA", "Communication", communicationId,
-    anexoId ? "Com anexo" : "Sem anexo");
+    anexoId ? "Com anexo — encaminhado ao Subcomandante/Oficial" : "Sem anexo — encaminhado ao Subcomandante/Oficial");
   redirect(`/comunicacoes/${communicationId}`);
 }
 
@@ -160,10 +184,10 @@ export async function tomarCienciaSemDefesa(_prev: State, formData: FormData): P
   });
   await prisma.communication.update({
     where: { id: communicationId },
-    data: { status: "AGUARDANDO_DECISAO" },
+    data: { status: "AGUARDANDO_PARECER" },
   });
   await auditLog(session.userId, "CIENCIA_SEM_DEFESA", "Communication", communicationId,
-    "Sem defesa — encaminhado ao Comandante");
+    "Sem defesa — encaminhado ao Subcomandante/Oficial para parecer");
   redirect(`/comunicacoes/${communicationId}`);
 }
 
@@ -281,14 +305,3 @@ export async function proferirDecisao(_prev: State, formData: FormData): Promise
   redirect(`/comunicacoes/${communicationId}`);
 }
 
-// ── Encaminhar para parecer (Protocolo / Admin) ───────────────────────────
-export async function encaminharParaParecer(_prev: State, formData: FormData): Promise<State> {
-  const session = await verifyRole("ADMINISTRADOR", "PROTOCOLO");
-  const communicationId = String(formData.get("communicationId") ?? "");
-  await prisma.communication.update({
-    where: { id: communicationId },
-    data: { status: "AGUARDANDO_PARECER" },
-  });
-  await auditLog(session.userId, "ENCAMINHAR_PARECER", "Communication", communicationId);
-  redirect(`/comunicacoes/${communicationId}`);
-}
