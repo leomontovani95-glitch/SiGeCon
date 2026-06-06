@@ -40,28 +40,34 @@ const isArquivadoPDF = (i: Item) =>
   i.recordType === "Arquivamento" ||
   (i.decisionSummary ?? "").toLowerCase().includes("arquiv");
 
-const GRUPOS: { label: string; filter: (i: Item) => boolean }[] = [
-  { label: "CPI 3",                     filter: (i) => i.recordType === "CPI 3"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
-  { label: "CPI 2",                     filter: (i) => i.recordType === "CPI 2"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
-  { label: "CPI 1",                     filter: (i) => i.recordType === "CPI 1"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
-  { label: "CPI 0",                     filter: (i) => i.recordType === "CPI 0"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
+const GRUPOS: { label: string; note?: string; filter: (i: Item) => boolean }[] = [
+  { label: "CPI 0", note: "Equivale a 50% dos pontos da CPI 1 (−0,1 pt por ocorrência)",
+                         filter: (i) => i.recordType === "CPI 0"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
+  { label: "CPI 1",     filter: (i) => i.recordType === "CPI 1"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
+  { label: "CPI 2",     filter: (i) => i.recordType === "CPI 2"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
+  { label: "CPI 3",     filter: (i) => i.recordType === "CPI 3"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
   { label: "Referências Elogiosas",     filter: (i) => i.recordType === "Referência Elogiosa"   && !isArquivadoPDF(i) },
   { label: "Elogios publicados em BI",  filter: (i) => i.recordType === "Elogio publicado em BI" && !isArquivadoPDF(i) },
   { label: "Reenquadramentos",          filter: (i) => i.decisionSummary === "Reenquadrar artigo" },
   { label: "Arquivamentos",             filter: (i) => isArquivadoPDF(i) },
 ];
 
-function TabelaTipo({ items, label }: { items: Item[]; label: string }) {
+function TabelaTipo({ items, label, note }: { items: Item[]; label: string; note?: string }) {
   if (items.length === 0) return null;
   return (
     <div className="print-section" style={{ marginTop: 24, pageBreakInside: "avoid" }}>
       <h3 style={{
         fontSize: "8.5pt", fontWeight: "bold", color: "#1e3a5f",
         textTransform: "uppercase", letterSpacing: "0.05em",
-        borderBottom: "1.5px solid #1e3a5f", paddingBottom: 3, marginBottom: 6,
+        borderBottom: "1.5px solid #1e3a5f", paddingBottom: 3, marginBottom: note ? 2 : 6,
       }}>
         {label} <span style={{ fontWeight: "normal", color: "#6b7280" }}>({items.length})</span>
       </h3>
+      {note && (
+        <p style={{ fontSize: "7.5pt", color: "#6b7280", fontStyle: "italic", marginBottom: 6 }}>
+          Obs.: {note}
+        </p>
+      )}
       <table className="cd-table">
         <colgroup>
           <col className="cd-col-proto" />
@@ -190,7 +196,7 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
 
       {/* Tabelas separadas por tipo */}
       {grupos.map((g) => (
-        <TabelaTipo key={g.label} label={g.label} items={g.itens} />
+        <TabelaTipo key={g.label} label={g.label} note={g.note} items={g.itens} />
       ))}
 
       {totalRegistros === 0 && (

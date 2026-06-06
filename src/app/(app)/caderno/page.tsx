@@ -12,38 +12,100 @@ const CADERNO_MANAGERS = [
   "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
 ];
 
-export default async function CadernoPage() {
+export default async function CadernoPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>;
+}) {
   const session = await verifySession();
   if (session.role === "ALUNO") redirect("/acesso-negado");
+
+  const sp = await searchParams;
+  const cursoId = sp.cursoId ?? "";
 
   const canManage = CADERNO_MANAGERS.includes(session.role);
   const school = getSchoolFilter(session.role, session.escola);
 
+  // Cursos disponíveis para este usuário (filtra por escola)
+  const cursosDisponiveis = await prisma.course.findMany({
+    where: { active: true, ...(school ? { school } : {}) },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
+
+  // Filtro de cadernos: por curso selecionado OU por escola
+  const cadernoWhere = cursoId
+    ? { courseId: cursoId }
+    : school
+      ? { course: { school } }
+      : {};
+
   const [cadernos, pendentesPublicacao] = await Promise.all([
     prisma.disciplinaryBook.findMany({
+      where: cadernoWhere,
       orderBy: [{ courseId: "asc" }, { number: "asc" }],
       include: { createdBy: true, publishedBy: true, course: true, _count: { select: { items: true } } },
     }),
-    // Conta registros DECIDIDA que ainda não foram inseridos em nenhum caderno
     prisma.communication.count({
-      where: { status: "DECIDIDA", disciplinaryBookItems: { none: {} } },
+      where: {
+        status: "DECIDIDA",
+        disciplinaryBookItems: { none: {} },
+        ...(cursoId ? { courseId: cursoId } : school ? { course: { school } } : {}),
+      },
     }),
   ]);
 
+  const cursoSelecionado = cursosDisponiveis.find((c) => c.id === cursoId);
+  const labelEscopo = school === "ESFAP" ? "Todos da EsFAP"
+    : school === "ESFO" ? "Todos da EsFO"
+    : "Todos os cursos";
+
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Caderno Disciplinar</h1>
-          <p className="text-sm text-gray-500">{cadernos.length} edição(ões)</p>
+          <p className="text-sm text-gray-500">
+            {cursoSelecionado ? cursoSelecionado.name : labelEscopo}
+            {" · "}{cadernos.length} edição(ões)
+          </p>
         </div>
         {canManage && <CriarCadernoBtn pendentesCount={pendentesPublicacao} />}
       </div>
 
+      {/* Seletor de cursos */}
+      {cursosDisponiveis.length > 1 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-5">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Filtrar por curso</p>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/caderno"
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                !cursoId ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              {labelEscopo}
+            </Link>
+            {cursosDisponiveis.map((curso) => (
+              <Link
+                key={curso.id}
+                href={`/caderno?cursoId=${curso.id}`}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  cursoId === curso.id ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                {curso.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {pendentesPublicacao > 0 && canManage && (
         <div className="mb-5 bg-yellow-50 border border-yellow-200 rounded-xl px-5 py-3 flex items-center gap-3">
           <span className="text-yellow-700 text-sm font-medium">
-            {pendentesPublicacao} registro(s) decidido(s) aguardando publicação em caderno.
+            {pendentesPublicacao} registro(s) decidido(s) aguardando publicação em caderno
+            {cursoSelecionado ? ` — ${cursoSelecionado.name}` : ""}.
           </span>
         </div>
       )}
@@ -53,7 +115,7 @@ export default async function CadernoPage() {
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="text-left px-4 py-3 font-medium text-gray-700">Nº Caderno</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-700">Escola</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-700">Curso</th>
               <th className="text-left px-4 py-3 font-medium text-gray-700">Registros</th>
               <th className="text-left px-4 py-3 font-medium text-gray-700">Status</th>
               <th className="text-left px-4 py-3 font-medium text-gray-700">Publicado em</th>
@@ -71,7 +133,9 @@ export default async function CadernoPage() {
                 <td className="px-4 py-3 text-xs text-gray-500">{c.course?.name ?? c.school ?? "—"}</td>
                 <td className="px-4 py-3 text-gray-600">{c._count.items}</td>
                 <td className="px-4 py-3">
-                  <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${c.status === "PUBLICADO" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+                  <span className={`text-xs px-2.5 py-0.5 rounded-full font-medium ${
+                    c.status === "PUBLICADO" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                  }`}>
                     {c.status === "PUBLICADO" ? "Publicado" : "Rascunho"}
                   </span>
                 </td>
@@ -87,7 +151,13 @@ export default async function CadernoPage() {
               </tr>
             ))}
             {cadernos.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">Nenhum caderno criado ainda.</td></tr>
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                  {cursoSelecionado
+                    ? `Nenhum caderno criado para ${cursoSelecionado.name}.`
+                    : "Nenhum caderno criado ainda."}
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
