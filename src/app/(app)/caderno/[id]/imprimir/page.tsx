@@ -101,7 +101,11 @@ function TabelaTipo({ items, label }: { items: Item[]; label: string }) {
               <td className="cd-col-dec">{item.decisionSummary}</td>
               <td className="cd-col-obs" style={{ fontSize: "7pt", color: "#666" }}>{item.shortObservation ?? "—"}</td>
               <td className="cd-col-pont" style={{ textAlign: "right", fontWeight: "bold" }}>
-                {item.score != null ? (item.score > 0 ? `+${item.score.toFixed(1)}` : item.score.toFixed(1)) : "—"}
+                {item.score != null
+                  ? (["Referência Elogiosa", "Elogio publicado em BI"].includes(item.recordType)
+                      ? `+${Math.abs(item.score).toFixed(1)}`
+                      : `−${Math.abs(item.score).toFixed(1)}`)
+                  : "—"}
               </td>
             </tr>
           ))}

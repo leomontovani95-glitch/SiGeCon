@@ -55,7 +55,10 @@ async function getDashboardGeral(role: string, userId: string) {
     aguardandoDecisao,
     decididas,
     referencias,
-    publicadas,
+    cadernosPublicados,
+    aguardandoPublicacao,
+    cpisArquivadasDiretas,
+    elogiososArquivadosDiretos,
   ] = await Promise.all([
     prisma.communication.count({ where: { ...filtroReporter, type: { name: { in: ["CPI 0", "CPI 1", "CPI 2", "CPI 3"] } } } }),
     prisma.communication.count({ where: { ...filtroReporter, status: "AGUARDANDO_CIENCIA" } }),
@@ -65,7 +68,11 @@ async function getDashboardGeral(role: string, userId: string) {
     prisma.communication.count({ where: { ...filtroReporter, status: "AGUARDANDO_DECISAO" } }),
     prisma.communication.count({ where: { ...filtroReporter, status: "DECIDIDA" } }),
     prisma.communication.count({ where: { ...filtroReporter, type: { name: "Referência Elogiosa" } } }),
-    prisma.communication.count({ where: { ...filtroReporter, status: "PUBLICADA_CADERNO" } }),
+    prisma.disciplinaryBook.count({ where: { status: "PUBLICADO" } }),
+    prisma.communication.count({ where: { ...filtroReporter, status: "DECIDIDA", disciplinaryBookItems: { none: {} } } }),
+    // Arquivadas diretamente (sem caderno)
+    prisma.communication.count({ where: { ...filtroReporter, status: "ARQUIVADA", type: { name: { in: ["CPI 0", "CPI 1", "CPI 2", "CPI 3"] } } } }),
+    prisma.communication.count({ where: { ...filtroReporter, status: "ARQUIVADA", type: { name: { in: ["Referência Elogiosa", "Elogio publicado em BI"] } } } }),
   ]);
 
   const [students, allPubItems] = await Promise.all([
@@ -75,6 +82,16 @@ async function getDashboardGeral(role: string, userId: string) {
       include: { communication: { include: { type: { select: { scoreNature: true } } } } },
     }),
   ]);
+
+  // Deriva contagens de publicação diretamente dos itens já carregados
+  const cpisPublicadas       = allPubItems.filter((i) => i.recordType.startsWith("CPI")).length;
+  const elogiososPublicados  = allPubItems.filter((i) =>
+    i.recordType === "Referência Elogiosa" || i.recordType === "Elogio publicado em BI"
+  ).length;
+
+  // Totais de arquivamento = publicados em caderno + arquivados diretamente
+  const cpisArquivadas      = cpisPublicadas      + cpisArquivadasDiretas;
+  const elogiososArquivados = elogiososPublicados + elogiososArquivadosDiretos;
 
   const pubPorAluno = new Map<string, typeof allPubItems>();
   for (const item of allPubItems) {
@@ -88,7 +105,13 @@ async function getDashboardGeral(role: string, userId: string) {
   }));
 
   return {
-    cards: { totalCPIs, aguardandoCienciaDefesa: aguardandoCiencia + aguardandoDefesa, prazoVencido, aguardandoParecer, aguardandoDecisao, decididas, referencias, publicadas },
+    cards: {
+      totalCPIs,
+      aguardandoCienciaDefesa: aguardandoCiencia + aguardandoDefesa,
+      prazoVencido, aguardandoParecer, aguardandoDecisao, decididas, referencias,
+      cpisPublicadas, elogiososPublicados, cadernosPublicados, aguardandoPublicacao,
+      cpisArquivadas, elogiososArquivados,
+    },
     zonaRisco: studentsWithNota.filter((s) => zonaDeRisco(s.nota)),
   };
 }
@@ -204,15 +227,23 @@ export default async function DashboardPage() {
   const data = await getDashboardGeral(session.role, session.userId);
   const canCreate = session.role !== "ALUNO";
 
-  const cards = [
-    { label: "CPIs Registradas", value: data.cards.totalCPIs, color: "bg-blue-600" },
+  const cardsEmTramite = [
+    { label: "CPIs Registradas",            value: data.cards.totalCPIs,               color: "bg-blue-600" },
     { label: "Ag. Ciência/Defesa do Aluno", value: data.cards.aguardandoCienciaDefesa, color: "bg-yellow-500" },
-    { label: "Prazo Vencido", value: data.cards.prazoVencido, color: "bg-red-600" },
-    { label: "Aguardando Parecer", value: data.cards.aguardandoParecer, color: "bg-purple-600" },
-    { label: "Aguardando Decisão", value: data.cards.aguardandoDecisao, color: "bg-indigo-600" },
-    { label: "Decididas", value: data.cards.decididas, color: "bg-green-600" },
-    { label: "Referências Elogiosas", value: data.cards.referencias, color: "bg-teal-600" },
-    { label: "Publicadas em Caderno", value: data.cards.publicadas, color: "bg-gray-600" },
+    { label: "Prazo Vencido",               value: data.cards.prazoVencido,            color: "bg-red-600" },
+    { label: "Aguardando Parecer",          value: data.cards.aguardandoParecer,       color: "bg-purple-600" },
+    { label: "Aguardando Decisão",          value: data.cards.aguardandoDecisao,       color: "bg-indigo-600" },
+    { label: "Decididas",                   value: data.cards.decididas,               color: "bg-green-600" },
+    { label: "Referências Elogiosas",       value: data.cards.referencias,             color: "bg-teal-600" },
+  ];
+
+  const cardsTramitadas = [
+    { label: "CPIs publicadas em caderno",                 value: data.cards.cpisPublicadas,       color: "bg-slate-700" },
+    { label: "Ref. elogiosa/Elogio publicados em caderno", value: data.cards.elogiososPublicados,  color: "bg-emerald-700" },
+    { label: "Cadernos publicados",                        value: data.cards.cadernosPublicados,   color: "bg-cyan-700" },
+    { label: "Decididas aguardando publicação",            value: data.cards.aguardandoPublicacao, color: "bg-orange-600" },
+    { label: "CPIs arquivadas",                            value: data.cards.cpisArquivadas,       color: "bg-slate-500" },
+    { label: "Ref. elogiosa/Elogio arquivados",            value: data.cards.elogiososArquivados,  color: "bg-emerald-500" },
   ];
 
   const subtitulo: Record<string, string> = {
@@ -227,13 +258,30 @@ export default async function DashboardPage() {
         <p className="text-sm text-gray-500">{subtitulo[session.role] ?? "Visão geral das comunicações em andamento"}</p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-8">
-        {cards.map((card) => (
-          <div key={card.label} className={`${card.color} rounded-xl p-4 text-white`}>
-            <p className="text-3xl font-bold">{card.value}</p>
-            <p className="text-xs mt-1 opacity-90">{card.label}</p>
-          </div>
-        ))}
+      {/* Em trâmite */}
+      <div className="mb-6">
+        <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Em trâmite</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+          {cardsEmTramite.map((card) => (
+            <div key={card.label} className={`${card.color} rounded-xl p-4 text-white`}>
+              <p className="text-3xl font-bold">{card.value}</p>
+              <p className="text-xs mt-1 opacity-90 leading-tight">{card.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Tramitadas */}
+      <div className="mb-8">
+        <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Tramitadas</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          {cardsTramitadas.map((card) => (
+            <div key={card.label} className={`${card.color} rounded-xl p-4 text-white`}>
+              <p className="text-3xl font-bold">{card.value}</p>
+              <p className="text-xs mt-1 opacity-90 leading-tight">{card.label}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       {data.zonaRisco.length > 0 && (

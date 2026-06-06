@@ -62,6 +62,7 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
         letter: regra.letter,
         suggestedScore, communicantName,
         status: "AGUARDANDO_CIENCIA",
+        defenseDeadline: calcularPrazoDefesa(new Date()),
       },
     });
     commId = comm.id;

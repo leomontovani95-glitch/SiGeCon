@@ -93,6 +93,15 @@ export default async function ComunicacaoPage({ params }: { params: Promise<{ id
           {comm.factTime && <p className="text-sm text-gray-700"><span className="font-medium">Hora:</span> {comm.factTime}</p>}
           {comm.factPlace && <p className="text-sm text-gray-700"><span className="font-medium">Local:</span> {comm.factPlace}</p>}
           <p className="text-sm text-gray-700"><span className="font-medium">Comunicante:</span> {comm.communicantName ?? comm.reporter.warName}</p>
+          {comm.defenseDeadline && (
+            <p className="text-sm text-gray-700">
+              <span className="font-medium">Prazo ciência/defesa:</span>{" "}
+              <span className={new Date() > new Date(comm.defenseDeadline) && comm.status === "AGUARDANDO_CIENCIA" ? "text-red-600 font-semibold" : "text-gray-700"}>
+                {format(new Date(comm.defenseDeadline), "dd/MM/yyyy", { locale: ptBR })}
+                {new Date() > new Date(comm.defenseDeadline) && comm.status === "AGUARDANDO_CIENCIA" && " ⚠ Expirado"}
+              </span>
+            </p>
+          )}
         </div>
       </div>
 
@@ -110,6 +119,22 @@ export default async function ComunicacaoPage({ params }: { params: Promise<{ id
             Art. {comm.article}{comm.item ? ` — Inc. ${comm.item}` : ""}{comm.letter ? ` — Al. ${comm.letter}` : ""}
           </p>
           {comm.manualRule && <p className="text-sm text-gray-600 mt-1">{comm.manualRule.description}</p>}
+        </div>
+      )}
+
+      {comm.acknowledgements.some((a) => a.method === "PRAZO_EXPIRADO") && (
+        <div className="bg-red-50 rounded-xl border border-red-300 p-4 mb-4">
+          <h2 className="text-xs font-semibold text-red-700 uppercase tracking-wide mb-1">
+            ⚠ Encaminhamento Automático por Prazo Expirado
+          </h2>
+          {comm.acknowledgements.filter((a) => a.method === "PRAZO_EXPIRADO").map((a) => (
+            <div key={a.id}>
+              <p className="text-sm text-red-800">{a.notes}</p>
+              <p className="text-xs text-red-400 mt-1">
+                Processado automaticamente em {format(new Date(a.acknowledgedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+              </p>
+            </div>
+          ))}
         </div>
       )}
 

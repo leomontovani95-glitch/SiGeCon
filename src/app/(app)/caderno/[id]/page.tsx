@@ -18,6 +18,15 @@ const TIPO_ORDER = [
   "Referência Elogiosa", "Elogio publicado em BI", "Arquivamento",
 ];
 
+const TIPOS_FAVORAVEIS = new Set(["Referência Elogiosa", "Elogio publicado em BI"]);
+
+function scoreDisplay(score: number | null, recordType: string) {
+  if (score == null || score === 0) return null;
+  const fav = TIPOS_FAVORAVEIS.has(recordType);
+  const mag = Math.abs(score);
+  return { fav, text: `${fav ? "+" : "−"}${mag.toFixed(1)}` };
+}
+
 function sortByNum<T extends { studentCourseNumber: string }>(items: T[]): T[] {
   return [...items].sort((a, b) =>
     (parseInt(a.studentCourseNumber, 10) || 0) - (parseInt(b.studentCourseNumber, 10) || 0)
@@ -68,7 +77,9 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
     ...[...grupos.entries()].filter(([t]) => !TIPO_ORDER.includes(t)).map(([t, items]) => ({ tipo: t, items })),
   ];
 
-  const totalFav = caderno.items.reduce((s, i) => s + (i.score && i.score < 0 ? Math.abs(i.score) : 0), 0);
+  const totalFav = caderno.items
+    .filter((i) => TIPOS_FAVORAVEIS.has(i.recordType))
+    .reduce((s, i) => s + Math.abs(i.score ?? 0), 0);
   const totalReenquadrados = reenquadrados.length;
 
   // Colunas base compartilhadas
@@ -100,11 +111,11 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
           <p className="text-xs opacity-90 mt-1">Total de registros</p>
         </div>
         <div className="bg-red-600 rounded-xl p-4 text-white">
-          <p className="text-3xl font-bold">{caderno.items.filter(i => i.score != null && i.score > 0).length}</p>
-          <p className="text-xs opacity-90 mt-1">Punições</p>
+          <p className="text-3xl font-bold">{caderno.items.filter(i => i.recordType.startsWith("CPI")).length}</p>
+          <p className="text-xs opacity-90 mt-1">Punições (CPI)</p>
         </div>
         <div className="bg-green-600 rounded-xl p-4 text-white">
-          <p className="text-3xl font-bold">{caderno.items.filter(i => i.score != null && i.score < 0).length}</p>
+          <p className="text-3xl font-bold">{caderno.items.filter(i => TIPOS_FAVORAVEIS.has(i.recordType)).length}</p>
           <p className="text-xs opacity-90 mt-1">Favoráveis</p>
         </div>
         <div className="bg-gray-500 rounded-xl p-4 text-white">
@@ -163,11 +174,7 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
                       </td>
                       <td className={`${tdBase} text-gray-700`}>{item.decisionSummary}</td>
                       <td className={`${tdBase} text-right font-bold`}>
-                        {item.score != null ? (
-                          <span className={item.score > 0 ? "text-red-600" : item.score < 0 ? "text-green-600" : "text-gray-500"}>
-                            {item.score > 0 ? "−" : item.score < 0 ? "+" : ""}{Math.abs(item.score).toFixed(1)}
-                          </span>
-                        ) : "—"}
+                        {(() => { const sd = scoreDisplay(item.score, item.recordType); return sd ? <span className={sd.fav ? "text-green-600" : "text-red-600"}>{sd.text}</span> : <span className="text-gray-400">—</span>; })()}
                       </td>
                     </tr>
                   ))}
@@ -224,11 +231,7 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
                         {format(new Date(item.factDate), "dd/MM/yyyy", { locale: ptBR })}
                       </td>
                       <td className={`${tdBase} text-right font-bold`}>
-                        {item.score != null ? (
-                          <span className={item.score > 0 ? "text-red-600" : item.score < 0 ? "text-green-600" : "text-gray-500"}>
-                            {item.score > 0 ? "−" : item.score < 0 ? "+" : ""}{Math.abs(item.score).toFixed(1)}
-                          </span>
-                        ) : "—"}
+                        {(() => { const sd = scoreDisplay(item.score, item.recordType); return sd ? <span className={sd.fav ? "text-green-600" : "text-red-600"}>{sd.text}</span> : <span className="text-gray-400">—</span>; })()}
                       </td>
                     </tr>
                   ))}
@@ -248,7 +251,7 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
       {/* Rodapé */}
       <div className="mt-4 text-xs text-gray-500 flex gap-6">
         <span>{caderno.items.length} registro(s) total</span>
-        {totalFav > 0 && <span className="text-green-600">Total favorável: +{totalFav.toFixed(1)} pt</span>}
+        {totalFav > 0 && <span className="text-green-600">Total favorável publicado: +{totalFav.toFixed(1)} pt</span>}
       </div>
     </div>
   );
