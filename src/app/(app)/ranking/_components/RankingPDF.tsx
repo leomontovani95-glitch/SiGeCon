@@ -13,7 +13,7 @@ export type RankingItem = {
 
 // Redimensiona a imagem para px×px via canvas antes de embedar no PDF.
 // Evita embedar o PNG original em full-res (que pode ter centenas de KB).
-function imgResized(url: string, px = 72): Promise<string> {
+function imgResized(url: string, px = 200): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
