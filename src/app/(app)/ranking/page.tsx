@@ -3,7 +3,6 @@ import { verifySession, getSchoolFilter } from "@/lib/dal";
 import { redirect } from "next/navigation";
 import { calcularNotaPublicada, faixaNota } from "@/lib/score";
 import Link from "next/link";
-import RankingPDF, { type RankingItem } from "./_components/RankingPDF";
 
 const PER_PAGE = 50;
 const ORDENS_VALIDAS = ["desc", "asc", "numAsc", "numDesc"] as const;
@@ -59,7 +58,7 @@ export default async function RankingPage({
     pubPorAluno.get(item.studentId)!.push(item);
   }
 
-  const ranking: RankingItem[] = rankingStudents
+  const ranking = rankingStudents
     .map((a) => ({
       warName:      a.warName,
       fullName:     a.fullName,
@@ -119,8 +118,13 @@ export default async function RankingPage({
             {" · "}notas baseadas nos cadernos publicados
           </p>
         </div>
-        {/* PDF exporta o ranking completo (todos os itens, sem paginação) */}
-        <RankingPDF ranking={ranking} label={cursoSelecionado?.name ?? labelEscopo} />
+        <Link
+          href={`/ranking/imprimir${cursoId ? `?cursoId=${cursoId}` : ""}`}
+          target="_blank"
+          className="bg-[#1e3a5f] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#16304f] transition-colors flex items-center gap-2"
+        >
+          <span>📄</span> Gerar PDF
+        </Link>
       </div>
 
       {/* Seletor de cursos */}

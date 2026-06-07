@@ -3,7 +3,6 @@ import { verifyRole } from "@/lib/dal";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import AdicionarItemBtn from "../../_components/AdicionarItemBtn";
 import PublicarBtn from "../../_components/PublicarBtn";
 import Link from "next/link";
 
@@ -14,32 +13,23 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
   );
   const { id } = await params;
 
-  const [caderno, decididas] = await Promise.all([
-    prisma.disciplinaryBook.findUnique({
-      where: { id },
-      include: {
-        createdBy: true,
-        course: true,
-        items: {
-          orderBy: [{ studentWarName: "asc" }],
-          include: {
-            student: { include: { course: true, platoon: true } },
-            communication: { select: { protocolNumber: true, article: true, item: true, letter: true } },
-          },
+  const caderno = await prisma.disciplinaryBook.findUnique({
+    where: { id },
+    include: {
+      createdBy: true,
+      course: true,
+      items: {
+        orderBy: [{ studentWarName: "asc" }],
+        include: {
+          student: { include: { course: true, platoon: true } },
+          communication: { select: { protocolNumber: true, article: true, item: true, letter: true } },
         },
       },
-    }),
-    prisma.communication.findMany({
-      where: { status: "DECIDIDA" },
-      include: { student: { include: { course: true, platoon: true } }, type: true, decisions: true },
-      orderBy: { updatedAt: "asc" },
-    }),
-  ]);
+    },
+  });
 
   if (!caderno) notFound();
 
-  const itemIds = new Set(caderno.items.map((i) => i.communicationId));
-  const disponiveis = decididas.filter((c) => !itemIds.has(c.id));
   const canPublish = caderno.status !== "PUBLICADO";
   const numero = caderno.course
     ? `CD Nº ${String(caderno.number).padStart(2, "0")} — ${caderno.course.name}`
@@ -132,46 +122,6 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
           <div className="px-4 py-2 bg-gray-50 border-t text-xs text-gray-500">{caderno.items.length} registro(s) compilado(s)</div>
         </div>
       </div>
-
-      {/* Decisões não incluídas */}
-      {disponiveis.length > 0 && (
-        <div className="mb-6">
-          <h2 className="font-semibold text-gray-900 mb-3">
-            Decisões não incluídas
-            <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">{disponiveis.length}</span>
-          </h2>
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="overflow-x-auto">
-              <div className="overflow-y-auto max-h-[30vh]">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-100 border-b border-gray-200 sticky top-0 z-10">
-                    <tr>
-                      <th className="text-left px-3 py-2 font-medium text-gray-700 text-xs">Protocolo</th>
-                      <th className="text-left px-3 py-2 font-medium text-gray-700 text-xs">Aluno</th>
-                      <th className="text-left px-3 py-2 font-medium text-gray-700 text-xs">Tipo</th>
-                      <th className="text-left px-3 py-2 font-medium text-gray-700 text-xs">Decisão</th>
-                      <th className="px-3 py-2"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {disponiveis.map((c) => (
-                      <tr key={c.id} className="hover:bg-gray-50">
-                        <td className="px-3 py-2 font-mono text-xs text-gray-500">{c.protocolNumber}</td>
-                        <td className="px-3 py-2 font-medium text-gray-900">{c.student.warName}</td>
-                        <td className="px-3 py-2 text-xs text-gray-600">{c.type.name}</td>
-                        <td className="px-3 py-2 text-xs text-gray-600">{c.decisions[0]?.decisionType ?? "—"}</td>
-                        <td className="px-3 py-2">
-                          <AdicionarItemBtn cadernoId={id} communicationId={c.id} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {canPublish && caderno.items.length > 0 && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-5">

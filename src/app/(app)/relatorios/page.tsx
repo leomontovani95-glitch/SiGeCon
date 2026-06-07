@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import Link from "next/link";
-import RelatorioPDF, { type RelatorioItem, type RelatorioMeta } from "./_components/RelatorioPDF";
 
 function resolveStatusLabel(c: {
   status: string;
@@ -116,7 +115,6 @@ export default async function RelatoriosPage({
   const total         = comunicacoes.length;
   const desfavoraveis = comunicacoes.filter((c) => c.type.scoreNature === "DESFAVORAVEL").length;
   const favoraveis    = comunicacoes.filter((c) => c.type.scoreNature === "FAVORAVEL").length;
-  const decididas     = comunicacoes.filter((c) => c.status === "DECIDIDA").length;
 
   const cursoSelecionado = cursosDisponiveis.find((c) => c.id === cursoId);
   const labelEscopo = school === "ESFAP" ? "Todos da EsFAP"
@@ -135,31 +133,17 @@ export default async function RelatoriosPage({
     return `/relatorios${qs ? `?${qs}` : ""}`;
   }
 
-  // Dados para o PDF
-  const pdfItems: RelatorioItem[] = comunicacoes.map((c) => ({
-    protocolNumber: c.protocolNumber,
-    typeName:       c.type.name,
-    warName:        c.student.warName,
-    courseName:     c.student.course.name,
-    factDate:       format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR }),
-    statusLabel:    resolveStatusLabel(c),
-    finalScore:     c.finalScore,
-  }));
-
-  // Monta subtítulo do PDF com os filtros aplicados
-  const filtrosAtivos: string[] = [];
-  if (cursoSelecionado) filtrosAtivos.push(cursoSelecionado.name);
-  else filtrosAtivos.push(labelEscopo);
-  if (tipo)       filtrosAtivos.push(`Tipo: ${tipo}`);
-  if (status)     filtrosAtivos.push(`Status: ${status}`);
-  if (dataInicio) filtrosAtivos.push(`De: ${dataInicio}`);
-  if (dataFim)    filtrosAtivos.push(`Até: ${dataFim}`);
-
-  const pdfMeta: RelatorioMeta = {
-    titulo:    "Relatório de Comunicações",
-    subtitulo: filtrosAtivos.join("  ·  "),
-    total, desfav: desfavoraveis, fav: favoraveis, decididas,
-  };
+  // Link para página de impressão preservando filtros ativos
+  function pdfHref() {
+    const p = new URLSearchParams();
+    if (cursoId)    p.set("cursoId",    cursoId);
+    if (tipo)       p.set("tipo",       tipo);
+    if (status)     p.set("status",     status);
+    if (dataInicio) p.set("dataInicio", dataInicio);
+    if (dataFim)    p.set("dataFim",    dataFim);
+    const qs = p.toString();
+    return `/relatorios/imprimir${qs ? `?${qs}` : ""}`;
+  }
 
   return (
     <div className="p-6">
@@ -172,7 +156,9 @@ export default async function RelatoriosPage({
             {" · "}{total} resultado(s)
           </p>
         </div>
-        <RelatorioPDF items={pdfItems} meta={pdfMeta} />
+        <Link href={pdfHref()} target="_blank" className="bg-[#1e3a5f] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#16304f] transition-colors flex items-center gap-2">
+          <span>📄</span> Gerar PDF
+        </Link>
       </div>
 
       {/* Seletor de cursos */}
@@ -246,7 +232,7 @@ export default async function RelatoriosPage({
           { label: "Total",          value: total,         color: "bg-blue-600" },
           { label: "Desfavoráveis",  value: desfavoraveis, color: "bg-red-600" },
           { label: "Favoráveis",     value: favoraveis,    color: "bg-green-600" },
-          { label: "Decididas",      value: decididas,     color: "bg-teal-600" },
+          { label: "Decididas",      value: comunicacoes.filter((c) => c.status === "DECIDIDA").length, color: "bg-teal-600" },
         ].map((card) => (
           <div key={card.label} className={`${card.color} rounded-xl p-4 text-white`}>
             <p className="text-2xl font-bold">{card.value}</p>
