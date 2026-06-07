@@ -4,6 +4,38 @@ import { prisma } from "@/lib/db";
 import { verifyRole } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
 
+type State = { error: string } | undefined;
+
+export async function adicionarPelotaoNoCurso(courseId: string, _prev: State, formData: FormData): Promise<State> {
+  const session = await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO");
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "Nome do pelotão é obrigatório." };
+  try {
+    const p = await prisma.platoon.create({ data: { courseId, name, active: true } });
+    await auditLog(session.userId, "CREATE", "Platoon", p.id, name);
+  } catch {
+    return { error: "Erro ao adicionar pelotão." };
+  }
+  redirect(`/cursos/${courseId}/editar`);
+}
+
+export async function excluirPelotaoNoCurso(courseId: string, platoonId: string, _prev: State, _fd: FormData): Promise<State> {
+  const session = await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO");
+  const pelotao = await prisma.platoon.findUnique({
+    where: { id: platoonId },
+    include: { _count: { select: { students: true } } },
+  });
+  if (!pelotao) return { error: "Pelotão não encontrado." };
+  if (pelotao._count.students > 0) return { error: `Não é possível excluir: pelotão possui ${pelotao._count.students} aluno(s).` };
+  try {
+    await prisma.platoon.delete({ where: { id: platoonId } });
+    await auditLog(session.userId, "DELETE", "Platoon", platoonId, pelotao.name);
+  } catch {
+    return { error: "Erro ao excluir pelotão." };
+  }
+  redirect(`/cursos/${courseId}/editar`);
+}
+
 export async function excluirCurso(id: string, _prev: { error: string } | undefined, _fd: FormData): Promise<{ error: string } | undefined> {
   const session = await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO");
   const curso = await prisma.course.findUnique({
@@ -22,8 +54,6 @@ export async function excluirCurso(id: string, _prev: { error: string } | undefi
   }
   redirect("/cursos");
 }
-
-type State = { error: string } | undefined;
 
 export async function salvarCurso(id: string | null, _prev: State, formData: FormData): Promise<State> {
   const session = await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO");

@@ -1,44 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
-import { decrypt } from "@/lib/session";
+import { jwtVerify } from "jose";
 
-const publicRoutes = ["/login"];
+const encodedKey = new TextEncoder().encode(process.env.SESSION_SECRET!);
 
-export default async function proxy(req: NextRequest) {
-  const path = req.nextUrl.pathname;
+export default async function proxy(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
 
+  // Não interceptar rotas de autenticação, página de perfil ou server actions (POST com Next-Action)
   if (
-    path.startsWith("/_next") ||
-    path.startsWith("/api") ||
-    path === "/manifest.json" ||
-    path === "/sw.js" ||
-    path.startsWith("/icons")
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/logout") ||
+    pathname.startsWith("/perfil") ||
+    request.headers.has("Next-Action")
   ) {
     return NextResponse.next();
   }
 
-  // Em proxy/middleware, usar req.cookies (não cookies() de next/headers)
-  const token = req.cookies.get("session")?.value;
-  const session = await decrypt(token);
-  const isPublic = publicRoutes.includes(path);
+  const token = request.cookies.get("session")?.value;
+  if (!token) return NextResponse.next();
 
-  if (!isPublic && !session?.userId) {
-    const url = new URL("/login", req.nextUrl);
-    url.searchParams.set("redirect", path);
-    return NextResponse.redirect(url);
-  }
+  try {
+    const { payload } = await jwtVerify(token, encodedKey, { algorithms: ["HS256"] });
+    const session = payload as { mustChangePassword?: boolean };
 
-  if (isPublic && session?.userId) {
-    return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
-  }
-
-  // Força troca de senha no primeiro acesso
-  if (session?.mustChangePassword && !path.startsWith("/perfil") && !path.startsWith("/logout")) {
-    return NextResponse.redirect(new URL("/perfil?mustChange=1", req.nextUrl));
+    if (session.mustChangePassword) {
+      return NextResponse.redirect(new URL("/perfil?mustChange=1", request.url));
+    }
+  } catch {
+    // Token inválido ou expirado — verifySession no layout trata o redirecionamento para /login
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icons|sw.js|manifest.json).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api).*)"],
 };

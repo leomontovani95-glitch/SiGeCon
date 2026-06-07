@@ -31,10 +31,8 @@ export default async function EditarUsuarioPage({ params }: { params: Promise<{ 
           warName: usuario.warName,
           rank: usuario.rank,
           rg: usuario.rg,
-          cpf: usuario.cpf ?? "",
           escola: usuario.escola ?? "TODAS",
           functionalNumber: usuario.functionalNumber,
-          email: usuario.email ?? "",
           role: usuario.role,
           active: String(usuario.active),
         }}

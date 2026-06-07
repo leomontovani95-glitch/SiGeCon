@@ -2,9 +2,9 @@
 import { useActionState } from "react";
 import { salvarCurso } from "../actions";
 
-type Props = { defaultValues?: Record<string, string>; id?: string; currentPlatoonCount?: number };
+type Props = { defaultValues?: Record<string, string>; id?: string };
 
-export default function CursoForm({ defaultValues, id, currentPlatoonCount }: Props) {
+export default function CursoForm({ defaultValues, id }: Props) {
   const action = salvarCurso.bind(null, id ?? null);
   const [state, formAction, pending] = useActionState(action, undefined);
 
@@ -35,12 +35,6 @@ export default function CursoForm({ defaultValues, id, currentPlatoonCount }: Pr
           <label className="block text-sm font-medium text-gray-700 mb-1">Quantidade de Pelotões</label>
           <input name="platoonCount" type="number" min="0" defaultValue="0" className="input" placeholder="0" />
           <p className="text-xs text-gray-400 mt-1">Pelotões serão criados automaticamente de 1º ao Nº informado.</p>
-        </div>
-      )}
-      {id && currentPlatoonCount !== undefined && (
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Pelotões cadastrados</label>
-          <p className="text-sm text-gray-600">{currentPlatoonCount} pelotão(ões)</p>
         </div>
       )}
       <div>

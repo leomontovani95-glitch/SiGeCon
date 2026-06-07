@@ -110,7 +110,7 @@ export async function tomarCienciaComDefesa(_prev: State, formData: FormData): P
     include: { student: true },
   });
   if (!comm) return { error: "Comunicação não encontrada." };
-  if (session.role === "ALUNO" && comm.student.email !== session.email)
+  if (session.role === "ALUNO" && comm.student.userId !== session.userId)
     return { error: "Sem permissão." };
   if (comm.status !== "AGUARDANDO_CIENCIA")
     return { error: "Esta comunicação não aguarda ciência." };
@@ -146,21 +146,25 @@ export async function tomarCienciaComDefesa(_prev: State, formData: FormData): P
   // Prazo de defesa: 2 dias úteis a partir de agora (ciência imediata)
   const prazo = calcularPrazoDefesa(new Date());
 
-  await prisma.studentAcknowledgement.create({
-    data: { communicationId, studentId: comm.studentId, method: "SISTEMA" },
-  });
-  await prisma.defense.create({
-    data: {
-      communicationId, studentId: comm.studentId, text,
-      isLate: false, attachmentId: anexoId,
-    },
-  });
-  await prisma.communication.update({
-    where: { id: communicationId },
-    data: { status: "AGUARDANDO_PARECER", defenseDeadline: prazo },
-  });
-  await auditLog(session.userId, "CIENCIA_COM_DEFESA", "Communication", communicationId,
-    anexoId ? "Com anexo — encaminhado ao Subcomandante/Oficial" : "Sem anexo — encaminhado ao Subcomandante/Oficial");
+  try {
+    await prisma.studentAcknowledgement.create({
+      data: { communicationId, studentId: comm.studentId, method: "SISTEMA" },
+    });
+    await prisma.defense.create({
+      data: {
+        communicationId, studentId: comm.studentId, text,
+        isLate: false, attachmentId: anexoId,
+      },
+    });
+    await prisma.communication.update({
+      where: { id: communicationId },
+      data: { status: "AGUARDANDO_PARECER", defenseDeadline: prazo },
+    });
+    await auditLog(session.userId, "CIENCIA_COM_DEFESA", "Communication", communicationId,
+      anexoId ? "Com anexo — encaminhado ao Subcomandante/Oficial" : "Sem anexo — encaminhado ao Subcomandante/Oficial");
+  } catch {
+    return { error: "Erro ao registrar ciência/defesa. Tente novamente." };
+  }
   redirect(`/comunicacoes/${communicationId}`);
 }
 
@@ -174,20 +178,24 @@ export async function tomarCienciaSemDefesa(_prev: State, formData: FormData): P
     include: { student: true },
   });
   if (!comm) return { error: "Comunicação não encontrada." };
-  if (session.role === "ALUNO" && comm.student.email !== session.email)
+  if (session.role === "ALUNO" && comm.student.userId !== session.userId)
     return { error: "Sem permissão." };
   if (comm.status !== "AGUARDANDO_CIENCIA")
     return { error: "Esta comunicação não aguarda ciência." };
 
-  await prisma.studentAcknowledgement.create({
-    data: { communicationId, studentId: comm.studentId, method: "SEM_DEFESA" },
-  });
-  await prisma.communication.update({
-    where: { id: communicationId },
-    data: { status: "AGUARDANDO_PARECER" },
-  });
-  await auditLog(session.userId, "CIENCIA_SEM_DEFESA", "Communication", communicationId,
-    "Sem defesa — encaminhado ao Subcomandante/Oficial para parecer");
+  try {
+    await prisma.studentAcknowledgement.create({
+      data: { communicationId, studentId: comm.studentId, method: "SEM_DEFESA" },
+    });
+    await prisma.communication.update({
+      where: { id: communicationId },
+      data: { status: "AGUARDANDO_PARECER" },
+    });
+    await auditLog(session.userId, "CIENCIA_SEM_DEFESA", "Communication", communicationId,
+      "Sem defesa — encaminhado ao Subcomandante/Oficial para parecer");
+  } catch {
+    return { error: "Erro ao registrar ciência. Tente novamente." };
+  }
   redirect(`/comunicacoes/${communicationId}`);
 }
 

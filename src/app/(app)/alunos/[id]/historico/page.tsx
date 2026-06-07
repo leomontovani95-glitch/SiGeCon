@@ -29,7 +29,7 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
   ]);
   if (!aluno) notFound();
 
-  if (session.role === "ALUNO" && aluno.email !== session.email) notFound();
+  if (session.role === "ALUNO" && aluno.userId !== session.userId) notFound();
 
   const nota  = calcularNotaPublicada(pubItems);
   const faixa = faixaNota(nota);

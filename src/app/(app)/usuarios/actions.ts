@@ -7,50 +7,41 @@ import { auditLog } from "@/lib/audit";
 
 type State = { error: string } | undefined;
 
+function senhaInicial(functionalNumber: string, rg: string): string {
+  return functionalNumber + rg.replace(/[^a-zA-Z0-9]/g, "");
+}
+
 export async function salvarUsuario(id: string | null, _prev: State, formData: FormData): Promise<State> {
   const session = await verifyRole(
     "ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO",
     "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
   );
 
-  const fullName        = String(formData.get("fullName")        ?? "").trim();
-  const warName         = String(formData.get("warName")         ?? "").trim();
-  const rank            = String(formData.get("rank")            ?? "").trim();
-  const rg              = String(formData.get("rg")              ?? "").trim();
-  const cpf             = String(formData.get("cpf")             ?? "").trim() || null;
-  const escola          = String(formData.get("escola")          ?? "TODAS").trim();
-  const functionalNumber= String(formData.get("functionalNumber")?? "").trim();
-  const email           = String(formData.get("email")           ?? "").trim().toLowerCase() || null;
-  const password        = String(formData.get("password")        ?? "");
-  const role            = String(formData.get("role")            ?? "PROTOCOLO");
-  const additionalRoles = (formData.getAll("additionalRoles") as string[])
+  const fullName         = String(formData.get("fullName")         ?? "").trim();
+  const warName          = String(formData.get("warName")          ?? "").trim();
+  const rank             = String(formData.get("rank")             ?? "").trim();
+  const rg               = String(formData.get("rg")              ?? "").trim();
+  const escola           = String(formData.get("escola")           ?? "TODAS").trim();
+  const functionalNumber = String(formData.get("functionalNumber") ?? "").trim();
+  const password         = String(formData.get("password")         ?? "");
+  const role             = String(formData.get("role")             ?? "PROTOCOLO");
+  const additionalRoles  = (formData.getAll("additionalRoles") as string[])
     .filter((r) => r && r !== role)
     .join(",");
   const active = formData.get("active") === "true";
 
-  if (!fullName || !warName || !rank || !rg || !functionalNumber || !cpf) {
-    return { error: "Preencha todos os campos obrigatórios (incluindo CPF)." };
+  if (!fullName || !warName || !rank || !rg || !functionalNumber) {
+    return { error: "Preencha todos os campos obrigatórios." };
   }
   if (password && password.length < 6) {
     return { error: "A senha deve ter no mínimo 6 caracteres." };
   }
 
-  // Campos base explicitamente tipados — evita PrismaClientValidationError com Record<string, unknown>
   const baseFields = {
-    fullName,
-    warName,
-    rank,
-    rg,
-    cpf,
-    escola,
-    functionalNumber,
-    email,
-    role,
-    additionalRoles,
-    active,
+    fullName, warName, rank, rg, escola, functionalNumber, role, additionalRoles, active,
   };
 
-  const senhaEfetiva = password || (!id ? functionalNumber : "");
+  const senhaEfetiva = password || (!id ? senhaInicial(functionalNumber, rg) : "");
 
   try {
     if (id) {
@@ -66,19 +57,17 @@ export async function salvarUsuario(id: string | null, _prev: State, formData: F
         data: {
           ...baseFields,
           passwordHash: await bcrypt.hash(senhaEfetiva, 10),
+          mustChangePassword: true,
         },
       });
       await auditLog(session.userId, "CREATE", "User", user.id, `Criado: ${fullName}`);
     }
   } catch (e: unknown) {
-    // Loga o erro completo no servidor para diagnóstico
     console.error("[salvarUsuario] erro:", e);
-
     const code = (e as { code?: string })?.code;
     const msg  = e instanceof Error ? e.message : String(e);
-
     if (code === "P2002" || msg.toLowerCase().includes("unique")) {
-      return { error: "E-mail, RG, CPF ou número funcional já cadastrado em outro usuário." };
+      return { error: "RG ou Número Funcional já cadastrado em outro usuário." };
     }
     if (code === "P2025") {
       return { error: "Usuário não encontrado. Tente recarregar a página." };
@@ -102,11 +91,12 @@ export async function resetarSenha(userId: string, _prev: ResetState, _fd: FormD
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return { error: "Usuário não encontrado." };
   if (!user.functionalNumber) return { error: "Número Funcional não cadastrado. Não é possível redefinir a senha automaticamente." };
+  const novaSenha = senhaInicial(user.functionalNumber, user.rg);
   await prisma.user.update({
     where: { id: userId },
-    data: { passwordHash: await bcrypt.hash(user.functionalNumber, 10) },
+    data: { passwordHash: await bcrypt.hash(novaSenha, 10), mustChangePassword: true },
   });
-  return { success: `Senha redefinida para o Número Funcional (${user.functionalNumber}).` };
+  return { success: `Senha redefinida para: Nº Funcional + RG sem pontuação.` };
 }
 
 export async function excluirUsuario(id: string, _prev: { error: string } | undefined, _fd: FormData): Promise<{ error: string } | undefined> {

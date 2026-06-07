@@ -25,7 +25,7 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
   });
   if (!comm) notFound();
 
-  if (session.role === "ALUNO" && comm.student.email !== session.email) notFound();
+  if (session.role === "ALUNO" && comm.student.userId !== session.userId) notFound();
 
   const isCPI = comm.type.name.startsWith("CPI");
   const docTitle = isCPI ? `CPI — ${comm.protocolNumber}` : `Referência Elogiosa — ${comm.protocolNumber}`;

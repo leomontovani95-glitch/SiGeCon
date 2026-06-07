@@ -4,9 +4,9 @@ import { calcularNotaPublicada, faixaNota, zonaDeRisco } from "@/lib/score";
 import Link from "next/link";
 
 // ── Dashboard do ALUNO ────────────────────────────────────────────────────
-async function getDashboardAluno(email: string) {
+async function getDashboardAluno(userId: string) {
   const aluno = await prisma.student.findFirst({
-    where: { email },
+    where: { userId },
     include: {
       course: true,
       platoon: true,
@@ -150,7 +150,7 @@ export default async function DashboardPage({
 
   // ── PORTAL DO ALUNO ──────────────────────────────────────────────────────
   if (session.role === "ALUNO") {
-    const dados = await getDashboardAluno(session.email);
+    const dados = await getDashboardAluno(session.userId);
 
     if (!dados) {
       return (

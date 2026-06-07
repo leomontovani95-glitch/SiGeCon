@@ -10,25 +10,24 @@ export async function login(
   _prev: LoginState,
   formData: FormData
 ): Promise<LoginState> {
-  const input = String(formData.get("cpf") ?? "").trim();
+  const input = String(formData.get("functionalNumber") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
   if (!input || !password) {
-    return { error: "Preencha CPF e senha." };
+    return { error: "Preencha o Número Funcional e a senha." };
   }
 
-  // Aceita CPF (novo padrão) ou e-mail (retrocompatibilidade com contas existentes)
   const user = await prisma.user.findFirst({
-    where: { OR: [{ cpf: input }, { email: input }] },
+    where: { functionalNumber: input },
   });
 
   if (!user || !user.active) {
-    return { error: "CPF ou senha inválidos." };
+    return { error: "Número Funcional ou senha inválidos." };
   }
 
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) {
-    return { error: "CPF ou senha inválidos." };
+    return { error: "Número Funcional ou senha inválidos." };
   }
 
   await createSession({

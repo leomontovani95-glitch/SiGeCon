@@ -30,10 +30,8 @@ export default async function PerfilPage({ searchParams }: { searchParams: Promi
     { label: "Nome completo",   value: user.fullName },
     { label: "Nome de guerra",  value: user.warName },
     { label: "Posto/Graduação", value: user.rank },
-    { label: "CPF",             value: user.cpf ?? "Não informado" },
     { label: "RG",              value: user.rg },
     { label: "Nº Funcional",    value: user.functionalNumber },
-    { label: "E-mail",          value: user.email },
     { label: "Função",          value: ROLE_LABELS[user.role] ?? user.role },
     { label: "Situação",        value: user.active ? "Ativo" : "Inativo" },
   ];

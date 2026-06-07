@@ -23,14 +23,14 @@ export default function LoginPage() {
         <form action={action} className="space-y-5">
           <div>
             <label
-              htmlFor="cpf"
+              htmlFor="functionalNumber"
               className="block text-sm font-medium text-gray-700 mb-1"
             >
-              Login
+              Número Funcional
             </label>
             <input
-              id="cpf"
-              name="cpf"
+              id="functionalNumber"
+              name="functionalNumber"
               type="text"
               autoComplete="username"
               required
@@ -85,18 +85,17 @@ export default function LoginPage() {
           <div className="mt-3 bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm space-y-3">
             <p className="font-semibold text-blue-800">Redefinição de senha</p>
             <div>
-              <p className="font-medium text-gray-700">Se você é aluno:</p>
+              <p className="font-medium text-gray-700">Senha do primeiro acesso:</p>
               <p className="text-gray-600 mt-0.5">
-                Entre em contato com o seu <strong>Chefe de Curso</strong>, que encaminhará
-                a solicitação ao administrador do sistema para redefinição da senha.
+                A senha inicial é o <strong>Número Funcional + RG sem pontuação</strong>.
+                Ex.: Funcional <em>123456</em> e RG <em>20.000-0</em> → senha <em>123456200000</em>.
               </p>
             </div>
             <div>
-              <p className="font-medium text-gray-700">Se você é servidor com função:</p>
+              <p className="font-medium text-gray-700">Esqueceu a senha após o primeiro acesso:</p>
               <p className="text-gray-600 mt-0.5">
-                Entre em contato diretamente com o <strong>Administrador do Sistema</strong>
-                {" "}ou com o <strong>Comandante da sua Escola</strong> para solicitar
-                a redefinição da senha.
+                Entre em contato com o <strong>Administrador do Sistema</strong> ou com o{" "}
+                <strong>Comandante da sua Escola</strong> para redefinição.
               </p>
             </div>
           </div>

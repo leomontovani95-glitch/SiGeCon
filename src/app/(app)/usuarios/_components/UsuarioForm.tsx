@@ -89,22 +89,8 @@ export default function UsuarioForm({ defaultValues, additionalRolesDefault = []
           <input name="functionalNumber" defaultValue={defaultValues?.functionalNumber} required className="input" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">CPF *</label>
-          <input name="cpf" defaultValue={defaultValues?.cpf} required className="input" placeholder="000.000.000-00" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
-          <input
-            name="email"
-            type="email"
-            defaultValue={defaultValues?.email ?? ""}
-            className="input"
-            autoComplete="off"
-          />
-        </div>
-        <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Senha{id ? " (deixe em branco para manter)" : " (deixe em branco para usar o nº funcional)"}
+            Senha{id ? " (deixe em branco para manter)" : " (deixe em branco para usar Nº Funcional + RG sem pontuação)"}
           </label>
           <input
             name="password"

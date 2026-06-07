@@ -142,7 +142,7 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
   if (cursoId)      where.courseId = cursoId;
   else if (school)  where.course   = { school };
   if (session.role === "ALUNO") {
-    const aluno = await prisma.student.findFirst({ where: { email: session.email } });
+    const aluno = await prisma.student.findFirst({ where: { userId: session.userId } });
     if (aluno) where.studentId = aluno.id;
   }
 

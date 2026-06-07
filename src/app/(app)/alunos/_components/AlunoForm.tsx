@@ -15,9 +15,8 @@ const STATUS_OPTIONS = [
 
 type DefaultValues = {
   fullName?: string; warName?: string; courseNumber?: string;
-  cpf?: string; rg?: string; functionalNumber?: string;
-  email?: string; status?: string;
-  courseId?: string; platoonId?: string;
+  rg?: string; functionalNumber?: string;
+  status?: string; courseId?: string; platoonId?: string;
 };
 
 type Props = { defaultValues?: DefaultValues; id?: string; courses: CourseOption[] };
@@ -93,21 +92,15 @@ export default function AlunoForm({ defaultValues, id, courses }: Props) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">CPF * <span className="text-gray-400 font-normal">(login)</span></label>
-          <input name="cpf" defaultValue={defaultValues?.cpf} required className="input" placeholder="000.000.000-00" />
-        </div>
-        <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">RG *</label>
           <input name="rg" defaultValue={defaultValues?.rg} required className="input" />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Número Funcional * <span className="text-gray-400 font-normal">(senha inicial)</span></label>
-          <input name="functionalNumber" defaultValue={defaultValues?.functionalNumber} required className="input" />
-        </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
-          <input name="email" type="email" defaultValue={defaultValues?.email} className="input" />
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Número Funcional * <span className="text-gray-400 font-normal">(login)</span>
+          </label>
+          <input name="functionalNumber" defaultValue={defaultValues?.functionalNumber} required className="input" />
         </div>
 
         <div>
@@ -117,6 +110,10 @@ export default function AlunoForm({ defaultValues, id, courses }: Props) {
           </select>
         </div>
       </div>
+
+      <p className="text-xs text-gray-400">
+        Senha do primeiro acesso: Número Funcional + RG sem pontuação.
+      </p>
 
       {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
 

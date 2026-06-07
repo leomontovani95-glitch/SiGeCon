@@ -38,7 +38,7 @@ export default async function ComunicacaoPage({ params }: { params: Promise<{ id
   if (!comm) notFound();
 
   if (session.role === "ALUNO") {
-    const ehEsteAluno = comm.student.userId === session.userId || comm.student.email === session.email;
+    const ehEsteAluno = comm.student.userId === session.userId;
     if (!ehEsteAluno) notFound();
   }
 
@@ -50,8 +50,7 @@ export default async function ComunicacaoPage({ params }: { params: Promise<{ id
       })
     : null;
 
-  const alunoEhEssePerfil = session.role === "ALUNO" &&
-    (comm.student.userId === session.userId || comm.student.email === session.email);
+  const alunoEhEssePerfil = session.role === "ALUNO" && comm.student.userId === session.userId;
 
   return (
     <div className="p-6 max-w-4xl">
@@ -105,12 +104,10 @@ export default async function ComunicacaoPage({ params }: { params: Promise<{ id
         </div>
       </div>
 
-      {!["ALUNO"].includes(session.role) && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Descrição do Fato</h2>
-          <p className="text-sm text-gray-700 whitespace-pre-wrap">{comm.factDescription}</p>
-        </div>
-      )}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Descrição do Fato</h2>
+        <p className="text-sm text-gray-700 whitespace-pre-wrap">{comm.factDescription}</p>
+      </div>
 
       {comm.article && (
         <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">

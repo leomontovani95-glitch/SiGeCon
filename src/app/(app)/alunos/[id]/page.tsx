@@ -21,7 +21,7 @@ export default async function AlunoPage({ params }: { params: Promise<{ id: stri
   const { id } = await params;
 
   if (session.role === "ALUNO") {
-    const aluno = await prisma.student.findFirst({ where: { id, email: session.email } });
+    const aluno = await prisma.student.findFirst({ where: { id, userId: session.userId } });
     if (!aluno) notFound();
   }
 
