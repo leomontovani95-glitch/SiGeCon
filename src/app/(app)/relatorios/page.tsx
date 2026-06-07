@@ -11,6 +11,8 @@ function resolveStatusLabel(c: {
   decisions: { decisionType: string }[];
   disciplinaryBookItems: { disciplinaryBook: { status: string } }[];
 }): string {
+  // Status legado: equivale a Decidida/Publicada
+  if (c.status === "PUBLICADA_CADERNO") return "Decidida/Publicada";
   if (c.status === "DECIDIDA") {
     const arq = c.decisions.some((d) => d.decisionType.toLowerCase().includes("arquiv"));
     if (arq) return "Arquivada";
@@ -67,7 +69,12 @@ export default async function RelatoriosPage({
   if (status) {
     switch (status) {
       case "DECIDIDA_PUBLICADA":
-        Object.assign(where, { status: "DECIDIDA", disciplinaryBookItems: { some: { disciplinaryBook: { status: "PUBLICADO" } } } });
+        Object.assign(where, {
+          OR: [
+            { status: "PUBLICADA_CADERNO" },
+            { status: "DECIDIDA", disciplinaryBookItems: { some: { disciplinaryBook: { status: "PUBLICADO" } } } },
+          ],
+        });
         break;
       case "DECIDIDA_NAO_PUBLICADA":
         Object.assign(where, {

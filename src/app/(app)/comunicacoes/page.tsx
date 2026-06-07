@@ -40,6 +40,10 @@ type CommItem = {
 };
 
 function derivedStatus(c: CommItem): { key: string; label: string; color: string } {
+  // PUBLICADA_CADERNO é status legado — semanticamente equivale a Decidida/Publicada
+  if (c.status === "PUBLICADA_CADERNO") {
+    return { key: "DECIDIDA_PUBLICADA", label: "Decidida/Publicada", color: "bg-teal-100 text-teal-700" };
+  }
   if (c.status === "DECIDIDA") {
     const arquivada = c.decisions.some((d) => d.decisionType.toLowerCase().includes("arquiv"));
     if (arquivada) return { key: "ARQUIVADA_DEC", label: "Arquivada", color: "bg-gray-100 text-gray-700" };
@@ -70,7 +74,13 @@ function buildStatusWhere(status: string): Record<string, unknown> | null {
   if (!status) return null;
   switch (status) {
     case "DECIDIDA_PUBLICADA":
-      return { status: "DECIDIDA", disciplinaryBookItems: { some: { disciplinaryBook: { status: "PUBLICADO" } } } };
+      // Inclui tanto DECIDIDA (com item publicado) quanto o status legado PUBLICADA_CADERNO
+      return {
+        OR: [
+          { status: "PUBLICADA_CADERNO" },
+          { status: "DECIDIDA", disciplinaryBookItems: { some: { disciplinaryBook: { status: "PUBLICADO" } } } },
+        ],
+      };
     case "DECIDIDA_NAO_PUBLICADA":
       return {
         status: "DECIDIDA",
