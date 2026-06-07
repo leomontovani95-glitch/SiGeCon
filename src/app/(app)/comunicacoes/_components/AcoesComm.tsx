@@ -3,55 +3,11 @@ import { useActionState, useState, useRef } from "react";
 import {
   tomarCienciaComDefesa,
   tomarCienciaSemDefesa,
-  emitirParecer,
   proferirDecisao,
   corrigirPontuacao,
 } from "../actions";
 
 type Sugestao = { titulo: string; texto: string };
-
-const SUGESTOES_PARECER: Record<string, Sugestao[]> = {
-  "Sugiro punição": [
-    {
-      titulo: "Concisa",
-      texto: "Analisados os fatos e os elementos constantes nos autos, verifico que a infração disciplinar está devidamente comprovada, não havendo justificativa suficiente a elidir a conduta irregular. Manifesto-me pelo sancionamento disciplinar do aluno.",
-    },
-    {
-      titulo: "Detalhada",
-      texto: "Após análise criteriosa dos fatos relatados, dos documentos constantes nos autos e da defesa apresentada pelo aluno, verifico que a conduta praticada contraria as normas disciplinares vigentes nesta Escola. A prova colhida é robusta e a justificativa apresentada não foi suficiente para desconstituir a irregularidade apurada. Diante do exposto, manifesto-me pelo sancionamento disciplinar, na forma regulamentar.",
-    },
-  ],
-  "Sugiro arquivamento": [
-    {
-      titulo: "Concisa",
-      texto: "Analisados os fatos e as justificativas apresentadas, constato que os elementos dos autos não são suficientes para a aplicação de sanção disciplinar. Manifesto-me pelo arquivamento da presente comunicação.",
-    },
-    {
-      titulo: "Detalhada",
-      texto: "Após análise dos fatos relatados e da defesa apresentada pelo aluno, verifico que as justificativas são procedentes e os elementos constantes nos autos não sustentam a aplicação de medida sancionatória. A conduta, embora passível de registro, não reúne os requisitos necessários para ensejar punição disciplinar. Diante do exposto, manifesto-me pelo arquivamento da presente comunicação.",
-    },
-  ],
-  "Sugiro reenquadramento de artigo": [
-    {
-      titulo: "Concisa",
-      texto: "Após análise dos fatos e dos dispositivos regulamentares aplicáveis, verifico que a conduta relatada melhor se enquadra em artigo diverso do originalmente indicado. Manifesto-me pelo reenquadramento, conforme fundamentos acima.",
-    },
-    {
-      titulo: "Detalhada",
-      texto: "Após análise detalhada dos fatos narrados e do cotejo com os dispositivos regulamentares vigentes, verifico que a tipificação originalmente atribuída à conduta não corresponde com precisão ao dispositivo aplicável. A conduta praticada encontra melhor enquadramento em artigo diverso, que prevê a infração de forma mais específica. Manifesto-me pelo reenquadramento do artigo, com o prosseguimento do processo sob a nova tipificação.",
-    },
-  ],
-  "Sugiro homologação (Referência Elogiosa)": [
-    {
-      titulo: "Concisa",
-      texto: "Analisados os fatos e os elementos constantes nos autos, verifico que o comportamento do aluno é digno de reconhecimento formal. Manifesto-me pela homologação da Referência Elogiosa.",
-    },
-    {
-      titulo: "Detalhada",
-      texto: "Após análise dos fatos relatados e dos elementos constantes nos autos, verifico que o comportamento do aluno destaca-se positivamente, demonstrando dedicação, comprometimento e conduta exemplar no âmbito desta Escola. As circunstâncias narradas atendem plenamente aos requisitos para o reconhecimento formal. Diante do exposto, manifesto-me pela homologação da Referência Elogiosa, que deverá ser anotada nos assentamentos do aluno.",
-    },
-  ],
-};
 
 const SUGESTOES_DECISAO: Record<string, Sugestao[]> = {
   "Punição": [
@@ -111,8 +67,7 @@ function pontuacaoPadrao(typeName: string, item: string | null): number | null {
 
 function nomeCpiDoInciso(typeName: string, item: string | null): string {
   const name = typeName.toLowerCase();
-  if (name.includes("referência elogiosa") || name.includes("referencia elogiosa"))
-    return "Referência Elogiosa";
+  if (name.includes("referência elogiosa") || name.includes("referencia elogiosa")) return "Referência Elogiosa";
   if (!item) return "CPI 0";
   if (item === "I") return "CPI 1";
   if (item === "II") return "CPI 2";
@@ -137,20 +92,17 @@ type CommInfo = {
 type SessionInfo = { role: string; userId: string; email: string };
 
 export default function AcoesComm({
-  comm, session, studentEmail, alunoEhEssePerfil, manualRules,
+  comm, session, alunoEhEssePerfil, mostraFormDefesa, manualRules,
 }: {
   comm: CommInfo;
   session: SessionInfo;
-  studentEmail: string;
   alunoEhEssePerfil: boolean;
+  mostraFormDefesa: boolean;
   manualRules: ManualRule[];
 }) {
-  const [mostraDefesa, setMostraDefesa] = useState(false);
-  const [arquivo, setArquivo] = useState<File | null>(null);
+  const [arquivos, setArquivos] = useState<File[]>([]);
   const [arquivoErro, setArquivoErro] = useState("");
   const [decisaoTipo, setDecisaoTipo] = useState("");
-  const [parecerRec, setParecerRec] = useState("");
-  const [parecerTexto, setParecerTexto] = useState("");
   const [decisaoTexto, setDecisaoTexto] = useState("");
   const [finalScoreDecisao, setFinalScoreDecisao] = useState<string>(() => {
     const def = pontuacaoPadrao(comm.typeName, comm.item);
@@ -163,17 +115,10 @@ export default function AcoesComm({
 
   const [defState, defAction, defPending] = useActionState(tomarCienciaComDefesa, undefined);
   const [semDefState, semDefAction, semDefPending] = useActionState(tomarCienciaSemDefesa, undefined);
-  const [parecerState, parecerAction, parecerPending] = useActionState(emitirParecer, undefined);
   const [decisaoState, decisaoAction, decisaoPending] = useActionState(proferirDecisao, undefined);
   const [correcaoState, correcaoAction, correcaoPending] = useActionState(corrigirPontuacao, undefined);
 
-  // Apenas o aluno pode tomar ciência/defesa
   const canTakeAck = alunoEhEssePerfil && comm.status === "AGUARDANDO_CIENCIA";
-  // Subcomandante/Oficial emitem parecer assim que o aluno toma ciência (status AGUARDANDO_PARECER)
-  const canEmitParecer =
-    ["SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO"].includes(session.role) &&
-    comm.status === "AGUARDANDO_PARECER" &&
-    comm.opinions.length === 0;
   const canDecide =
     ["ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA"].includes(session.role) &&
     comm.status === "AGUARDANDO_DECISAO";
@@ -181,42 +126,46 @@ export default function AcoesComm({
     ["ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA"].includes(session.role) &&
     comm.decisions.length > 0;
 
-  function validarArquivo(file: File | null) {
-    if (!file) { setArquivoErro(""); setArquivo(null); return; }
+  const baseUrl = `/comunicacoes/${comm.id}`;
+
+  function validarArquivos(files: FileList | null) {
+    if (!files || files.length === 0) { setArquivoErro(""); setArquivos([]); return; }
+    const lista = Array.from(files);
     const tiposOk = ["image/png", "image/jpeg", "application/pdf"];
-    if (!tiposOk.includes(file.type)) {
-      setArquivoErro("Formato inválido. Use PNG, JPEG ou PDF.");
-      setArquivo(null);
-      if (fileRef.current) fileRef.current.value = "";
-      return;
+    for (const f of lista) {
+      if (!tiposOk.includes(f.type)) {
+        setArquivoErro(`Formato inválido (${f.name}). Use PNG, JPEG ou PDF.`);
+        setArquivos([]);
+        if (fileRef.current) fileRef.current.value = "";
+        return;
+      }
     }
-    if (file.size > 10 * 1024 * 1024) {
-      setArquivoErro("Arquivo maior que 10 MB.");
-      setArquivo(null);
+    const totalBytes = lista.reduce((s, f) => s + f.size, 0);
+    if (totalBytes > 5 * 1024 * 1024) {
+      setArquivoErro(`Total excede 5 MB (${(totalBytes / 1024 / 1024).toFixed(1)} MB).`);
+      setArquivos([]);
       if (fileRef.current) fileRef.current.value = "";
       return;
     }
     setArquivoErro("");
-    setArquivo(file);
+    setArquivos(lista);
   }
 
   return (
     <div className="space-y-4 mt-6">
-      {/* ── CIÊNCIA DO ALUNO ─────────────────────────────────── */}
-      {canTakeAck && !mostraDefesa && (
+
+      {/* ── OPÇÕES DE CIÊNCIA (antes de tomar ciência) ────────────── */}
+      {canTakeAck && !mostraFormDefesa && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
           <h3 className="font-semibold text-yellow-900 mb-2">Ciência da Comunicação</h3>
           <p className="text-sm text-gray-600 mb-4">
             Você tem duas opções: apresentar sua justificativa/defesa ou apenas tomar ciência sem defesa.
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              type="button"
-              onClick={() => setMostraDefesa(true)}
-              className="btn-primary text-sm"
-            >
+            {/* Link — troca para URL com ?defesa=1, sem dependência de React state */}
+            <a href={`${baseUrl}?defesa=1`} className="btn-primary text-sm text-center">
               Tomar ciência e apresentar defesa
-            </button>
+            </a>
 
             <form action={semDefAction}>
               <input type="hidden" name="communicationId" value={comm.id} />
@@ -240,17 +189,13 @@ export default function AcoesComm({
       )}
 
       {/* ── FORMULÁRIO DE DEFESA ─────────────────────────────── */}
-      {canTakeAck && mostraDefesa && (
+      {canTakeAck && mostraFormDefesa && (
         <div className="bg-orange-50 border border-orange-200 rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-orange-900">Justificativa / Defesa</h3>
-            <button
-              type="button"
-              onClick={() => { setMostraDefesa(false); setArquivo(null); setArquivoErro(""); }}
-              className="text-xs text-gray-500 hover:text-gray-700"
-            >
+            <a href={baseUrl} className="text-xs text-gray-500 hover:text-gray-700">
               ← Voltar
-            </button>
+            </a>
           </div>
 
           <form action={defAction} className="space-y-4">
@@ -271,23 +216,29 @@ export default function AcoesComm({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Anexar documento <span className="text-gray-400 font-normal">(opcional — PNG, JPEG ou PDF, máx. 10 MB)</span>
+                Anexar documento(s) <span className="text-gray-400 font-normal">(opcional — PNG, JPEG ou PDF — máx. 5 MB no total, múltiplos permitidos)</span>
               </label>
               <input
                 ref={fileRef}
                 type="file"
                 name="file"
                 accept=".png,.jpg,.jpeg,.pdf"
-                onChange={(e) => validarArquivo(e.target.files?.[0] ?? null)}
+                multiple
+                onChange={(e) => validarArquivos(e.target.files)}
                 className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[#1e3a5f] file:text-white hover:file:bg-[#16304f] cursor-pointer"
               />
-              {arquivoErro && (
-                <p className="text-sm text-red-600 mt-1">{arquivoErro}</p>
-              )}
-              {arquivo && !arquivoErro && (
-                <p className="text-sm text-green-700 mt-1">
-                  ✓ {arquivo.name} ({(arquivo.size / 1024 / 1024).toFixed(2)} MB)
-                </p>
+              {arquivoErro && <p className="text-sm text-red-600 mt-1">{arquivoErro}</p>}
+              {arquivos.length > 0 && !arquivoErro && (
+                <div className="mt-1 space-y-0.5">
+                  {arquivos.map((f, i) => (
+                    <p key={i} className="text-sm text-green-700">
+                      ✓ {f.name} ({(f.size / 1024 / 1024).toFixed(2)} MB)
+                    </p>
+                  ))}
+                  <p className="text-xs text-gray-500">
+                    Total: {(arquivos.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                </div>
               )}
             </div>
 
@@ -305,86 +256,8 @@ export default function AcoesComm({
               >
                 {defPending ? "Enviando..." : "Enviar Defesa"}
               </button>
-              <button
-                type="button"
-                onClick={() => { setMostraDefesa(false); setArquivo(null); setArquivoErro(""); }}
-                className="btn-secondary"
-              >
-                Cancelar
-              </button>
+              <a href={baseUrl} className="btn-secondary">Cancelar</a>
             </div>
-          </form>
-        </div>
-      )}
-
-      {/* ── PARECER (Subcomandante / Oficial) ───────────────── */}
-      {canEmitParecer && (
-        <div className="bg-purple-50 border border-purple-200 rounded-xl p-5">
-          <h3 className="font-semibold text-purple-900 mb-3">Emitir Parecer</h3>
-          <form action={parecerAction} className="space-y-3">
-            <input type="hidden" name="communicationId" value={comm.id} />
-
-            {/* Recomendação primeiro — define as sugestões */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Recomendação <span className="text-red-500">*</span>
-              </label>
-              <select
-                name="recommendation"
-                className="input max-w-xs"
-                value={parecerRec}
-                onChange={(e) => setParecerRec(e.target.value)}
-                required
-              >
-                <option value="">Selecione</option>
-                <option value="Sugiro punição">Sugiro punição</option>
-                <option value="Sugiro arquivamento">Sugiro arquivamento</option>
-                <option value="Sugiro reenquadramento de artigo">Sugiro reenquadramento de artigo</option>
-                <option value="Sugiro homologação (Referência Elogiosa)">Sugiro homologação (Referência Elogiosa)</option>
-              </select>
-            </div>
-
-            {/* Sugestões de texto por tipo de recomendação */}
-            {parecerRec && SUGESTOES_PARECER[parecerRec] && (
-              <div className="bg-purple-100 border border-purple-200 rounded-lg p-3">
-                <p className="text-xs font-semibold text-purple-800 mb-2">Sugestões de texto — clique para usar:</p>
-                <div className="flex flex-col gap-2">
-                  {SUGESTOES_PARECER[parecerRec].map((s, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => setParecerTexto(s.texto)}
-                      className="text-left text-xs bg-white border border-purple-200 rounded-lg px-3 py-2 hover:bg-purple-50 hover:border-purple-400 transition-colors"
-                    >
-                      <span className="font-semibold text-purple-700">{s.titulo}:</span>{" "}
-                      <span className="text-gray-600 line-clamp-2">{s.texto.substring(0, 120)}…</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Texto do Parecer <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                name="text"
-                rows={6}
-                required
-                placeholder="Análise dos fatos, da defesa (quando houver) e fundamentação..."
-                className="input"
-                value={parecerTexto}
-                onChange={(e) => setParecerTexto(e.target.value)}
-              />
-            </div>
-
-            {parecerState?.error && (
-              <p className="text-sm text-red-600">{parecerState.error}</p>
-            )}
-            <button type="submit" disabled={parecerPending} className="btn-primary">
-              {parecerPending ? "Emitindo..." : "Emitir Parecer"}
-            </button>
           </form>
         </div>
       )}
@@ -418,9 +291,7 @@ export default function AcoesComm({
               <input type="hidden" name="decisionId" value={comm.decisions[0].id} />
               <input type="hidden" name="communicationId" value={comm.id} />
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nova pontuação
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nova pontuação</label>
                 <input
                   name="novaScore"
                   type="number"
@@ -490,7 +361,6 @@ export default function AcoesComm({
               </select>
             </div>
 
-            {/* Seletor de novo artigo para reenquadramento */}
             {decisaoTipo === "Reenquadrar artigo" && (
               <div className="bg-white border border-gray-200 rounded-lg p-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -526,7 +396,6 @@ export default function AcoesComm({
               </div>
             )}
 
-            {/* Sugestões de texto por tipo de decisão */}
             {decisaoTipo && SUGESTOES_DECISAO[decisaoTipo] && (
               <div className="bg-green-100 border border-green-200 rounded-lg p-3">
                 <p className="text-xs font-semibold text-green-800 mb-2">Sugestões de texto — clique para usar:</p>
@@ -560,9 +429,7 @@ export default function AcoesComm({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Pontuação final aplicada
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Pontuação final aplicada</label>
               <input
                 name="finalScore"
                 type="number"

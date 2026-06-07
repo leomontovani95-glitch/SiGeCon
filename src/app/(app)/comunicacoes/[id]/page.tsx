@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import AcoesComm from "../_components/AcoesComm";
+import ParecerForm from "../_components/ParecerForm";
 import Link from "next/link";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -17,23 +18,32 @@ const STATUS_LABELS: Record<string, string> = {
   FINALIZADA: "Finalizada", DEVOLVIDA: "Devolvida para Complementação",
 };
 
-export default async function ComunicacaoPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ComunicacaoPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string>>;
+}) {
   const session = await verifySession();
   const { id } = await params;
+  const sp = await searchParams;
+  const mostraFormDefesa = sp.defesa === "1";
 
   const [manualRules, comm] = await Promise.all([
     prisma.manualRule.findMany({ where: { active: true }, orderBy: [{ article: "asc" }, { item: "asc" }] }),
     prisma.communication.findUnique({
-    where: { id },
-    include: {
-      type: true, student: { include: { course: true, platoon: true } },
-      reporter: true, manualRule: true,
-      witnesses: true, attachments: true,
-      acknowledgements: true, defenses: true,
-      opinions: { include: { author: true } },
-      decisions: { include: { authority: true } },
-    },
-  }),
+      where: { id },
+      include: {
+        type: true, student: { include: { course: true, platoon: true } },
+        reporter: true, manualRule: true,
+        witnesses: true, attachments: true,
+        acknowledgements: true,
+        defenses: { include: { attachments: true } },
+        opinions: { include: { author: true } },
+        decisions: { include: { authority: true } },
+      },
+    }),
   ]);
   if (!comm) notFound();
 
@@ -42,7 +52,6 @@ export default async function ComunicacaoPage({ params }: { params: Promise<{ id
     if (!ehEsteAluno) notFound();
   }
 
-  // Busca o caderno em que foi publicada (se aplicável)
   const cadernoPublicado = comm.status === "PUBLICADA_CADERNO"
     ? await prisma.disciplinaryBook.findFirst({
         where: { status: "PUBLICADO", items: { some: { communicationId: comm.id } } },
@@ -51,6 +60,10 @@ export default async function ComunicacaoPage({ params }: { params: Promise<{ id
     : null;
 
   const alunoEhEssePerfil = session.role === "ALUNO" && comm.student.userId === session.userId;
+
+  const tomouCienciaComDefesa = comm.defenses.length > 0;
+  const tomouCienciaSemDefesa = comm.acknowledgements.some((a) => a.method === "SEM_DEFESA");
+  const mostrarSecaoDefesa = tomouCienciaComDefesa || tomouCienciaSemDefesa;
 
   return (
     <div className="p-6 max-w-4xl">
@@ -135,18 +148,41 @@ export default async function ComunicacaoPage({ params }: { params: Promise<{ id
         </div>
       )}
 
-      {comm.defenses.length > 0 && !["ALUNO"].includes(session.role) && (
+      {/* Posição do aluno — visível para todos após a ciência */}
+      {mostrarSecaoDefesa && (
         <div className="bg-amber-50 rounded-xl border border-amber-200 p-4 mb-4">
-          <h2 className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">Justificativa/Defesa do Aluno</h2>
-          {comm.defenses.map((d) => (
-            <div key={d.id}>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{d.text}</p>
-              <p className="text-xs text-gray-400 mt-2">
-                Apresentada em {format(new Date(d.submittedAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                {d.isLate && <span className="ml-2 text-red-600 font-medium">(Fora do prazo)</span>}
-              </p>
-            </div>
-          ))}
+          <h2 className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">Posição do Aluno</h2>
+          {tomouCienciaComDefesa ? (
+            comm.defenses.map((d) => (
+              <div key={d.id}>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{d.text}</p>
+                <p className="text-xs text-gray-400 mt-2">
+                  Defesa apresentada em {format(new Date(d.submittedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                  {d.isLate && <span className="ml-2 text-red-600 font-medium">(Fora do prazo)</span>}
+                </p>
+                {d.attachments.length > 0 && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-gray-500">Anexo(s):</span>
+                    {d.attachments.map((a) => (
+                      <a
+                        key={a.id}
+                        href={a.filePath}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-[#1e3a5f] bg-white border border-[#1e3a5f] rounded-lg px-3 py-1.5 hover:bg-blue-50 transition-colors"
+                      >
+                        📎 {a.fileName}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-gray-600 italic">
+              O aluno tomou ciência da comunicação e optou por não apresentar justificativa/defesa.
+            </p>
+          )}
         </div>
       )}
 
@@ -158,7 +194,7 @@ export default async function ComunicacaoPage({ params }: { params: Promise<{ id
               <p className="text-sm text-gray-700 whitespace-pre-wrap">{o.text}</p>
               {o.recommendation && <p className="text-sm font-medium text-purple-800 mt-2">Recomendação: {o.recommendation}</p>}
               <p className="text-xs text-gray-400 mt-2">
-                {o.author.warName} ({o.authorRole.replace("_", " ")}) — {format(new Date(o.createdAt), "dd/MM/yyyy", { locale: ptBR })}
+                {o.author.warName} ({o.authorRole.replace(/_/g, " ")}) — {format(new Date(o.createdAt), "dd/MM/yyyy", { locale: ptBR })}
               </p>
             </div>
           ))}
@@ -183,6 +219,22 @@ export default async function ComunicacaoPage({ params }: { params: Promise<{ id
         </div>
       )}
 
+      {/* Formulário de parecer — componente independente para hidratação isolada */}
+      {canEmitOpinion(session.role, session.additionalRoles) &&
+        comm.status === "AGUARDANDO_PARECER" &&
+        comm.opinions.length === 0 && (
+          <ParecerForm
+            communicationId={comm.id}
+            manualRules={manualRules.map((r) => ({
+              id: r.id,
+              article: r.article,
+              item: r.item ?? null,
+              letter: r.letter ?? null,
+              description: r.description,
+            }))}
+          />
+        )}
+
       <AcoesComm
         comm={{
           id: comm.id,
@@ -197,8 +249,8 @@ export default async function ComunicacaoPage({ params }: { params: Promise<{ id
           item: comm.item,
         }}
         session={{ role: session.role, userId: session.userId, email: session.email }}
-        studentEmail={comm.student.email ?? ""}
         alunoEhEssePerfil={alunoEhEssePerfil}
+        mostraFormDefesa={mostraFormDefesa}
         manualRules={manualRules.map((r) => ({
           id: r.id,
           article: r.article,

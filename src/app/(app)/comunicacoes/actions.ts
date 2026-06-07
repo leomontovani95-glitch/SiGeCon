@@ -11,7 +11,7 @@ import { calcularPrazoDefesa } from "@/lib/prazos";
 type State = { error: string } | undefined;
 
 const TIPOS_PERMITIDOS = ["image/png", "image/jpeg", "application/pdf"];
-const LIMITE_BYTES = 10 * 1024 * 1024; // 10 MB
+const LIMITE_TOTAL_BYTES = 5 * 1024 * 1024; // 5 MB total
 
 // ── Registrar comunicação (CPI / Referência Elogiosa / Elogio BI) ────────
 export async function registrarComunicacao(_prev: State, formData: FormData): Promise<State> {
@@ -115,32 +115,16 @@ export async function tomarCienciaComDefesa(_prev: State, formData: FormData): P
   if (comm.status !== "AGUARDANDO_CIENCIA")
     return { error: "Esta comunicação não aguarda ciência." };
 
-  // Processar anexo (opcional)
-  let anexoId: string | null = null;
-  const arquivo = formData.get("file") as File | null;
-  if (arquivo && arquivo.size > 0) {
-    if (!TIPOS_PERMITIDOS.includes(arquivo.type))
-      return { error: "Tipo de arquivo não permitido. Use PNG, JPEG ou PDF." };
-    if (arquivo.size > LIMITE_BYTES)
-      return { error: "O arquivo excede o limite de 10 MB." };
-
-    const ext = arquivo.name.split(".").pop() ?? "bin";
-    const fileName = `${Date.now()}-defesa.${ext}`;
-    const dir = path.join(process.cwd(), "public", "uploads", communicationId);
-    await mkdir(dir, { recursive: true });
-    const buffer = Buffer.from(await arquivo.arrayBuffer());
-    await writeFile(path.join(dir, fileName), buffer);
-
-    const attachment = await prisma.attachment.create({
-      data: {
-        communicationId,
-        fileName: arquivo.name,
-        filePath: `/uploads/${communicationId}/${fileName}`,
-        fileType: arquivo.type,
-        uploadedBy: session.userId,
-      },
-    });
-    anexoId = attachment.id;
+  // Processar anexos (opcionais — múltiplos, total ≤ 5 MB)
+  const arquivos = (formData.getAll("file") as File[]).filter((f) => f && f.size > 0);
+  if (arquivos.length > 0) {
+    for (const f of arquivos) {
+      if (!TIPOS_PERMITIDOS.includes(f.type))
+        return { error: `Tipo de arquivo não permitido (${f.name}). Use PNG, JPEG ou PDF.` };
+    }
+    const totalBytes = arquivos.reduce((s, f) => s + f.size, 0);
+    if (totalBytes > LIMITE_TOTAL_BYTES)
+      return { error: `O total dos arquivos excede o limite de 5 MB (${(totalBytes / 1024 / 1024).toFixed(1)} MB enviado).` };
   }
 
   // Prazo de defesa: 2 dias úteis a partir de agora (ciência imediata)
@@ -150,18 +134,38 @@ export async function tomarCienciaComDefesa(_prev: State, formData: FormData): P
     await prisma.studentAcknowledgement.create({
       data: { communicationId, studentId: comm.studentId, method: "SISTEMA" },
     });
-    await prisma.defense.create({
-      data: {
-        communicationId, studentId: comm.studentId, text,
-        isLate: false, attachmentId: anexoId,
-      },
+    const defense = await prisma.defense.create({
+      data: { communicationId, studentId: comm.studentId, text, isLate: false },
     });
+
+    // Salvar cada arquivo como Attachment vinculado à defesa
+    if (arquivos.length > 0) {
+      const dir = path.join(process.cwd(), "public", "uploads", communicationId);
+      await mkdir(dir, { recursive: true });
+      for (const arquivo of arquivos) {
+        const ext = arquivo.name.split(".").pop() ?? "bin";
+        const savedName = `${Date.now()}-${Math.random().toString(36).slice(2)}-defesa.${ext}`;
+        const buffer = Buffer.from(await arquivo.arrayBuffer());
+        await writeFile(path.join(dir, savedName), buffer);
+        await prisma.attachment.create({
+          data: {
+            communicationId,
+            defenseId: defense.id,
+            fileName: arquivo.name,
+            filePath: `/uploads/${communicationId}/${savedName}`,
+            fileType: arquivo.type,
+            uploadedBy: session.userId,
+          },
+        });
+      }
+    }
+
     await prisma.communication.update({
       where: { id: communicationId },
       data: { status: "AGUARDANDO_PARECER", defenseDeadline: prazo },
     });
     await auditLog(session.userId, "CIENCIA_COM_DEFESA", "Communication", communicationId,
-      anexoId ? "Com anexo — encaminhado ao Subcomandante/Oficial" : "Sem anexo — encaminhado ao Subcomandante/Oficial");
+      arquivos.length > 0 ? `Com ${arquivos.length} anexo(s) — encaminhado ao Subcomandante/Oficial` : "Sem anexo — encaminhado ao Subcomandante/Oficial");
   } catch {
     return { error: "Erro ao registrar ciência/defesa. Tente novamente." };
   }
@@ -207,14 +211,27 @@ export async function emitirParecer(_prev: State, formData: FormData): Promise<S
   const communicationId = String(formData.get("communicationId") ?? "");
   const text = String(formData.get("text") ?? "").trim();
   const recommendation = String(formData.get("recommendation") ?? "").trim() || null;
+  const newManualRuleIdParecer = String(formData.get("newManualRuleIdParecer") ?? "").trim() || null;
   if (!text) return { error: "Informe o texto do parecer." };
   if (!recommendation) return { error: "Selecione uma recomendação." };
+  if (recommendation === "Sugiro reenquadramento de artigo" && !newManualRuleIdParecer) {
+    return { error: "Selecione o artigo sugerido para reenquadramento." };
+  }
 
   const existente = await prisma.opinion.findFirst({ where: { communicationId } });
   if (existente) return { error: "Já existe um parecer registrado para esta comunicação." };
 
+  // Se reenquadramento, inclui o artigo sugerido na recomendação
+  let recommendationFinal = recommendation;
+  if (recommendation === "Sugiro reenquadramento de artigo" && newManualRuleIdParecer) {
+    const regra = await prisma.manualRule.findUnique({ where: { id: newManualRuleIdParecer } });
+    if (regra) {
+      recommendationFinal = `Sugiro reenquadramento — Art. ${regra.article}${regra.item ? `, Inc. ${regra.item}` : ""}${regra.letter ? `, Al. ${regra.letter}` : ""}`;
+    }
+  }
+
   await prisma.opinion.create({
-    data: { communicationId, authorId: session.userId, authorRole: session.role, text, recommendation },
+    data: { communicationId, authorId: session.userId, authorRole: session.role, text, recommendation: recommendationFinal },
   });
   await prisma.communication.update({
     where: { id: communicationId },

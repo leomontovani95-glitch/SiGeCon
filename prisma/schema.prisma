@@ -172,6 +172,7 @@ model Witness {
 model Attachment {
   id              String   @id @default(cuid())
   communicationId String
+  defenseId       String?
   fileName        String
   filePath        String
   fileType        String?
@@ -179,7 +180,7 @@ model Attachment {
   createdAt       DateTime @default(now())
 
   communication Communication @relation(fields: [communicationId], references: [id])
-  defenses      Defense[]
+  defense       Defense?      @relation(fields: [defenseId], references: [id])
 }
 
 model StudentAcknowledgement {
@@ -201,11 +202,10 @@ model Defense {
   text            String
   submittedAt     DateTime @default(now())
   isLate          Boolean  @default(false)
-  attachmentId    String?
 
-  communication Communication @relation(fields: [communicationId], references: [id])
-  student       Student       @relation(fields: [studentId], references: [id])
-  attachment    Attachment?   @relation(fields: [attachmentId], references: [id])
+  communication Communication  @relation(fields: [communicationId], references: [id])
+  student       Student        @relation(fields: [studentId], references: [id])
+  attachments   Attachment[]
 }
 
 model Opinion {
