@@ -11,13 +11,21 @@ export type RankingItem = {
   nota: number;
 };
 
-async function imgBase64(url: string): Promise<string> {
-  const r = await fetch(url);
-  const buf = await r.arrayBuffer();
-  const bytes = new Uint8Array(buf);
-  let bin = "";
-  for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
-  return `data:image/png;base64,${btoa(bin)}`;
+// Redimensiona a imagem para px×px via canvas antes de embedar no PDF.
+// Evita embedar o PNG original em full-res (que pode ter centenas de KB).
+function imgResized(url: string, px = 72): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = px; c.height = px;
+      c.getContext("2d")!.drawImage(img, 0, 0, px, px);
+      resolve(c.toDataURL("image/png"));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
 }
 
 export default function RankingPDF({ ranking, label }: { ranking: RankingItem[]; label?: string }) {
@@ -26,8 +34,8 @@ export default function RankingPDF({ ranking, label }: { ranking: RankingItem[];
     const { default: autoTable } = await import("jspdf-autotable");
 
     const [logoPMES, logoAPM] = await Promise.all([
-      imgBase64("/logo-pmes.png"),
-      imgBase64("/brasao-apm.png"),
+      imgResized("/logo-pmes.png"),
+      imgResized("/brasao-apm.png"),
     ]);
 
     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
