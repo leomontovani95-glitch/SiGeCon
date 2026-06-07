@@ -13,16 +13,16 @@ export async function salvarUsuario(id: string | null, _prev: State, formData: F
     "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
   );
 
-  const fullName = String(formData.get("fullName") ?? "").trim();
-  const warName = String(formData.get("warName") ?? "").trim();
-  const rank = String(formData.get("rank") ?? "").trim();
-  const rg = String(formData.get("rg") ?? "").trim();
-  const cpf = String(formData.get("cpf") ?? "").trim() || null;
-  const escola = String(formData.get("escola") ?? "TODAS").trim();
-  const functionalNumber = String(formData.get("functionalNumber") ?? "").trim();
-  const email = String(formData.get("email") ?? "").trim().toLowerCase() || null;
-  const password = String(formData.get("password") ?? "");
-  const role = String(formData.get("role") ?? "PROTOCOLO");
+  const fullName        = String(formData.get("fullName")        ?? "").trim();
+  const warName         = String(formData.get("warName")         ?? "").trim();
+  const rank            = String(formData.get("rank")            ?? "").trim();
+  const rg              = String(formData.get("rg")              ?? "").trim();
+  const cpf             = String(formData.get("cpf")             ?? "").trim() || null;
+  const escola          = String(formData.get("escola")          ?? "TODAS").trim();
+  const functionalNumber= String(formData.get("functionalNumber")?? "").trim();
+  const email           = String(formData.get("email")           ?? "").trim().toLowerCase() || null;
+  const password        = String(formData.get("password")        ?? "");
+  const role            = String(formData.get("role")            ?? "PROTOCOLO");
   const additionalRoles = (formData.getAll("additionalRoles") as string[])
     .filter((r) => r && r !== role)
     .join(",");
@@ -31,28 +31,62 @@ export async function salvarUsuario(id: string | null, _prev: State, formData: F
   if (!fullName || !warName || !rank || !rg || !functionalNumber || !cpf) {
     return { error: "Preencha todos os campos obrigatórios (incluindo CPF)." };
   }
-  if (password && password.length < 6) return { error: "A senha deve ter no mínimo 6 caracteres." };
+  if (password && password.length < 6) {
+    return { error: "A senha deve ter no mínimo 6 caracteres." };
+  }
 
-  // Senha inicial = número funcional se não informada
+  // Campos base explicitamente tipados — evita PrismaClientValidationError com Record<string, unknown>
+  const baseFields = {
+    fullName,
+    warName,
+    rank,
+    rg,
+    cpf,
+    escola,
+    functionalNumber,
+    email,
+    role,
+    additionalRoles,
+    active,
+  };
+
   const senhaEfetiva = password || (!id ? functionalNumber : "");
-  const data: Record<string, unknown> = { fullName, warName, rank, rg, cpf, escola, functionalNumber, email, role, additionalRoles, active };
-  if (senhaEfetiva) data.passwordHash = await bcrypt.hash(senhaEfetiva, 10);
 
   try {
     if (id) {
-      await prisma.user.update({ where: { id }, data });
+      await prisma.user.update({
+        where: { id },
+        data: senhaEfetiva
+          ? { ...baseFields, passwordHash: await bcrypt.hash(senhaEfetiva, 10) }
+          : baseFields,
+      });
       await auditLog(session.userId, "UPDATE", "User", id, `Atualizado: ${fullName}`);
     } else {
-      const user = await prisma.user.create({ data: data as Parameters<typeof prisma.user.create>[0]["data"] });
+      const user = await prisma.user.create({
+        data: {
+          ...baseFields,
+          passwordHash: await bcrypt.hash(senhaEfetiva, 10),
+        },
+      });
       await auditLog(session.userId, "CREATE", "User", user.id, `Criado: ${fullName}`);
     }
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("[salvarUsuario]", msg);
-    const isUnique = msg.toLowerCase().includes("unique") ||
-      (e as { code?: string })?.code === "P2002";
-    if (isUnique) return { error: "E-mail, RG ou número funcional já cadastrado em outro usuário." };
-    return { error: `Erro ao salvar: ${msg.slice(0, 120)}` };
+    // Loga o erro completo no servidor para diagnóstico
+    console.error("[salvarUsuario] erro:", e);
+
+    const code = (e as { code?: string })?.code;
+    const msg  = e instanceof Error ? e.message : String(e);
+
+    if (code === "P2002" || msg.toLowerCase().includes("unique")) {
+      return { error: "E-mail, RG, CPF ou número funcional já cadastrado em outro usuário." };
+    }
+    if (code === "P2025") {
+      return { error: "Usuário não encontrado. Tente recarregar a página." };
+    }
+    if (code === "P2003") {
+      return { error: "Operação não permitida: há registros vinculados a este usuário." };
+    }
+    return { error: "Erro ao salvar. Verifique os dados e tente novamente." };
   }
 
   redirect("/usuarios");
