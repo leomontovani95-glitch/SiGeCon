@@ -6,34 +6,33 @@ import Link from "next/link";
 
 // ── Status base (DB) ─────────────────────────────────────────────────────────
 const STATUS_LABELS_BASE: Record<string, string> = {
-  REGISTRADA: "Registrada",
-  AGUARDANDO_CIENCIA: "Ag. Ciência/Defesa",
-  AGUARDANDO_DEFESA: "Ag. Ciência/Defesa",
-  JUSTIFICATIVA_APRESENTADA: "Defesa Apresentada",
-  PRAZO_EXPIRADO: "Prazo Expirado",
-  AGUARDANDO_PARECER: "Ag. Parecer",
-  PARECER_EMITIDO: "Parecer Emitido",
-  AGUARDANDO_DECISAO: "Ag. Decisão",
-  DECIDIDA: "Decidida",
-  ARQUIVADA: "Arquivada",
-  PUBLICADA_CADERNO: "Pub. Caderno",
-  FINALIZADA: "Finalizada",
+  REGISTRADA:                  "Registrada",
+  AGUARDANDO_CIENCIA:          "Ag. Ciência/Defesa",
+  AGUARDANDO_DEFESA:           "Ag. Ciência/Defesa",
+  JUSTIFICATIVA_APRESENTADA:   "Defesa Apresentada",
+  PRAZO_EXPIRADO:              "Prazo Expirado",
+  AGUARDANDO_PARECER:          "Ag. Parecer",
+  PARECER_EMITIDO:             "Parecer Emitido",
+  AGUARDANDO_DECISAO:          "Ag. Decisão",
+  DECIDIDA:                    "Decidida",
+  ARQUIVADA:                   "Arquivada",
+  PUBLICADA_CADERNO:           "Pub. Caderno",
+  FINALIZADA:                  "Finalizada",
 };
 
 const STATUS_COLORS_BASE: Record<string, string> = {
-  REGISTRADA: "bg-blue-100 text-blue-700",
-  AGUARDANDO_CIENCIA: "bg-yellow-100 text-yellow-700",
-  AGUARDANDO_DEFESA: "bg-yellow-100 text-yellow-700",
-  PRAZO_EXPIRADO: "bg-red-100 text-red-700",
-  AGUARDANDO_PARECER: "bg-purple-100 text-purple-700",
-  AGUARDANDO_DECISAO: "bg-indigo-100 text-indigo-700",
-  DECIDIDA: "bg-green-100 text-green-700",
-  ARQUIVADA: "bg-gray-100 text-gray-700",
-  PUBLICADA_CADERNO: "bg-teal-100 text-teal-700",
-  FINALIZADA: "bg-green-200 text-green-900",
+  REGISTRADA:          "bg-blue-100 text-blue-700",
+  AGUARDANDO_CIENCIA:  "bg-yellow-100 text-yellow-700",
+  AGUARDANDO_DEFESA:   "bg-yellow-100 text-yellow-700",
+  PRAZO_EXPIRADO:      "bg-red-100 text-red-700",
+  AGUARDANDO_PARECER:  "bg-purple-100 text-purple-700",
+  AGUARDANDO_DECISAO:  "bg-indigo-100 text-indigo-700",
+  DECIDIDA:            "bg-green-100 text-green-700",
+  ARQUIVADA:           "bg-gray-100 text-gray-700",
+  PUBLICADA_CADERNO:   "bg-teal-100 text-teal-700",
+  FINALIZADA:          "bg-green-200 text-green-900",
 };
 
-// ── Status derivado (calculado com base em decisões e cadernos) ───────────────
 type CommItem = {
   status: string;
   decisions: { decisionType: string }[];
@@ -55,20 +54,18 @@ function derivedStatus(c: CommItem): { key: string; label: string; color: string
   };
 }
 
-// ── Opções do filtro de status ────────────────────────────────────────────────
 const FILTER_OPTIONS = [
-  { value: "",                    label: "Todos os status" },
-  { value: "AGUARDANDO_CIENCIA",  label: "Ag. Ciência/Defesa" },
-  { value: "PRAZO_EXPIRADO",      label: "Prazo Expirado" },
+  { value: "",                       label: "Todos os status" },
+  { value: "AGUARDANDO_CIENCIA",     label: "Ag. Ciência/Defesa" },
+  { value: "PRAZO_EXPIRADO",         label: "Prazo Expirado" },
   { value: "JUSTIFICATIVA_APRESENTADA", label: "Defesa Apresentada" },
-  { value: "AGUARDANDO_PARECER",  label: "Ag. Parecer" },
-  { value: "AGUARDANDO_DECISAO",  label: "Ag. Decisão" },
-  { value: "DECIDIDA_PUBLICADA",  label: "Decidida/Publicada" },
+  { value: "AGUARDANDO_PARECER",     label: "Ag. Parecer" },
+  { value: "AGUARDANDO_DECISAO",     label: "Ag. Decisão" },
+  { value: "DECIDIDA_PUBLICADA",     label: "Decidida/Publicada" },
   { value: "DECIDIDA_NAO_PUBLICADA", label: "Decidida/Não publicada" },
-  { value: "ARQUIVADA_DEC",       label: "Arquivada" },
+  { value: "ARQUIVADA_DEC",          label: "Arquivada" },
 ];
 
-// Mapeia filtros derivados para where do Prisma
 function buildStatusWhere(status: string): Record<string, unknown> | null {
   if (!status) return null;
   switch (status) {
@@ -87,29 +84,44 @@ function buildStatusWhere(status: string): Record<string, unknown> | null {
   }
 }
 
+// Colunas ordenáveis e seus orderBy do Prisma
+type Dir = "asc" | "desc";
+const COLS: Record<string, (d: Dir) => object> = {
+  protocolNumber: (d) => ({ protocolNumber: d }),
+  typeName:       (d) => ({ type: { name: d } }),
+  courseNumber:   (d) => ({ courseNumber: d }),
+  warName:        (d) => ({ student: { warName: d } }),
+  factDate:       (d) => ({ factDate: d }),
+  status:         (d) => ({ status: d }),
+};
+
 export default async function ComunicacoesPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const session = await verifySession();
   const sp = await searchParams;
   const busca   = sp.busca   ?? "";
   const status  = sp.status  ?? "";
   const cursoId = sp.cursoId ?? "";
+  const tipo    = sp.tipo    ?? "";
+  const col     = sp.col in COLS ? sp.col : "";
+  const dir: Dir = sp.dir === "asc" ? "asc" : "desc";
 
   const school = getSchoolFilter(session.role, session.escola);
 
-  // Cursos disponíveis para o seletor (limitados pela escola do usuário)
-  const cursosDisponiveis = session.role !== "ALUNO"
-    ? await prisma.course.findMany({
-        where: { active: true, ...(school ? { school } : {}) },
-        orderBy: { name: "asc" },
-        select: { id: true, name: true },
-      })
-    : [];
+  const [cursosDisponiveis, tipos] = await Promise.all([
+    session.role !== "ALUNO"
+      ? prisma.course.findMany({
+          where: { active: true, ...(school ? { school } : {}) },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+    prisma.communicationType.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+  ]);
 
   const where: Record<string, unknown> = {};
-
   const statusWhere = buildStatusWhere(status);
   if (statusWhere) Object.assign(where, statusWhere);
-
+  if (tipo)   where.type = { name: tipo };
   if (busca) {
     where.OR = [
       { protocolNumber: { contains: busca } },
@@ -117,22 +129,21 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
       { student: { fullName: { contains: busca } } },
     ];
   }
-
-  // Filtro de escola/curso: curso selecionado tem precedência
-  if (cursoId) {
-    where.courseId = cursoId;
-  } else if (school) {
-    where.course = { school };
-  }
-
+  if (cursoId)      where.courseId = cursoId;
+  else if (school)  where.course   = { school };
   if (session.role === "ALUNO") {
     const aluno = await prisma.student.findFirst({ where: { email: session.email } });
     if (aluno) where.studentId = aluno.id;
   }
 
+  // orderBy: coluna escolhida → courseId → createdAt
+  const orderBy = col
+    ? [COLS[col](dir), { courseId: "asc" as const }, { createdAt: "desc" as const }]
+    : [{ courseId: "asc" as const }, { createdAt: "desc" as const }];
+
   const comunicacoes = await prisma.communication.findMany({
     where,
-    orderBy: [{ courseId: "asc" }, { createdAt: "desc" }],
+    orderBy,
     include: {
       type: true, student: true, reporter: true, course: true,
       decisions: { select: { decisionType: true } },
@@ -141,37 +152,58 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
     take: 200,
   });
 
-  // Agrupa por curso mantendo a ordem dos cursos
+  // Agrupa por curso
   const cursosOrdem: string[] = [];
   const porCurso = new Map<string, { nome: string; itens: typeof comunicacoes }>();
   for (const c of comunicacoes) {
     const cid = c.courseId;
-    if (!porCurso.has(cid)) {
-      cursosOrdem.push(cid);
-      porCurso.set(cid, { nome: c.course.name, itens: [] });
-    }
+    if (!porCurso.has(cid)) { cursosOrdem.push(cid); porCurso.set(cid, { nome: c.course.name, itens: [] }); }
     porCurso.get(cid)!.itens.push(c);
   }
 
   const canCreate = session.role !== "ALUNO";
   const cursoSelecionado = cursosDisponiveis.find((c) => c.id === cursoId);
-  const labelEscopo = school === "ESFAP" ? "Todos da EsFAP"
-    : school === "ESFO"  ? "Todos da EsFO"
-    : "Todos os cursos";
+  const labelEscopo = school === "ESFAP" ? "Todos da EsFAP" : school === "ESFO" ? "Todos da EsFO" : "Todos os cursos";
 
-  // Monta URL para os pills preservando busca e status atuais
-  function pillHref(novoCursoId: string) {
+  // Constrói URL preservando todos os filtros
+  function buildUrl(overrides: Record<string, string>) {
     const p = new URLSearchParams();
-    if (novoCursoId) p.set("cursoId", novoCursoId);
-    if (busca)  p.set("busca",  busca);
-    if (status) p.set("status", status);
+    if (cursoId)  p.set("cursoId",  cursoId);
+    if (busca)    p.set("busca",    busca);
+    if (status)   p.set("status",   status);
+    if (tipo)     p.set("tipo",     tipo);
+    if (col)      p.set("col",      col);
+    if (dir)      p.set("dir",      dir);
+    for (const [k, v] of Object.entries(overrides)) {
+      if (v) p.set(k, v); else p.delete(k);
+    }
     const qs = p.toString();
     return `/comunicacoes${qs ? `?${qs}` : ""}`;
   }
 
+  function pillHref(novoCursoId: string) {
+    return buildUrl({ cursoId: novoCursoId, col: "", dir: "" });
+  }
+
+  // Gera href para ordenação de coluna (toggle asc/desc)
+  function sortHref(newCol: string) {
+    const newDir = col === newCol && dir === "asc" ? "desc" : "asc";
+    return buildUrl({ col: newCol, dir: newDir });
+  }
+
+  // Indicador visual de ordenação
+  function sortIndicator(c: string) {
+    if (col !== c) return <span className="text-gray-300 group-hover:text-gray-500 ml-0.5">↕</span>;
+    return <span className="text-[#1e3a5f] ml-0.5">{dir === "asc" ? "↑" : "↓"}</span>;
+  }
+
+  const thBase = "text-left px-3 py-2.5 font-medium text-gray-600 text-xs whitespace-nowrap";
+  const thLink = "flex items-center gap-0.5 hover:text-[#1e3a5f] transition-colors cursor-pointer group select-none";
+
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-5">
+      {/* Título */}
+      <div className="flex items-start justify-between mb-5 flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Comunicações</h1>
           <p className="text-sm text-gray-500">
@@ -193,17 +225,11 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
         <div className="bg-white rounded-xl border border-gray-200 p-4 mb-5">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Filtrar por curso</p>
           <div className="flex flex-wrap gap-2">
-            <Link href={pillHref("")}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                !cursoId ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}>
+            <Link href={pillHref("")} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${!cursoId ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
               {labelEscopo}
             </Link>
             {cursosDisponiveis.map((curso) => (
-              <Link key={curso.id} href={pillHref(curso.id)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  cursoId === curso.id ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}>
+              <Link key={curso.id} href={pillHref(curso.id)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${cursoId === curso.id ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
                 {curso.name}
               </Link>
             ))}
@@ -211,16 +237,38 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
         </div>
       )}
 
-      {/* Filtros de busca e status */}
-      <form method="GET" className="flex gap-3 mb-6 flex-wrap">
+      {/* Filtros de busca, tipo e status */}
+      <form method="GET" className="bg-white rounded-xl border border-gray-200 p-4 mb-5 flex flex-wrap gap-3 items-end">
         {cursoId && <input type="hidden" name="cursoId" value={cursoId} />}
-        <input name="busca" defaultValue={busca} placeholder="Protocolo, nome de guerra..." className="input max-w-xs" />
-        <select name="status" defaultValue={status} className="input max-w-xs">
-          {FILTER_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
-        <button type="submit" className="btn-primary px-6">Filtrar</button>
+        {col     && <input type="hidden" name="col"     value={col} />}
+        {dir     && <input type="hidden" name="dir"     value={dir} />}
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Busca</label>
+          <input name="busca" defaultValue={busca} placeholder="Protocolo, nome de guerra..." className="input text-sm w-52" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
+          <select name="tipo" defaultValue={tipo} className="input text-sm">
+            <option value="">Todos os tipos</option>
+            {tipos.map((t) => (
+              <option key={t.id} value={t.name}>{t.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
+          <select name="status" defaultValue={status} className="input text-sm">
+            {FILTER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex gap-2">
+          <button type="submit" className="btn-primary">Filtrar</button>
+          {(busca || tipo || status) && (
+            <Link href={buildUrl({ busca: "", tipo: "", status: "" })} className="btn-secondary text-sm">Limpar</Link>
+          )}
+        </div>
       </form>
 
       {comunicacoes.length === 0 && (
@@ -233,7 +281,6 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
         const grupo = porCurso.get(cid)!;
         return (
           <div key={cid} className="mb-8">
-            {/* Cabeçalho do grupo só aparece quando há mais de um curso no resultado */}
             {cursosOrdem.length > 1 && (
               <div className="flex items-center gap-3 mb-2">
                 <h2 className="text-base font-bold text-[#1e3a5f] uppercase tracking-wide">{grupo.nome}</h2>
@@ -245,13 +292,25 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
               <table className="w-full text-sm min-w-max">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="text-left px-3 py-2.5 font-medium text-gray-600 text-xs whitespace-nowrap">Protocolo</th>
-                    <th className="text-left px-3 py-2.5 font-medium text-gray-600 text-xs whitespace-nowrap">Tipo</th>
-                    <th className="text-left px-3 py-2.5 font-medium text-gray-600 text-xs whitespace-nowrap">Nº</th>
-                    <th className="text-left px-3 py-2.5 font-medium text-gray-600 text-xs whitespace-nowrap">Aluno</th>
-                    <th className="text-left px-3 py-2.5 font-medium text-gray-600 text-xs whitespace-nowrap">Data do Fato</th>
-                    <th className="text-left px-3 py-2.5 font-medium text-gray-600 text-xs whitespace-nowrap">Status</th>
-                    <th className="px-3 py-2.5"></th>
+                    <th className={thBase}>
+                      <Link href={sortHref("protocolNumber")} className={thLink}>Protocolo{sortIndicator("protocolNumber")}</Link>
+                    </th>
+                    <th className={thBase}>
+                      <Link href={sortHref("typeName")} className={thLink}>Tipo{sortIndicator("typeName")}</Link>
+                    </th>
+                    <th className={thBase}>
+                      <Link href={sortHref("courseNumber")} className={thLink}>Nº{sortIndicator("courseNumber")}</Link>
+                    </th>
+                    <th className={thBase}>
+                      <Link href={sortHref("warName")} className={thLink}>Aluno{sortIndicator("warName")}</Link>
+                    </th>
+                    <th className={thBase}>
+                      <Link href={sortHref("factDate")} className={thLink}>Data do Fato{sortIndicator("factDate")}</Link>
+                    </th>
+                    <th className={thBase}>
+                      <Link href={sortHref("status")} className={thLink}>Status{sortIndicator("status")}</Link>
+                    </th>
+                    <th className="px-3 py-2.5 w-10"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
