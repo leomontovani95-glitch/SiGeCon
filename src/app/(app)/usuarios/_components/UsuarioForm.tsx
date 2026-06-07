@@ -1,6 +1,15 @@
 "use client";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { salvarUsuario } from "../actions";
+
+// Posto padrão sugerido por função (pode ser alterado manualmente)
+const ROLE_DEFAULT_RANK: Record<string, string> = {
+  COMANDANTE_APM:          "TEN CEL PM",
+  SUBCOMANDANTE_APM:       "MAJ PM",
+  CHEFE_DIVISAO_ACADEMICA: "MAJ PM",
+  COMANDANTE_ESFAP:        "CAP PM",
+  COMANDANTE_ESFO:         "CAP PM",
+};
 
 const ROLES = [
   { value: "ADMINISTRADOR",           label: "Administrador" },
@@ -28,6 +37,13 @@ export default function UsuarioForm({ defaultValues, additionalRolesDefault = []
   const action = salvarUsuario.bind(null, id ?? null);
   const [state, formAction, pending] = useActionState(action, undefined);
 
+  const [rank, setRank] = useState(defaultValues?.rank ?? "");
+
+  function handleRoleChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const suggestion = ROLE_DEFAULT_RANK[e.target.value];
+    if (suggestion) setRank(suggestion);
+  }
+
   return (
     <>
     {/* Campo dummy oculto para enganar o auto-fill do browser */}
@@ -47,7 +63,7 @@ export default function UsuarioForm({ defaultValues, additionalRolesDefault = []
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Posto/Graduação *</label>
-          <select name="rank" defaultValue={defaultValues?.rank ?? ""} required className="input">
+          <select name="rank" value={rank} onChange={(e) => setRank(e.target.value)} required className="input">
             <option value="" disabled>Selecione</option>
             <option>CEL PM</option>
             <option>TEN CEL PM</option>
@@ -100,7 +116,7 @@ export default function UsuarioForm({ defaultValues, additionalRolesDefault = []
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Função principal *</label>
-          <select name="role" defaultValue={defaultValues?.role ?? "PROTOCOLO"} className="input">
+          <select name="role" defaultValue={defaultValues?.role ?? "PROTOCOLO"} onChange={handleRoleChange} className="input">
             {ROLES.map((r) => (
               <option key={r.value} value={r.value}>{r.label}</option>
             ))}
