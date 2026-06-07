@@ -64,7 +64,12 @@ async function getDashboardGeral(
     referencias,
     cadernosPublicados,
   ] = await Promise.all([
-    prisma.communication.count({ where: { ...filtroReporter, ...cf, type: { name: { in: ["CPI 0","CPI 1","CPI 2","CPI 3"] } } } }),
+    // CPIs ainda em trâmite (sem caderno publicado)
+    prisma.communication.count({ where: {
+      ...filtroReporter, ...cf,
+      type: { name: { in: ["CPI 0","CPI 1","CPI 2","CPI 3"] } },
+      disciplinaryBookItems: { none: { disciplinaryBook: { status: "PUBLICADO" } } },
+    } }),
     prisma.communication.count({ where: { ...filtroReporter, ...cf, status: "AGUARDANDO_CIENCIA" } }),
     prisma.communication.count({ where: { ...filtroReporter, ...cf, status: "AGUARDANDO_DEFESA" } }),
     prisma.communication.count({ where: { ...filtroReporter, ...cf, status: "PRAZO_EXPIRADO" } }),
@@ -76,7 +81,12 @@ async function getDashboardGeral(
       type: { name: { in: ["CPI 0","CPI 1","CPI 2","CPI 3"] } },
       disciplinaryBookItems: { none: { disciplinaryBook: { status: "PUBLICADO" } } },
     } }),
-    prisma.communication.count({ where: { ...filtroReporter, ...cf, type: { name: { in: ["Referência Elogiosa", "Elogio publicado em BI"] } } } }),
+    // Refs/Elogios ainda em trâmite (sem caderno publicado)
+    prisma.communication.count({ where: {
+      ...filtroReporter, ...cf,
+      type: { name: { in: ["Referência Elogiosa", "Elogio publicado em BI"] } },
+      disciplinaryBookItems: { none: { disciplinaryBook: { status: "PUBLICADO" } } },
+    } }),
     prisma.disciplinaryBook.count({ where: { status: "PUBLICADO", ...(scopeCourseIds.length ? { courseId: { in: scopeCourseIds } } : {}) } }),
   ]);
 
