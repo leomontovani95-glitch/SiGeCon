@@ -89,10 +89,12 @@ export default function RankingPDF({ ranking, label }: { ranking: RankingItem[];
     const tableStartY = cY + (label ? 18 : 13);
 
     // ── Tabela ───────────────────────────────────────────────────────────────
-    // Larguras ajustadas para retrato (usável: 186mm com margens 12mm cada lado)
-    // Pos(9) + Nº(13) + NomeGuerra(30) + NomeCompleto(42) + Curso(22) + Pelotão(22) + Nota(14) + Classif(34) = 186mm
+    // Usável: 186mm (210mm - 12mm margem esq. - 12mm margem dir.)
+    // Pos(8) + Nº(11) + NomeGuerra(28) + NomeCompleto(55) + Curso(20) + Pelotão(20) + Nota(12) + Classif(32) = 186mm
+    // NomeCompleto: conteúdo = 55-3(padding) = 52mm ≈ 43 caracteres a 7pt
     autoTable(doc, {
       startY: tableStartY,
+      tableWidth: pW - mL - mR,   // força a tabela a ocupar toda a largura útil
       margin: { top: 32, bottom: 14, left: mL, right: mR },
       head: [["Pos.", "Nº", "Nome de Guerra", "Nome Completo", "Curso", "Pelotão", "Nota", "Classificação"]],
       body: ranking.map((a, i) => [
@@ -109,14 +111,14 @@ export default function RankingPDF({ ranking, label }: { ranking: RankingItem[];
       headStyles: { fillColor: [30, 58, 95], textColor: 255, fontStyle: "bold", fontSize: 7 },
       alternateRowStyles: { fillColor: [245, 247, 250] },
       columnStyles: {
-        0: { cellWidth: 9,  halign: "center" },
-        1: { cellWidth: 13 },
-        2: { cellWidth: 30 },
-        3: { cellWidth: 42 },
-        4: { cellWidth: 22 },
-        5: { cellWidth: 22 },
-        6: { cellWidth: 14, halign: "center", fontStyle: "bold" },
-        7: { cellWidth: 34 },
+        0: { cellWidth: 8,  halign: "center" },
+        1: { cellWidth: 11 },
+        2: { cellWidth: 28 },
+        3: { cellWidth: 55 },
+        4: { cellWidth: 20 },
+        5: { cellWidth: 20 },
+        6: { cellWidth: 12, halign: "center", fontStyle: "bold" },
+        7: { cellWidth: 32 },
       },
       didParseCell(data) {
         if (data.column.index === 6 && data.section === "body") {
