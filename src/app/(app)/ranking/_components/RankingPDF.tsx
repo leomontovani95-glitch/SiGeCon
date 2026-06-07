@@ -11,8 +11,7 @@ export type RankingItem = {
   nota: number;
 };
 
-// Redimensiona a imagem para px×px via canvas antes de embedar no PDF.
-// Evita embedar o PNG original em full-res (que pode ter centenas de KB).
+// Redimensiona para px×px via canvas — evita embedar PNG full-res
 function imgResized(url: string, px = 200): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -38,17 +37,20 @@ export default function RankingPDF({ ranking, label }: { ranking: RankingItem[];
       imgResized("/brasao-apm.png"),
     ]);
 
-    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    // Retrato A4: 210 × 297mm
+    const doc  = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const agora = new Date();
-    const pW  = doc.internal.pageSize.getWidth();
-    const lW  = 18;
-    const hY  = 8;
+    const pW = doc.internal.pageSize.getWidth();   // 210mm
+    const pH = doc.internal.pageSize.getHeight();  // 297mm
+    const lW = 18;   // logo width/height mm
+    const hY = 8;    // header top
+    const mL = 12;   // left margin
+    const mR = 12;   // right margin
 
-    // Logos no cabeçalho
-    doc.addImage(logoPMES, "PNG", 14, hY, lW, lW);
-    doc.addImage(logoAPM,  "PNG", pW - 14 - lW, hY, lW, lW);
+    // ── Cabeçalho pg.1 ──────────────────────────────────────────────────────
+    doc.addImage(logoPMES, "PNG", mL, hY, lW, lW);
+    doc.addImage(logoAPM,  "PNG", pW - mR - lW, hY, lW, lW);
 
-    // Texto institucional centralizado
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(80, 80, 80);
@@ -64,32 +66,34 @@ export default function RankingPDF({ ranking, label }: { ranking: RankingItem[];
     doc.setTextColor(60, 60, 60);
     doc.text("ACADEMIA DE POLÍCIA MILITAR", pW / 2, hY + 17, { align: "center" });
 
-    // Linha separadora
     doc.setDrawColor(30, 58, 95);
     doc.setLineWidth(0.4);
-    doc.line(14, hY + lW + 3, pW - 14, hY + lW + 3);
+    doc.line(mL, hY + lW + 3, pW - mR, hY + lW + 3);
 
-    const cY = hY + lW + 8; // Y início do conteúdo ≈ 34mm
+    const cY = hY + lW + 8; // ≈ 34mm
 
-    // Título do relatório
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
+    doc.setFontSize(11);
     doc.setTextColor(30, 58, 95);
-    doc.text("Ranking de Conduta Profissional", 14, cY);
+    doc.text("Ranking de Conduta Profissional", mL, cY);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
-    if (label) doc.text(label, 14, cY + 6);
+    if (label) doc.text(label, mL, cY + 6);
     doc.text(
-      `Gerado em ${agora.toLocaleDateString("pt-BR")} às ${agora.toLocaleTimeString("pt-BR")} · ${ranking.length} aluno(s) ativo(s)`,
-      14, cY + (label ? 12 : 6),
+      `Gerado em ${agora.toLocaleDateString("pt-BR")} às ${agora.toLocaleTimeString("pt-BR")} · ${ranking.length} aluno(s)`,
+      mL, cY + (label ? 12 : 6),
     );
 
-    const tableY = cY + (label ? 18 : 12);
+    const tableStartY = cY + (label ? 18 : 13);
 
+    // ── Tabela ───────────────────────────────────────────────────────────────
+    // Larguras ajustadas para retrato (usável: 186mm com margens 12mm cada lado)
+    // Pos(9) + Nº(13) + NomeGuerra(30) + NomeCompleto(42) + Curso(22) + Pelotão(22) + Nota(14) + Classif(34) = 186mm
     autoTable(doc, {
-      startY: tableY,
+      startY: tableStartY,
+      margin: { top: 32, bottom: 14, left: mL, right: mR },
       head: [["Pos.", "Nº", "Nome de Guerra", "Nome Completo", "Curso", "Pelotão", "Nota", "Classificação"]],
       body: ranking.map((a, i) => [
         `${i + 1}º`,
@@ -101,15 +105,18 @@ export default function RankingPDF({ ranking, label }: { ranking: RankingItem[];
         a.nota.toFixed(2),
         faixaNota(a.nota).label,
       ]),
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [30, 58, 95], textColor: 255, fontStyle: "bold" },
+      styles:     { fontSize: 7, cellPadding: 1.5, overflow: "linebreak" },
+      headStyles: { fillColor: [30, 58, 95], textColor: 255, fontStyle: "bold", fontSize: 7 },
       alternateRowStyles: { fillColor: [245, 247, 250] },
       columnStyles: {
-        0: { cellWidth: 12, halign: "center" },
-        1: { cellWidth: 14 },
+        0: { cellWidth: 9,  halign: "center" },
+        1: { cellWidth: 13 },
+        2: { cellWidth: 30 },
+        3: { cellWidth: 42 },
+        4: { cellWidth: 22 },
         5: { cellWidth: 22 },
-        6: { cellWidth: 16, halign: "center", fontStyle: "bold" },
-        7: { cellWidth: 26 },
+        6: { cellWidth: 14, halign: "center", fontStyle: "bold" },
+        7: { cellWidth: 34 },
       },
       didParseCell(data) {
         if (data.column.index === 6 && data.section === "body") {
@@ -124,36 +131,29 @@ export default function RankingPDF({ ranking, label }: { ranking: RankingItem[];
         }
       },
       didDrawPage: (data) => {
-        // Cabeçalho simplificado nas páginas seguintes
         if (data.pageNumber > 1) {
-          doc.addImage(logoPMES, "PNG", 14, hY, lW, lW);
-          doc.addImage(logoAPM,  "PNG", pW - 14 - lW, hY, lW, lW);
+          doc.addImage(logoPMES, "PNG", mL, hY, lW, lW);
+          doc.addImage(logoAPM,  "PNG", pW - mR - lW, hY, lW, lW);
           doc.setFont("helvetica", "bold");
-          doc.setFontSize(9);
+          doc.setFontSize(8);
           doc.setTextColor(30, 58, 95);
-          doc.text("POLÍCIA MILITAR — ACADEMIA DE POLÍCIA MILITAR", pW / 2, hY + 10, { align: "center" });
+          doc.text("POLÍCIA MILITAR — ACADEMIA DE POLÍCIA MILITAR", pW / 2, hY + 11, { align: "center" });
           doc.setDrawColor(30, 58, 95);
           doc.setLineWidth(0.4);
-          doc.line(14, hY + lW + 3, pW - 14, hY + lW + 3);
+          doc.line(mL, hY + lW + 3, pW - mR, hY + lW + 3);
         }
       },
     });
 
-    // Rodapé com número de páginas
+    // ── Rodapé ───────────────────────────────────────────────────────────────
     const pageCount = (doc as unknown as { internal: { getNumberOfPages(): number } }).internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7);
       doc.setTextColor(150);
-      const pH = doc.internal.pageSize.getHeight();
-      doc.text(
-        `Página ${i} de ${pageCount}`,
-        pW - 14,
-        pH - 8,
-        { align: "right" },
-      );
-      doc.text("Documento de uso interno — APM/ES", 14, pH - 8);
+      doc.text(`Página ${i} de ${pageCount}`, pW - mR, pH - 7, { align: "right" });
+      doc.text("Documento de uso interno — APM/ES", mL, pH - 7);
     }
 
     doc.save(`ranking-conduta-${agora.toISOString().split("T")[0]}.pdf`);
