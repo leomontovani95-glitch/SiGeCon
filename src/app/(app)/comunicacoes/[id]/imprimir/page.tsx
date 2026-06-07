@@ -33,7 +33,7 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
   return (
     <PrintLayout title={docTitle}>
       <div className="print-section">
-        <h2>{isCPI ? "Comunicação de Procedimento Interno (CPI)" : "Referência Elogiosa"}</h2>
+        <h2>{isCPI ? "Conduta Profissional Inadequada (CPI)" : "Referência Elogiosa"}</h2>
         <div className="print-field">
           <label>Número de Protocolo</label>
           <span className="print-protocol">{comm.protocolNumber}</span>

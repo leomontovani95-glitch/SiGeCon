@@ -11,26 +11,77 @@ export type RankingItem = {
   nota: number;
 };
 
+async function imgBase64(url: string): Promise<string> {
+  const r = await fetch(url);
+  const buf = await r.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let bin = "";
+  for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+  return `data:image/png;base64,${btoa(bin)}`;
+}
+
 export default function RankingPDF({ ranking, label }: { ranking: RankingItem[]; label?: string }) {
   const gerarPDF = useCallback(async () => {
     const { default: jsPDF } = await import("jspdf");
     const { default: autoTable } = await import("jspdf-autotable");
 
+    const [logoPMES, logoAPM] = await Promise.all([
+      imgBase64("/logo-pmes.png"),
+      imgBase64("/brasao-apm.png"),
+    ]);
+
     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
     const agora = new Date();
+    const pW  = doc.internal.pageSize.getWidth();
+    const lW  = 18;
+    const hY  = 8;
 
+    // Logos no cabeçalho
+    doc.addImage(logoPMES, "PNG", 14, hY, lW, lW);
+    doc.addImage(logoAPM,  "PNG", pW - 14 - lW, hY, lW, lW);
+
+    // Texto institucional centralizado
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(80, 80, 80);
+    doc.text("Governo do Estado do Espírito Santo", pW / 2, hY + 4, { align: "center" });
+
+    doc.setFont("helvetica", "bold");
     doc.setFontSize(13);
     doc.setTextColor(30, 58, 95);
-    doc.text(`SiGeCon — Ranking de Conduta${label ? ` — ${label}` : ""}`, 14, 14);
+    doc.text("POLÍCIA MILITAR", pW / 2, hY + 11, { align: "center" });
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(60, 60, 60);
+    doc.text("ACADEMIA DE POLÍCIA MILITAR", pW / 2, hY + 17, { align: "center" });
+
+    // Linha separadora
+    doc.setDrawColor(30, 58, 95);
+    doc.setLineWidth(0.4);
+    doc.line(14, hY + lW + 3, pW - 14, hY + lW + 3);
+
+    const cY = hY + lW + 8; // Y início do conteúdo ≈ 34mm
+
+    // Título do relatório
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(30, 58, 95);
+    doc.text("Ranking de Conduta Profissional", 14, cY);
+
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
+    if (label) doc.text(label, 14, cY + 6);
     doc.text(
       `Gerado em ${agora.toLocaleDateString("pt-BR")} às ${agora.toLocaleTimeString("pt-BR")} · ${ranking.length} aluno(s) ativo(s)`,
-      14, 20
+      14, cY + (label ? 12 : 6),
     );
 
+    const tableY = cY + (label ? 18 : 12);
+
     autoTable(doc, {
-      startY: 25,
+      startY: tableY,
       head: [["Pos.", "Nº", "Nome de Guerra", "Nome Completo", "Curso", "Pelotão", "Nota", "Classificação"]],
       body: ranking.map((a, i) => [
         `${i + 1}º`,
@@ -64,19 +115,37 @@ export default function RankingPDF({ ranking, label }: { ranking: RankingItem[];
           }
         }
       },
+      didDrawPage: (data) => {
+        // Cabeçalho simplificado nas páginas seguintes
+        if (data.pageNumber > 1) {
+          doc.addImage(logoPMES, "PNG", 14, hY, lW, lW);
+          doc.addImage(logoAPM,  "PNG", pW - 14 - lW, hY, lW, lW);
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(9);
+          doc.setTextColor(30, 58, 95);
+          doc.text("POLÍCIA MILITAR — ACADEMIA DE POLÍCIA MILITAR", pW / 2, hY + 10, { align: "center" });
+          doc.setDrawColor(30, 58, 95);
+          doc.setLineWidth(0.4);
+          doc.line(14, hY + lW + 3, pW - 14, hY + lW + 3);
+        }
+      },
     });
 
+    // Rodapé com número de páginas
     const pageCount = (doc as unknown as { internal: { getNumberOfPages(): number } }).internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
+      doc.setFont("helvetica", "normal");
       doc.setFontSize(7);
       doc.setTextColor(150);
+      const pH = doc.internal.pageSize.getHeight();
       doc.text(
         `Página ${i} de ${pageCount}`,
-        doc.internal.pageSize.getWidth() - 14,
-        doc.internal.pageSize.getHeight() - 8,
-        { align: "right" }
+        pW - 14,
+        pH - 8,
+        { align: "right" },
       );
+      doc.text("Documento de uso interno — APM/ES", 14, pH - 8);
     }
 
     doc.save(`ranking-conduta-${agora.toISOString().split("T")[0]}.pdf`);

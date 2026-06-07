@@ -20,6 +20,15 @@ export type RelatorioMeta = {
   decididas: number;
 };
 
+async function imgBase64(url: string): Promise<string> {
+  const r = await fetch(url);
+  const buf = await r.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let bin = "";
+  for (let i = 0; i < bytes.byteLength; i++) bin += String.fromCharCode(bytes[i]);
+  return `data:image/png;base64,${btoa(bin)}`;
+}
+
 export default function RelatorioPDF({
   items,
   meta,
@@ -31,32 +40,70 @@ export default function RelatorioPDF({
     const { default: jsPDF } = await import("jspdf");
     const { default: autoTable } = await import("jspdf-autotable");
 
-    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-    const agora = new Date();
+    const [logoPMES, logoAPM] = await Promise.all([
+      imgBase64("/logo-pmes.png"),
+      imgBase64("/brasao-apm.png"),
+    ]);
 
-    // Cabeçalho
+    const doc  = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const agora = new Date();
+    const pW  = doc.internal.pageSize.getWidth();
+    const lW  = 18;
+    const hY  = 8;
+
+    // Logos no cabeçalho da primeira página
+    doc.addImage(logoPMES, "PNG", 14, hY, lW, lW);
+    doc.addImage(logoAPM,  "PNG", pW - 14 - lW, hY, lW, lW);
+
+    // Texto institucional centralizado
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(80, 80, 80);
+    doc.text("Governo do Estado do Espírito Santo", pW / 2, hY + 4, { align: "center" });
+
+    doc.setFont("helvetica", "bold");
     doc.setFontSize(13);
     doc.setTextColor(30, 58, 95);
-    doc.text(`SiGeCon — ${meta.titulo}`, 14, 14);
+    doc.text("POLÍCIA MILITAR", pW / 2, hY + 11, { align: "center" });
 
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(60, 60, 60);
+    doc.text("ACADEMIA DE POLÍCIA MILITAR", pW / 2, hY + 17, { align: "center" });
+
+    // Linha separadora
+    doc.setDrawColor(30, 58, 95);
+    doc.setLineWidth(0.4);
+    doc.line(14, hY + lW + 3, pW - 14, hY + lW + 3);
+
+    const cY = hY + lW + 8; // Y início do conteúdo ≈ 34mm
+
+    // Título do relatório
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(30, 58, 95);
+    doc.text(`SiGeCon — ${meta.titulo}`, 14, cY);
+
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
-    doc.text(meta.subtitulo, 14, 20);
+    doc.text(meta.subtitulo, 14, cY + 6);
     doc.text(
       `Gerado em ${agora.toLocaleDateString("pt-BR")} às ${agora.toLocaleTimeString("pt-BR")} · ${items.length} registro(s)`,
-      14, 25,
+      14, cY + 11,
     );
 
-    // Linha de resumo
+    // Resumo
+    doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
     doc.setTextColor(30, 58, 95);
     doc.text(
-      `Total: ${meta.total}   Desfavoráveis: ${meta.desfav}   Favoráveis: ${meta.fav}   Decididas: ${meta.decididas}`,
-      14, 31,
+      `Total: ${meta.total}   |   Desfavoráveis: ${meta.desfav}   |   Favoráveis: ${meta.fav}   |   Decididas: ${meta.decididas}`,
+      14, cY + 17,
     );
 
     autoTable(doc, {
-      startY: 36,
+      startY: cY + 22,
       head: [["Protocolo", "Tipo", "Aluno", "Curso", "Data do Fato", "Status", "Pont."]],
       body: items.map((r) => [
         r.protocolNumber,
@@ -71,12 +118,12 @@ export default function RelatorioPDF({
       headStyles: { fillColor: [30, 58, 95], textColor: 255, fontStyle: "bold" },
       alternateRowStyles: { fillColor: [245, 247, 250] },
       columnStyles: {
-        0: { cellWidth: 52 },  // Protocolo
-        1: { cellWidth: 18 },  // Tipo
-        2: { cellWidth: 30 },  // Aluno
-        3: { cellWidth: 30 },  // Curso
-        4: { cellWidth: 22, halign: "center" },  // Data
-        6: { cellWidth: 12, halign: "center", fontStyle: "bold" },  // Pont.
+        0: { cellWidth: 52 },
+        1: { cellWidth: 18 },
+        2: { cellWidth: 30 },
+        3: { cellWidth: 30 },
+        4: { cellWidth: 22, halign: "center" },
+        6: { cellWidth: 12, halign: "center", fontStyle: "bold" },
       },
       didParseCell(data) {
         if (data.column.index === 5 && data.section === "body") {
@@ -89,19 +136,32 @@ export default function RelatorioPDF({
             data.cell.styles.textColor = [75, 85, 99];
         }
       },
+      didDrawPage: (data) => {
+        // Cabeçalho simplificado nas páginas seguintes
+        if (data.pageNumber > 1) {
+          doc.addImage(logoPMES, "PNG", 14, hY, lW, lW);
+          doc.addImage(logoAPM,  "PNG", pW - 14 - lW, hY, lW, lW);
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(9);
+          doc.setTextColor(30, 58, 95);
+          doc.text("POLÍCIA MILITAR — ACADEMIA DE POLÍCIA MILITAR", pW / 2, hY + 10, { align: "center" });
+          doc.setDrawColor(30, 58, 95);
+          doc.setLineWidth(0.4);
+          doc.line(14, hY + lW + 3, pW - 14, hY + lW + 3);
+        }
+      },
     });
 
+    // Rodapé com número de páginas
     const pageCount = (doc as unknown as { internal: { getNumberOfPages(): number } }).internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
+      doc.setFont("helvetica", "normal");
       doc.setFontSize(7);
       doc.setTextColor(150);
-      doc.text(
-        `Página ${i} de ${pageCount}`,
-        doc.internal.pageSize.getWidth() - 14,
-        doc.internal.pageSize.getHeight() - 8,
-        { align: "right" },
-      );
+      const pH = doc.internal.pageSize.getHeight();
+      doc.text(`Página ${i} de ${pageCount}`, pW - 14, pH - 8, { align: "right" });
+      doc.text("Documento de uso interno — APM/ES", 14, pH - 8);
     }
 
     const slug = agora.toISOString().split("T")[0];
