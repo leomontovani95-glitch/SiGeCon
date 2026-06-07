@@ -5,6 +5,7 @@ import {
   tomarCienciaSemDefesa,
   emitirParecer,
   proferirDecisao,
+  corrigirPontuacao,
 } from "../actions";
 
 type Sugestao = { titulo: string; texto: string };
@@ -95,6 +96,30 @@ const SUGESTOES_DECISAO: Record<string, Sugestao[]> = {
   ],
 };
 
+function pontuacaoPadrao(typeName: string, item: string | null): number | null {
+  const name = typeName.toLowerCase();
+  if (name.includes("referência elogiosa") || name.includes("referencia elogiosa")) return 0.2;
+  if (name.startsWith("cpi")) {
+    if (!item) return 0.1;
+    if (item === "I") return 0.2;
+    if (item === "II") return 0.4;
+    if (item === "III") return 0.6;
+    return 0.1;
+  }
+  return null;
+}
+
+function nomeCpiDoInciso(typeName: string, item: string | null): string {
+  const name = typeName.toLowerCase();
+  if (name.includes("referência elogiosa") || name.includes("referencia elogiosa"))
+    return "Referência Elogiosa";
+  if (!item) return "CPI 0";
+  if (item === "I") return "CPI 1";
+  if (item === "II") return "CPI 2";
+  if (item === "III") return "CPI 3";
+  return "CPI 0";
+}
+
 type ManualRule = { id: string; article: string; item: string | null; letter: string | null; description: string };
 
 type CommInfo = {
@@ -105,6 +130,9 @@ type CommInfo = {
   finalScore: number | null;
   suggestedScore: number | null;
   opinions: { id: string }[];
+  decisions: { id: string; finalScore: number | null; decisionType: string }[];
+  typeName: string;
+  item: string | null;
 };
 type SessionInfo = { role: string; userId: string; email: string };
 
@@ -124,12 +152,20 @@ export default function AcoesComm({
   const [parecerRec, setParecerRec] = useState("");
   const [parecerTexto, setParecerTexto] = useState("");
   const [decisaoTexto, setDecisaoTexto] = useState("");
+  const [finalScoreDecisao, setFinalScoreDecisao] = useState<string>(() => {
+    const def = pontuacaoPadrao(comm.typeName, comm.item);
+    return def !== null ? def.toFixed(1) : "";
+  });
+  const [novoRuleId, setNovoRuleId] = useState<string>("");
+  const [mostraCorrecao, setMostraCorrecao] = useState(false);
+  const [novaPontuacao, setNovaPontuacao] = useState<string>("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [defState, defAction, defPending] = useActionState(tomarCienciaComDefesa, undefined);
   const [semDefState, semDefAction, semDefPending] = useActionState(tomarCienciaSemDefesa, undefined);
   const [parecerState, parecerAction, parecerPending] = useActionState(emitirParecer, undefined);
   const [decisaoState, decisaoAction, decisaoPending] = useActionState(proferirDecisao, undefined);
+  const [correcaoState, correcaoAction, correcaoPending] = useActionState(corrigirPontuacao, undefined);
 
   // Apenas o aluno pode tomar ciência/defesa
   const canTakeAck = alunoEhEssePerfil && comm.status === "AGUARDANDO_CIENCIA";
@@ -141,6 +177,9 @@ export default function AcoesComm({
   const canDecide =
     ["ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA"].includes(session.role) &&
     comm.status === "AGUARDANDO_DECISAO";
+  const canEditScore =
+    ["ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA"].includes(session.role) &&
+    comm.decisions.length > 0;
 
   function validarArquivo(file: File | null) {
     if (!file) { setArquivoErro(""); setArquivo(null); return; }
@@ -350,6 +389,74 @@ export default function AcoesComm({
         </div>
       )}
 
+      {/* ── CORREÇÃO DE PONTUAÇÃO (após decisão) ────────────── */}
+      {canEditScore && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="font-semibold text-yellow-900">Corrigir Pontuação Aplicada</h3>
+            <button
+              type="button"
+              onClick={() => {
+                if (!mostraCorrecao) {
+                  const dec = comm.decisions[0];
+                  setNovaPontuacao(dec.finalScore !== null ? dec.finalScore.toFixed(1) : "");
+                }
+                setMostraCorrecao(!mostraCorrecao);
+              }}
+              className="text-xs text-yellow-700 hover:text-yellow-900 underline"
+            >
+              {mostraCorrecao ? "Cancelar" : "Corrigir pontuação →"}
+            </button>
+          </div>
+          {!mostraCorrecao && (
+            <p className="text-xs text-gray-500">
+              Pontuação atual: <strong>{comm.decisions[0]?.finalScore != null ? `${comm.decisions[0].finalScore.toFixed(1)} pt` : "—"}</strong>
+            </p>
+          )}
+          {mostraCorrecao && (
+            <form action={correcaoAction} className="space-y-3 mt-3">
+              <input type="hidden" name="decisionId" value={comm.decisions[0].id} />
+              <input type="hidden" name="communicationId" value={comm.id} />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nova pontuação
+                </label>
+                <input
+                  name="novaScore"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={novaPontuacao}
+                  onChange={(e) => setNovaPontuacao(e.target.value)}
+                  className="input max-w-xs"
+                />
+                {(() => {
+                  const padrao = pontuacaoPadrao(comm.typeName, comm.item);
+                  const atual = novaPontuacao !== "" ? Number(novaPontuacao) : null;
+                  if (padrao !== null && atual !== null && Math.abs(atual - padrao) > 0.001) {
+                    return (
+                      <p className="text-xs text-red-600 mt-1 font-medium">
+                        ⚠ Pontuação diferente do padrão {nomeCpiDoInciso(comm.typeName, comm.item)} ({padrao.toFixed(1)} pt)
+                      </p>
+                    );
+                  }
+                  return null;
+                })()}
+                <p className="text-xs text-gray-400 mt-1">
+                  A correção será refletida automaticamente no caderno disciplinar.
+                </p>
+              </div>
+              {correcaoState?.error && (
+                <p className="text-sm text-red-600">{correcaoState.error}</p>
+              )}
+              <button type="submit" disabled={correcaoPending} className="btn-primary">
+                {correcaoPending ? "Salvando..." : "Salvar Correção"}
+              </button>
+            </form>
+          )}
+        </div>
+      )}
+
       {/* ── DECISÃO (Comandante) ─────────────────────────────── */}
       {canDecide && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-5">
@@ -365,7 +472,15 @@ export default function AcoesComm({
                 required
                 className="input max-w-xs"
                 value={decisaoTipo}
-                onChange={(e) => setDecisaoTipo(e.target.value)}
+                onChange={(e) => {
+                  const tipo = e.target.value;
+                  setDecisaoTipo(tipo);
+                  setNovoRuleId("");
+                  if (tipo !== "Reenquadrar artigo") {
+                    const def = pontuacaoPadrao(comm.typeName, comm.item);
+                    if (def !== null) setFinalScoreDecisao(def.toFixed(1));
+                  }
+                }}
               >
                 <option value="">Selecione</option>
                 <option value="Punição">Punição</option>
@@ -381,7 +496,23 @@ export default function AcoesComm({
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Novo artigo do Manual do Aluno <span className="text-red-500">*</span>
                 </label>
-                <select name="newManualRuleId" required className="input">
+                <select
+                  name="newManualRuleId"
+                  required
+                  className="input"
+                  value={novoRuleId}
+                  onChange={(e) => {
+                    const selectedId = e.target.value;
+                    setNovoRuleId(selectedId);
+                    if (selectedId) {
+                      const regra = manualRules.find((r) => r.id === selectedId);
+                      if (regra) {
+                        const newScore = pontuacaoPadrao(comm.typeName, regra.item);
+                        if (newScore !== null) setFinalScoreDecisao(newScore.toFixed(1));
+                      }
+                    }
+                  }}
+                >
                   <option value="">Selecione o artigo</option>
                   {manualRules.map((r) => (
                     <option key={r.id} value={r.id}>
@@ -437,12 +568,29 @@ export default function AcoesComm({
                 type="number"
                 step="0.1"
                 min="0"
-                defaultValue={comm.suggestedScore ?? ""}
-                placeholder={comm.suggestedScore ? String(comm.suggestedScore) : "0.0"}
+                value={finalScoreDecisao}
+                onChange={(e) => setFinalScoreDecisao(e.target.value)}
                 className="input max-w-xs"
               />
+              {(() => {
+                const isReenq = decisaoTipo === "Reenquadrar artigo";
+                if (isReenq && !novoRuleId) return null;
+                const itemEfetivo = isReenq
+                  ? (manualRules.find((r) => r.id === novoRuleId)?.item ?? null)
+                  : comm.item;
+                const padrao = pontuacaoPadrao(comm.typeName, itemEfetivo);
+                const atual = finalScoreDecisao !== "" ? Number(finalScoreDecisao) : null;
+                if (padrao !== null && atual !== null && Math.abs(atual - padrao) > 0.001) {
+                  return (
+                    <p className="text-xs text-red-600 mt-1 font-medium">
+                      ⚠ Pontuação diferente do padrão {nomeCpiDoInciso(comm.typeName, itemEfetivo)} ({padrao.toFixed(1)} pt)
+                    </p>
+                  );
+                }
+                return null;
+              })()}
               <p className="text-xs text-gray-400 mt-1">
-                Deixe em branco para pontuação zero (ex: arquivamento, homologação de referência).
+                Deixe em branco para pontuação zero (ex: arquivamento).
               </p>
             </div>
             {decisaoState?.error && (

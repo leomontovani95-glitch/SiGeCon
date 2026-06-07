@@ -195,6 +195,9 @@ export default async function ComunicacaoPage({ params }: { params: Promise<{ id
           finalScore: comm.finalScore,
           suggestedScore: comm.suggestedScore,
           opinions: comm.opinions.map((o) => ({ id: o.id })),
+          decisions: comm.decisions.map((d) => ({ id: d.id, finalScore: d.finalScore, decisionType: d.decisionType })),
+          typeName: comm.type.name,
+          item: comm.item,
         }}
         session={{ role: session.role, userId: session.userId, email: session.email }}
         studentEmail={comm.student.email ?? ""}

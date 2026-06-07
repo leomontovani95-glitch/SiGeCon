@@ -305,3 +305,36 @@ export async function proferirDecisao(_prev: State, formData: FormData): Promise
   redirect(`/comunicacoes/${communicationId}`);
 }
 
+// ── Corrigir pontuação após decisão (Comandante) ──────────────────────────
+export async function corrigirPontuacao(_prev: State, formData: FormData): Promise<State> {
+  const session = await verifySession();
+  if (!canDecide(session.role, session.additionalRoles))
+    return { error: "Sem permissão para corrigir pontuação." };
+
+  const decisionId = String(formData.get("decisionId") ?? "").trim();
+  const communicationId = String(formData.get("communicationId") ?? "").trim();
+  const raw = formData.get("novaScore");
+  const novaScore = raw !== null && raw !== "" ? Number(raw) : null;
+
+  if (!decisionId || !communicationId) return { error: "Dados inválidos." };
+
+  const decision = await prisma.decision.findFirst({
+    where: { id: decisionId, communicationId },
+  });
+  if (!decision) return { error: "Decisão não encontrada." };
+
+  await prisma.decision.update({ where: { id: decisionId }, data: { finalScore: novaScore } });
+  await prisma.communication.update({ where: { id: communicationId }, data: { finalScore: novaScore } });
+  await prisma.disciplinaryBookItem.updateMany({ where: { communicationId }, data: { score: novaScore } });
+
+  await auditLog(
+    session.userId,
+    "CORRECAO_PONTUACAO",
+    "Decision",
+    decisionId,
+    `Pontuação corrigida para: ${novaScore ?? 0}`,
+  );
+
+  redirect(`/comunicacoes/${communicationId}`);
+}
+
