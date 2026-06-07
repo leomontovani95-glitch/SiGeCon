@@ -130,15 +130,18 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
   const { id } = await params;
   const caderno = await fetchCaderno(id);
 
-  const schoolRole = caderno.school === "ESFAP" ? "COMANDANTE_ESFAP"
-    : caderno.school === "ESFO" ? "COMANDANTE_ESFO"
+  // Escola efetiva: campo direto do caderno ou herdado do curso vinculado
+  const escolaEfetiva = caderno.school ?? caderno.course?.school ?? null;
+
+  const schoolRole = escolaEfetiva === "ESFAP" ? "COMANDANTE_ESFAP"
+    : escolaEfetiva === "ESFO" ? "COMANDANTE_ESFO"
     : null;
   const comandante = schoolRole
     ? await prisma.user.findFirst({ where: { role: schoolRole, active: true } })
     : caderno.publishedBy ?? null;
 
-  const schoolLabel = caderno.school === "ESFAP" ? "EsFAP"
-    : caderno.school === "ESFO" ? "EsFO"
+  const schoolLabel = escolaEfetiva === "ESFAP" ? "EsFAP"
+    : escolaEfetiva === "ESFO" ? "EsFO"
     : "Escola";
 
   const numero = caderno.course
