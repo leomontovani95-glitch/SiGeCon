@@ -1,9 +1,11 @@
 import { prisma } from "@/lib/db";
-import { verifyRole } from "@/lib/dal";
+import { verifyRole, getSchoolFilter } from "@/lib/dal";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import PublicarBtn from "../../_components/PublicarBtn";
+import RemoverItemBtn from "../../_components/RemoverItemBtn";
+import AdicionarItemBtn from "../../_components/AdicionarItemBtn";
 import Link from "next/link";
 
 export default async function EditarCadernoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -13,22 +15,40 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
   );
   const { id } = await params;
 
-  const caderno = await prisma.disciplinaryBook.findUnique({
-    where: { id },
-    include: {
-      createdBy: true,
-      course: true,
-      items: {
-        orderBy: [{ studentWarName: "asc" }],
-        include: {
-          student: { include: { course: true, platoon: true } },
-          communication: { select: { protocolNumber: true, article: true, item: true, letter: true } },
+  const school = getSchoolFilter(session.role, session.escola);
+
+  const [caderno, pendentes] = await Promise.all([
+    prisma.disciplinaryBook.findUnique({
+      where: { id },
+      include: {
+        createdBy: true,
+        course: true,
+        items: {
+          orderBy: [{ studentWarName: "asc" }],
+          include: {
+            student: { include: { course: true, platoon: true } },
+            communication: { select: { protocolNumber: true, article: true, item: true, letter: true } },
+          },
         },
       },
-    },
-  });
+    }),
+    // Registros com decisão fora de qualquer caderno rascunho (escola do usuário)
+    prisma.communication.findMany({
+      where: {
+        status: "DECIDIDA",
+        disciplinaryBookItems: { none: { disciplinaryBook: { status: "RASCUNHO" } } },
+        ...(school ? { course: { school } } : {}),
+      },
+      include: { student: { include: { course: true, platoon: true } }, type: true, decisions: true },
+      orderBy: { updatedAt: "asc" },
+    }),
+  ]);
 
   if (!caderno) notFound();
+
+  // Filtra pendentes: não deve incluir itens que já estão neste caderno
+  const itemIds = new Set(caderno.items.map((i) => i.communicationId));
+  const pendentesDisponiveis = pendentes.filter((c) => !itemIds.has(c.id));
 
   const canPublish = caderno.status !== "PUBLICADO";
   const numero = caderno.course
@@ -56,7 +76,7 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
         </div>
       </div>
 
-      {/* Registros compilados — tabela com scroll */}
+      {/* Registros compilados */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-gray-900">
@@ -71,7 +91,7 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
               <table className="w-full text-sm">
                 <thead className="bg-[#1e3a5f] text-white sticky top-0 z-10">
                   <tr>
-                    <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Protocolo CPI</th>
+                    <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Protocolo</th>
                     <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Enquadramento</th>
                     <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Curso</th>
                     <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Pelotão</th>
@@ -81,6 +101,7 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
                     <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Data Fato</th>
                     <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Decisão</th>
                     <th className="text-right px-3 py-3 font-medium whitespace-nowrap">Pont.</th>
+                    {canPublish && <th className="px-3 py-3"></th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -110,10 +131,19 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
                           </span>
                         ) : "—"}
                       </td>
+                      {canPublish && (
+                        <td className="px-3 py-2.5 text-xs">
+                          <RemoverItemBtn cadernoId={id} itemId={item.id} />
+                        </td>
+                      )}
                     </tr>
                   ))}
                   {caderno.items.length === 0 && (
-                    <tr><td colSpan={10} className="px-4 py-6 text-center text-gray-400">Nenhum registro compilado.</td></tr>
+                    <tr>
+                      <td colSpan={canPublish ? 11 : 10} className="px-4 py-6 text-center text-gray-400">
+                        Nenhum registro compilado.
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
@@ -122,6 +152,49 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
           <div className="px-4 py-2 bg-gray-50 border-t text-xs text-gray-500">{caderno.items.length} registro(s) compilado(s)</div>
         </div>
       </div>
+
+      {/* Registros ainda não incluídos — aparecem aqui quando removidos de algum rascunho */}
+      {canPublish && pendentesDisponiveis.length > 0 && (
+        <div className="mb-6">
+          <h2 className="font-semibold text-gray-900 mb-1">
+            Registros ainda não incluídos
+            <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">{pendentesDisponiveis.length}</span>
+          </h2>
+          <p className="text-xs text-gray-500 mb-3">
+            Esses registros têm decisão do Comandante mas não estão em nenhum rascunho. Inclua-os agora ou deixe para o próximo caderno.
+          </p>
+          <div className="bg-white rounded-xl border border-yellow-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-yellow-50 border-b border-yellow-200">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-medium text-gray-700 text-xs">Protocolo</th>
+                    <th className="text-left px-3 py-2 font-medium text-gray-700 text-xs">Aluno</th>
+                    <th className="text-left px-3 py-2 font-medium text-gray-700 text-xs">Curso</th>
+                    <th className="text-left px-3 py-2 font-medium text-gray-700 text-xs">Tipo</th>
+                    <th className="text-left px-3 py-2 font-medium text-gray-700 text-xs">Decisão</th>
+                    <th className="px-3 py-2"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {pendentesDisponiveis.map((c) => (
+                    <tr key={c.id} className="hover:bg-yellow-50">
+                      <td className="px-3 py-2 font-mono text-xs text-gray-500">{c.protocolNumber}</td>
+                      <td className="px-3 py-2 font-medium text-gray-900">{c.student.warName}</td>
+                      <td className="px-3 py-2 text-xs text-gray-600">{c.student.course.name}</td>
+                      <td className="px-3 py-2 text-xs text-gray-600">{c.type.name}</td>
+                      <td className="px-3 py-2 text-xs text-gray-600">{c.decisions[0]?.decisionType ?? "—"}</td>
+                      <td className="px-3 py-2">
+                        <AdicionarItemBtn cadernoId={id} communicationId={c.id} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {canPublish && caderno.items.length > 0 && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-5">

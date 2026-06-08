@@ -40,7 +40,7 @@ export default async function CadernoPage({
       ? { course: { school } }
       : {};
 
-  const [cadernos, pendentesPublicacao] = await Promise.all([
+  const [cadernos, pendentesPublicacao, naoIncluidos] = await Promise.all([
     prisma.disciplinaryBook.findMany({
       where: cadernoWhere,
       orderBy: [{ courseId: "asc" }, { number: "asc" }],
@@ -52,6 +52,16 @@ export default async function CadernoPage({
         disciplinaryBookItems: { none: {} },
         ...(cursoId ? { courseId: cursoId } : school ? { course: { school } } : {}),
       },
+    }),
+    // Registros com decisão fora de qualquer caderno rascunho (removidos manualmente)
+    prisma.communication.findMany({
+      where: {
+        status: "DECIDIDA",
+        disciplinaryBookItems: { none: { disciplinaryBook: { status: "RASCUNHO" } } },
+        ...(cursoId ? { courseId: cursoId } : school ? { course: { school } } : {}),
+      },
+      include: { student: { include: { course: true } }, type: true, decisions: true },
+      orderBy: { updatedAt: "desc" },
     }),
   ]);
 
@@ -162,6 +172,48 @@ export default async function CadernoPage({
           </tbody>
         </table>
       </div>
+
+      {/* Registros ainda não incluídos em nenhum rascunho */}
+      {naoIncluidos.length > 0 && (
+        <div className="mt-8">
+          <div className="flex items-center gap-3 mb-3">
+            <h2 className="text-base font-bold text-yellow-800">
+              Registro(s) ainda não incluído(s)
+            </h2>
+            <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full font-medium">
+              {naoIncluidos.length}
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            Esses registros têm decisão do Comandante mas não estão em nenhum caderno rascunho.
+            Para incluí-los, acesse o caderno rascunho correspondente e clique em &quot;Incluir&quot;.
+          </p>
+          <div className="bg-white rounded-xl border border-yellow-200 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-yellow-50 border-b border-yellow-200">
+                <tr>
+                  <th className="text-left px-4 py-3 font-medium text-gray-700 text-xs">Protocolo</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-700 text-xs">Aluno</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-700 text-xs">Curso</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-700 text-xs">Tipo</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-700 text-xs">Decisão</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {naoIncluidos.map((c) => (
+                  <tr key={c.id} className="hover:bg-yellow-50">
+                    <td className="px-4 py-2.5 font-mono text-xs text-gray-500">{c.protocolNumber}</td>
+                    <td className="px-4 py-2.5 font-medium text-gray-900">{c.student.warName}</td>
+                    <td className="px-4 py-2.5 text-xs text-gray-600">{c.student.course.name}</td>
+                    <td className="px-4 py-2.5 text-xs text-gray-600">{c.type.name}</td>
+                    <td className="px-4 py-2.5 text-xs text-gray-600">{c.decisions[0]?.decisionType ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { verifyRole } from "@/lib/dal";
+import { verifyRole, getSchoolFilter } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
 
 export async function criarCaderno() {
@@ -10,9 +10,13 @@ export async function criarCaderno() {
     "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
   );
 
-  // Busca todas as comunicações DECIDIDAS, agrupa por curso
+  // Busca comunicações DECIDIDAS — filtra pela escola do usuário para evitar contaminação cruzada
+  const school = getSchoolFilter(session.role, session.escola);
   const decididas = await prisma.communication.findMany({
-    where: { status: "DECIDIDA" },
+    where: {
+      status: "DECIDIDA",
+      ...(school ? { course: { school } } : {}),
+    },
     include: { student: true, type: true, decisions: true },
     orderBy: { updatedAt: "asc" },
   });
@@ -140,4 +144,21 @@ export async function adicionarItem(cadernoId: string, communicationId: string) 
     },
   });
   await auditLog(session.userId, "ADD_ITEM", "DisciplinaryBook", cadernoId, communicationId);
+  redirect(`/caderno/${cadernoId}/editar`);
+}
+
+export async function removerItemCaderno(cadernoId: string, itemId: string) {
+  const session = await verifyRole(
+    "ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA",
+    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
+  );
+
+  const caderno = await prisma.disciplinaryBook.findUnique({ where: { id: cadernoId } });
+  if (!caderno || caderno.status === "PUBLICADO") return;
+
+  await prisma.disciplinaryBookItem.delete({
+    where: { id: itemId, disciplinaryBookId: cadernoId },
+  });
+  await auditLog(session.userId, "REMOVE_ITEM", "DisciplinaryBook", cadernoId, itemId);
+  redirect(`/caderno/${cadernoId}/editar`);
 }
