@@ -40,19 +40,23 @@ const isArquivadoPDF = (i: Item) =>
   i.recordType === "Arquivamento" ||
   (i.decisionSummary ?? "").toLowerCase().includes("arquiv");
 
-const GRUPOS: { label: string; note?: string; filter: (i: Item) => boolean }[] = [
+const TD_TAC_SET = new Set(["TD Leve", "TD Média", "TD Grave", "TAC"]);
+
+const GRUPOS: { label: string; note?: string; isTdTac?: boolean; filter: (i: Item) => boolean }[] = [
   { label: "CPI 0", note: "Equivale a 50% dos pontos da CPI 1 (−0,1 pt por ocorrência)",
                          filter: (i) => i.recordType === "CPI 0"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
   { label: "CPI 1",     filter: (i) => i.recordType === "CPI 1"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
   { label: "CPI 2",     filter: (i) => i.recordType === "CPI 2"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
   { label: "CPI 3",     filter: (i) => i.recordType === "CPI 3"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
+  { label: "TD / TAC — Transgressões Disciplinares e Termos de Ajuste de Conduta",
+    isTdTac: true,       filter: (i) => TD_TAC_SET.has(i.recordType)             && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
   { label: "Referências Elogiosas",     filter: (i) => i.recordType === "Referência Elogiosa"   && !isArquivadoPDF(i) },
   { label: "Elogios publicados em BI",  filter: (i) => i.recordType === "Elogio publicado em BI" && !isArquivadoPDF(i) },
   { label: "Reenquadramentos",          filter: (i) => i.decisionSummary === "Reenquadrar artigo" },
   { label: "Arquivamentos",             filter: (i) => isArquivadoPDF(i) },
 ];
 
-function TabelaTipo({ items, label, note }: { items: Item[]; label: string; note?: string }) {
+function TabelaTipo({ items, label, note, isTdTac }: { items: Item[]; label: string; note?: string; isTdTac?: boolean }) {
   if (items.length === 0) return null;
   return (
     <div className="print-section" style={{ marginTop: 24, pageBreakInside: "avoid" }}>
@@ -100,7 +104,9 @@ function TabelaTipo({ items, label, note }: { items: Item[]; label: string; note
                 {item.communication.protocolNumber}
               </td>
               <td className="cd-col-enq" style={{ color: "#1e3a8a", fontSize: "7pt" }}>
-                {fmtEnq(item.communication.article, item.communication.item, item.communication.letter)}
+                {isTdTac
+                  ? item.decisionSummary
+                  : fmtEnq(item.communication.article, item.communication.item, item.communication.letter)}
               </td>
               <td className="cd-col-pel">{item.student.platoon?.name ?? "—"}</td>
               <td className="cd-col-num" style={{ fontFamily: "monospace", textAlign: "center" }}>
@@ -108,7 +114,7 @@ function TabelaTipo({ items, label, note }: { items: Item[]; label: string; note
               </td>
               <td className="cd-col-nome" style={{ fontWeight: "bold" }}>{item.studentWarName}</td>
               <td className="cd-col-data">{format(new Date(item.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
-              <td className="cd-col-dec">{item.decisionSummary}</td>
+              <td className="cd-col-dec">{isTdTac ? "Sanção" : item.decisionSummary}</td>
               <td className="cd-col-obs" style={{ fontSize: "7pt", color: "#666" }}>{item.shortObservation ?? "—"}</td>
               <td className="cd-col-pont" style={{ textAlign: "right", fontWeight: "bold" }}>
                 {item.score != null
@@ -199,7 +205,7 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
 
       {/* Tabelas separadas por tipo */}
       {grupos.map((g) => (
-        <TabelaTipo key={g.label} label={g.label} note={g.note} items={g.itens} />
+        <TabelaTipo key={g.label} label={g.label} note={g.note} isTdTac={g.isTdTac} items={g.itens} />
       ))}
 
       {totalRegistros === 0 && (

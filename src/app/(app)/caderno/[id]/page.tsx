@@ -15,7 +15,8 @@ function fmtEnq(art: string | null, inc: string | null, al: string | null) {
 
 const CPI_ORDER    = ["CPI 0", "CPI 1", "CPI 2", "CPI 3"];
 const ELOGIO_ORDER = ["Referência Elogiosa", "Elogio publicado em BI"];
-const TIPO_ORDER   = [...CPI_ORDER, ...ELOGIO_ORDER, "Arquivamento"];
+const TD_TAC_TIPOS = new Set(["TD Leve", "TD Média", "TD Grave", "TAC"]);
+const TIPO_ORDER   = [...CPI_ORDER, ...ELOGIO_ORDER, "Arquivamento", "TD Leve", "TD Média", "TD Grave", "TAC"];
 
 const CPI0_NOTE = "CPI de Grau 0 — sanção equivalente à metade da CPI 1 (−0,1 pt)";
 
@@ -128,10 +129,15 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
     i.recordType === "Arquivamento" ||
     (i.decisionSummary ?? "").toLowerCase().includes("arquiv");
 
-  // Separa: reenquadramentos, arquivamentos (independente do tipo) e demais
+  // Separa: reenquadramentos, arquivamentos, TD/TAC e demais
   const reenquadrados = sortByNum(caderno.items.filter(i => i.decisionSummary === "Reenquadrar artigo"));
   const arquivados    = sortByNum(caderno.items.filter(i => i.decisionSummary !== "Reenquadrar artigo" && isArquivado(i)));
-  const demais        = caderno.items.filter(i => i.decisionSummary !== "Reenquadrar artigo" && !isArquivado(i));
+  const tdTacItems    = sortByNum(caderno.items.filter(i =>
+    i.decisionSummary !== "Reenquadrar artigo" && !isArquivado(i) && TD_TAC_TIPOS.has(i.recordType)
+  ));
+  const demais        = caderno.items.filter(i =>
+    i.decisionSummary !== "Reenquadrar artigo" && !isArquivado(i) && !TD_TAC_TIPOS.has(i.recordType)
+  );
 
   const grupos = new Map<string, typeof caderno.items>();
   for (const item of demais) {
@@ -177,7 +183,7 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
       </div>
 
       {/* Cards resumo */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 mb-6">
         <div className="bg-blue-600 rounded-xl p-4 text-white">
           <p className="text-3xl font-bold">{caderno.items.length}</p>
           <p className="text-xs opacity-90 mt-1">Total de registros</p>
@@ -185,6 +191,10 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
         <div className="bg-red-600 rounded-xl p-4 text-white">
           <p className="text-3xl font-bold">{caderno.items.filter(i => i.recordType.startsWith("CPI")).length}</p>
           <p className="text-xs opacity-90 mt-1">Punições (CPI)</p>
+        </div>
+        <div className="bg-orange-600 rounded-xl p-4 text-white">
+          <p className="text-3xl font-bold">{tdTacItems.length}</p>
+          <p className="text-xs opacity-90 mt-1">TD / TAC</p>
         </div>
         <div className="bg-green-600 rounded-xl p-4 text-white">
           <p className="text-3xl font-bold">{caderno.items.filter(i => TIPOS_FAVORAVEIS.has(i.recordType)).length}</p>
@@ -217,6 +227,56 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
             <TabelaGrupo items={items} thBase={thBase} tdBase={tdBase} />
           </div>
         ))}
+
+        {/* TD / TAC */}
+        {tdTacItems.length > 0 && (
+          <div>
+            <h2 className="text-base font-bold text-orange-800 mb-2 flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-orange-600" />
+              TD / TAC — Transgressões Disciplinares e Termos de Ajuste de Conduta
+              <span className="text-xs font-normal text-gray-400">({tdTacItems.length} registro{tdTacItems.length !== 1 ? "s" : ""})</span>
+            </h2>
+            <div className="bg-white rounded-xl border border-orange-200 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-orange-700 text-white">
+                  <tr>
+                    <th className={thBase}>Protocolo</th>
+                    <th className={thBase}>Enquadramento</th>
+                    <th className={thBase}>Pelotão</th>
+                    <th className={thBase}>Nº</th>
+                    <th className={thBase}>Nome de Guerra</th>
+                    <th className={thBase}>Data</th>
+                    <th className={thBase}>Decisão</th>
+                    <th className={`${thBase} text-right`}>Pont.</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-orange-100">
+                  {tdTacItems.map((item, idx) => (
+                    <tr key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-orange-50"}>
+                      <td className={`${tdBase} font-mono whitespace-nowrap`}>
+                        <a href={`/comunicacoes/${item.communicationId}`} className="text-blue-700 hover:underline">
+                          {item.communication.protocolNumber}
+                        </a>
+                      </td>
+                      <td className={`${tdBase} text-gray-700 whitespace-nowrap font-medium`}>{item.decisionSummary}</td>
+                      <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{item.student.platoon?.name ?? "—"}</td>
+                      <td className={`${tdBase} font-mono text-gray-700 whitespace-nowrap`}>{item.studentCourseNumber}</td>
+                      <td className={`${tdBase} font-semibold text-gray-900 whitespace-nowrap`}>{item.studentWarName}</td>
+                      <td className={`${tdBase} text-gray-500 whitespace-nowrap`}>{new Date(item.factDate).toLocaleDateString("pt-BR")}</td>
+                      <td className={`${tdBase} text-orange-800 whitespace-nowrap font-medium`}>Sanção</td>
+                      <td className={`${tdBase} text-right font-bold`}>
+                        {item.score != null && item.score > 0
+                          ? <span className="text-red-600">−{item.score.toFixed(1)}</span>
+                          : <span className="text-gray-400">—</span>
+                        }
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Reenquadramentos */}
         {reenquadrados.length > 0 && (
