@@ -10,7 +10,7 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
   const session = await verifySession();
   const { id } = await params;
 
-  const [aluno, pubItems] = await Promise.all([
+  const [aluno, pubItemsRaw] = await Promise.all([
     prisma.student.findUnique({
       where: { id },
       include: {
@@ -24,18 +24,45 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
     }),
     prisma.disciplinaryBookItem.findMany({
       where: { studentId: id, disciplinaryBook: { status: "PUBLICADO" } },
-      include: { communication: { include: { type: { select: { scoreNature: true } } } } },
+      include: {
+        communication: { include: { type: { select: { scoreNature: true } } } },
+        disciplinaryBook: { select: { id: true, number: true, publicationDate: true, course: { select: { name: true } } } },
+      },
+      orderBy: { disciplinaryBook: { publicationDate: "asc" } },
     }),
   ]);
   if (!aluno) notFound();
 
   if (session.role === "ALUNO" && aluno.userId !== session.userId) notFound();
 
+  const pubItems = pubItemsRaw;
   const nota  = calcularNotaPublicada(pubItems);
   const faixa = faixaNota(nota);
 
   const desfavoravel = pubItems.filter((i) => i.communication.type.scoreNature === "DESFAVORAVEL").reduce((s, i) => s + Math.abs(i.score ?? 0), 0);
   const favoravel    = pubItems.filter((i) => i.communication.type.scoreNature === "FAVORAVEL").reduce((s, i) => s + Math.abs(i.score ?? 0), 0);
+
+  // Evolução da nota por caderno publicado
+  const cadernosOrdenados = Array.from(
+    new Map(
+      pubItems
+        .filter((i) => i.disciplinaryBook.publicationDate)
+        .map((i) => [i.disciplinaryBook.id, i.disciplinaryBook])
+    ).values()
+  ).sort((a, b) => new Date(a.publicationDate!).getTime() - new Date(b.publicationDate!).getTime());
+
+  const evolucao: { label: string; date: Date; nota: number }[] = [];
+  for (const caderno of cadernosOrdenados) {
+    const itensTeCaderno = pubItems.filter((i) =>
+      new Date(i.disciplinaryBook.publicationDate!).getTime() <= new Date(caderno.publicationDate!).getTime()
+    );
+    const notaApos = calcularNotaPublicada(itensTeCaderno);
+    evolucao.push({
+      label: `CD Nº ${String(caderno.number).padStart(2, "0")}${caderno.course ? ` — ${caderno.course.name}` : ""}`,
+      date: new Date(caderno.publicationDate!),
+      nota: notaApos,
+    });
+  }
 
   const STATUS_LABELS: Record<string, string> = {
     REGISTRADA: "Registrada",
@@ -77,6 +104,45 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
           </div>
         </div>
       </div>
+
+      {/* Evolução da nota por caderno */}
+      {evolucao.length > 1 && (
+        <div className="print-section">
+          <h2>Evolução da Nota por Caderno Publicado</h2>
+          <table className="print-table">
+            <thead>
+              <tr>
+                <th>Caderno</th>
+                <th>Data de Publicação</th>
+                <th style={{ textAlign: "right" }}>Nota Acumulada</th>
+                <th style={{ textAlign: "right" }}>Variação</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style={{ fontStyle: "italic", color: "#888" }}>Início do curso</td>
+                <td>—</td>
+                <td style={{ textAlign: "right", fontWeight: "bold" }}>10,00</td>
+                <td style={{ textAlign: "right" }}>—</td>
+              </tr>
+              {evolucao.map((e, i) => {
+                const anterior = i === 0 ? 10 : evolucao[i - 1].nota;
+                const variacao = e.nota - anterior;
+                return (
+                  <tr key={e.label}>
+                    <td style={{ fontFamily: "monospace", fontSize: "8pt" }}>{e.label}</td>
+                    <td>{format(e.date, "dd/MM/yyyy", { locale: ptBR })}</td>
+                    <td style={{ textAlign: "right", fontWeight: "bold" }}>{e.nota.toFixed(2)}</td>
+                    <td style={{ textAlign: "right", fontWeight: "bold", color: variacao < 0 ? "#b91c1c" : variacao > 0 ? "#15803d" : "#888" }}>
+                      {variacao === 0 ? "—" : `${variacao > 0 ? "+" : ""}${variacao.toFixed(2)}`}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="print-section">
         <h2>Comunicações ({aluno.communications.length} total)</h2>

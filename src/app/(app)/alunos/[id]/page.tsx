@@ -25,7 +25,7 @@ export default async function AlunoPage({ params }: { params: Promise<{ id: stri
     if (!aluno) notFound();
   }
 
-  const [aluno, pubItems] = await Promise.all([
+  const [aluno, pubItems, provisItems] = await Promise.all([
     prisma.student.findUnique({
       where: { id },
       include: {
@@ -41,12 +41,20 @@ export default async function AlunoPage({ params }: { params: Promise<{ id: stri
       where: { studentId: id, disciplinaryBook: { status: "PUBLICADO" } },
       include: { communication: { include: { type: { select: { scoreNature: true } } } } },
     }),
+    prisma.disciplinaryBookItem.findMany({
+      where: { studentId: id, disciplinaryBook: { status: "RASCUNHO" } },
+      include: { communication: { include: { type: { select: { scoreNature: true } } } } },
+    }),
   ]);
   if (!aluno) notFound();
 
   const nota  = calcularNotaPublicada(pubItems);
   const faixa = faixaNota(nota);
   const risco = zonaDeRisco(nota);
+
+  const notaProvisoria = provisItems.length > 0
+    ? calcularNotaPublicada([...pubItems, ...provisItems])
+    : nota;
 
   const totalDesfavoravel = pubItems
     .filter((i) => i.communication.type.scoreNature === "DESFAVORAVEL")
@@ -94,6 +102,17 @@ export default async function AlunoPage({ params }: { params: Promise<{ id: stri
             <span className="text-red-600">− {totalDesfavoravel.toFixed(1)} desfav.</span>
             <span className="text-green-600">+ {totalFavoravel.toFixed(1)} fav.</span>
           </div>
+          {provisItems.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-gray-200">
+              <p className="text-xs text-gray-500">
+                Nota provisória:{" "}
+                <span className={`font-bold ${notaProvisoria < nota ? "text-red-600" : "text-gray-700"}`}>
+                  {notaProvisoria.toFixed(2)}
+                </span>
+                <span className="text-gray-400"> (incl. rascunho)</span>
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

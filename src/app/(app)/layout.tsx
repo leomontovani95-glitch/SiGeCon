@@ -10,27 +10,55 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .findUnique({ where: { id: session.userId }, select: { rank: true } })
     .then((u) => u?.rank ?? "");
 
-  let pendingDespachos = 0;
   const school = getSchoolFilter(role, session.escola);
   const schoolFilter = school ? { course: { school } } : {};
+  const badgeCounts: Record<string, number> = {};
 
+  // ── /despachos badge ─────────────────────────────────────────────────────
   if ((PARECERISTAS as string[]).includes(role)) {
-    pendingDespachos = await prisma.communication.count({
+    const n = await prisma.communication.count({
       where: { status: { in: ["AGUARDANDO_PARECER", "JUSTIFICATIVA_APRESENTADA"] }, ...schoolFilter },
     });
+    if (n > 0) badgeCounts["/despachos"] = n;
   } else if ((COMANDANTES as string[]).includes(role)) {
-    pendingDespachos = await prisma.communication.count({
+    const n = await prisma.communication.count({
       where: { status: "AGUARDANDO_DECISAO", ...schoolFilter },
     });
+    if (n > 0) badgeCounts["/despachos"] = n;
   } else if ((VIEWERS_APM as string[]).includes(role)) {
-    pendingDespachos = await prisma.communication.count({
+    const n = await prisma.communication.count({
       where: { status: { in: ["AGUARDANDO_PARECER", "JUSTIFICATIVA_APRESENTADA", "AGUARDANDO_DECISAO"] } },
     });
+    if (n > 0) badgeCounts["/despachos"] = n;
+  }
+
+  // ── /comunicacoes badge ──────────────────────────────────────────────────
+  if (role === "PROTOCOLO") {
+    // Comunicações recém-registradas aguardando trâmite
+    const n = await prisma.communication.count({
+      where: { status: "REGISTRADA", ...schoolFilter },
+    });
+    if (n > 0) badgeCounts["/comunicacoes"] = n;
+  } else if (role === "ALUNO") {
+    // Comunicações do aluno aguardando sua ação
+    const student = await prisma.student.findFirst({
+      where: { userId: session.userId },
+      select: { id: true },
+    });
+    if (student) {
+      const n = await prisma.communication.count({
+        where: {
+          studentId: student.id,
+          status: { in: ["AGUARDANDO_CIENCIA", "AGUARDANDO_DEFESA", "PRAZO_EXPIRADO"] },
+        },
+      });
+      if (n > 0) badgeCounts["/comunicacoes"] = n;
+    }
   }
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar role={role} rank={userRank} warName={session.warName} pendingDespachos={pendingDespachos} />
+      <Sidebar role={role} rank={userRank} warName={session.warName} badgeCounts={badgeCounts} />
       <main className="flex-1 overflow-auto bg-gray-50">
         {children}
       </main>

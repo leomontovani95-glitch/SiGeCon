@@ -342,7 +342,7 @@ export default function ComunicacaoForm({ tipos, regras, cursos }: Props) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Data do Fato *</label>
-          <input name="factDate" type="date" required className="input" />
+          <input name="factDate" type="date" required className="input" defaultValue={new Date().toISOString().split("T")[0]} />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Hora do Fato</label>

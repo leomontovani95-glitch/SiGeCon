@@ -47,7 +47,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 const nav: NavItem[] = [
   { href: "/dashboard",    label: "Painel",               icon: "📊" },
-  { href: "/comunicacoes", label: "Comunicações",         icon: "📋" },
+  { href: "/comunicacoes", label: "Comunicações",         icon: "📋", hasBadge: true },
   { href: "/despachos",    label: "Despachos",            icon: "📨", roles: DESPACHOS_ROLES, hasBadge: true },
   { href: "/alunos",       label: "Alunos",               icon: "👤", roles: STAFF },
   { href: "/caderno",      label: "Caderno Disciplinar",  icon: "📖", roles: STAFF },
@@ -56,6 +56,7 @@ const nav: NavItem[] = [
   { href: "/usuarios",     label: "Usuários",             icon: "👥", roles: COMANDANTES },
   { href: "/cursos",       label: "Cursos",               icon: "🎓", roles: COMANDANTES },
   { href: "/tipos",        label: "Tipos de Comunicação", icon: "⚙️", roles: TIPOS_ROLES },
+  { href: "/auditoria",    label: "Auditoria",            icon: "🔍", roles: ["ADMINISTRADOR"] },
   { href: "/perfil",       label: "Meu Perfil",           icon: "👤" },
 ];
 
@@ -63,12 +64,12 @@ export default function Sidebar({
   role,
   rank,
   warName,
-  pendingDespachos = 0,
+  badgeCounts = {},
 }: {
   role: string;
   rank: string;
   warName: string;
-  pendingDespachos?: number;
+  badgeCounts?: Record<string, number>;
 }) {
   const pathname = usePathname();
   const isUnrestricted = ["ADMINISTRADOR", "CHEFE_DIVISAO_ACADEMICA"].includes(role);
@@ -90,7 +91,7 @@ export default function Sidebar({
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {visibleNav.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/");
-          const badge = item.hasBadge && pendingDespachos > 0;
+          const count = item.hasBadge ? (badgeCounts[item.href] ?? 0) : 0;
           return (
             <Link
               key={item.href}
@@ -103,9 +104,9 @@ export default function Sidebar({
                 <span className="text-base">{item.icon}</span>
                 {item.label}
               </span>
-              {badge && (
+              {count > 0 && (
                 <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
-                  {pendingDespachos > 99 ? "99+" : pendingDespachos}
+                  {count > 99 ? "99+" : count}
                 </span>
               )}
             </Link>

@@ -2,6 +2,8 @@ import { prisma } from "@/lib/db";
 import { verifySession, getSchoolFilter } from "@/lib/dal";
 import { calcularNotaPublicada, faixaNota, zonaDeRisco } from "@/lib/score";
 import Link from "next/link";
+import { format, differenceInCalendarDays } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 // ── Dashboard do ALUNO ────────────────────────────────────────────────────
 async function getDashboardAluno(userId: string) {
@@ -18,19 +20,28 @@ async function getDashboardAluno(userId: string) {
   });
   if (!aluno) return null;
 
-  const pubItems = await prisma.disciplinaryBookItem.findMany({
-    where: { studentId: aluno.id, disciplinaryBook: { status: "PUBLICADO" } },
-    include: { communication: { include: { type: { select: { scoreNature: true } } } } },
-  });
+  const [pubItems, provisItems] = await Promise.all([
+    prisma.disciplinaryBookItem.findMany({
+      where: { studentId: aluno.id, disciplinaryBook: { status: "PUBLICADO" } },
+      include: { communication: { include: { type: { select: { scoreNature: true } } } } },
+    }),
+    prisma.disciplinaryBookItem.findMany({
+      where: { studentId: aluno.id, disciplinaryBook: { status: "RASCUNHO" } },
+      include: { communication: { include: { type: { select: { scoreNature: true } } } } },
+    }),
+  ]);
 
   const comms = aluno.communications;
   const favoraveisPublicados = pubItems.filter((i) => i.communication.type.scoreNature === "FAVORAVEL").length;
+  const nota = calcularNotaPublicada(pubItems);
+  const notaProvisoria = provisItems.length > 0 ? calcularNotaPublicada([...pubItems, ...provisItems]) : nota;
 
   return {
     aluno,
-    nota: calcularNotaPublicada(pubItems),
+    nota,
+    notaProvisoria,
+    temProvisorio: provisItems.length > 0,
     pendenteCiencia: comms.filter((c) => c.status === "AGUARDANDO_CIENCIA" || c.status === "AGUARDANDO_DEFESA").length,
-    aguardandoDefesa: 0,
     prazoVencido: comms.filter((c) => c.status === "PRAZO_EXPIRADO").length,
     decididas: pubItems.length,
     favoraveis: favoraveisPublicados,
@@ -42,29 +53,20 @@ async function getDashboardAluno(userId: string) {
   };
 }
 
-// ── Dashboard geral — recebe os IDs de cursos no escopo ──────────────────
-async function getDashboardGeral(
-  role: string,
-  userId: string,
-  scopeCourseIds: string[],
-) {
+// ── Dashboard geral ────────────────────────────────────────────────────────
+async function getDashboardGeral(role: string, userId: string, scopeCourseIds: string[]) {
   const filtroReporter = role === "COMUNICANTE" ? { reporterId: userId } : {};
-  // Filtro de curso: se scopeCourseIds for vazio, nada é exibido (fallback seguro)
   const cf = scopeCourseIds.length > 0 ? { courseId: { in: scopeCourseIds } } : {};
 
+  const agora = new Date();
+  // Limite: prazos vencidos há mais de 2 dias
+  const prazoCorte = new Date(agora.getTime() - 2 * 24 * 60 * 60 * 1000);
+
   const [
-    totalCPIs,
-    aguardandoCiencia,
-    aguardandoDefesa,
-    prazoVencido,
-    aguardandoParecer,
-    aguardandoDecisao,
-    // CPIs com decisão do Comandante que ainda não foram publicadas em caderno publicado
-    cpisDecididasAgPublicacao,
-    referencias,
-    cadernosPublicados,
+    totalCPIs, aguardandoCiencia, aguardandoDefesa, prazoVencido,
+    aguardandoParecer, aguardandoDecisao, cpisDecididasAgPublicacao, referencias, cadernosPublicados,
+    commsComPrazo,
   ] = await Promise.all([
-    // CPIs ainda em trâmite (sem caderno publicado)
     prisma.communication.count({ where: {
       ...filtroReporter, ...cf,
       type: { name: { in: ["CPI 0","CPI 1","CPI 2","CPI 3"] } },
@@ -76,18 +78,27 @@ async function getDashboardGeral(
     prisma.communication.count({ where: { ...filtroReporter, ...cf, status: "AGUARDANDO_PARECER" } }),
     prisma.communication.count({ where: { ...filtroReporter, ...cf, status: "AGUARDANDO_DECISAO" } }),
     prisma.communication.count({ where: {
-      ...filtroReporter, ...cf,
-      status: "DECIDIDA",
+      ...filtroReporter, ...cf, status: "DECIDIDA",
       type: { name: { in: ["CPI 0","CPI 1","CPI 2","CPI 3"] } },
       disciplinaryBookItems: { none: { disciplinaryBook: { status: "PUBLICADO" } } },
     } }),
-    // Refs/Elogios ainda em trâmite (sem caderno publicado)
     prisma.communication.count({ where: {
       ...filtroReporter, ...cf,
       type: { name: { in: ["Referência Elogiosa", "Elogio publicado em BI"] } },
       disciplinaryBookItems: { none: { disciplinaryBook: { status: "PUBLICADO" } } },
     } }),
     prisma.disciplinaryBook.count({ where: { status: "PUBLICADO", ...(scopeCourseIds.length ? { courseId: { in: scopeCourseIds } } : {}) } }),
+    // Prazos vencidos há mais de 2 dias e ainda não publicados em caderno
+    prisma.communication.findMany({
+      where: {
+        ...cf,
+        status: { in: ["AGUARDANDO_CIENCIA", "AGUARDANDO_DEFESA", "PRAZO_EXPIRADO"] },
+        defenseDeadline: { lt: prazoCorte },
+      },
+      include: { student: true, type: { select: { name: true } } },
+      orderBy: { defenseDeadline: "asc" },
+      take: 30,
+    }),
   ]);
 
   const [students, allPubItems] = await Promise.all([
@@ -101,19 +112,12 @@ async function getDashboardGeral(
     }),
   ]);
 
-  // Arquivado = decisão do Comandante foi arquivar (sem desconto/acréscimo de pontos)
-  const isArquivado = (summary: string | null) =>
-    (summary ?? "").toLowerCase().includes("arquiv");
-
-  // CPIs publicadas em caderno com SANÇÃO confirmada (pontos descontados)
+  const isArquivado = (summary: string | null) => (summary ?? "").toLowerCase().includes("arquiv");
   const cpisPublicadas      = allPubItems.filter(i => i.recordType.startsWith("CPI") && !isArquivado(i.decisionSummary)).length;
-  // CPIs publicadas em caderno com decisão de ARQUIVAR (sem desconto)
   const cpisArquivadas      = allPubItems.filter(i => i.recordType.startsWith("CPI") &&  isArquivado(i.decisionSummary)).length;
-  // RE/EBI publicados em caderno com decisão FAVORÁVEL (pontos somados)
   const elogiososPublicados = allPubItems.filter(i =>
     (i.recordType === "Referência Elogiosa" || i.recordType === "Elogio publicado em BI") && !isArquivado(i.decisionSummary)
   ).length;
-  // RE/EBI publicados em caderno com decisão de ARQUIVAR (sem acréscimo)
   const elogiososArquivados = allPubItems.filter(i =>
     (i.recordType === "Referência Elogiosa" || i.recordType === "Elogio publicado em BI") &&  isArquivado(i.decisionSummary)
   ).length;
@@ -125,21 +129,18 @@ async function getDashboardGeral(
   }
 
   const studentsWithNota = students.map((s) => ({
-    ...s,
-    nota: calcularNotaPublicada(pubPorAluno.get(s.id) ?? []),
+    ...s, nota: calcularNotaPublicada(pubPorAluno.get(s.id) ?? []),
   }));
 
   return {
     cards: {
-      totalCPIs,
-      aguardandoCienciaDefesa: aguardandoCiencia + aguardandoDefesa,
-      prazoVencido, aguardandoParecer, aguardandoDecisao,
-      cpisDecididasAgPublicacao,
-      referencias,
-      cpisPublicadas, elogiososPublicados, cadernosPublicados,
+      totalCPIs, aguardandoCienciaDefesa: aguardandoCiencia + aguardandoDefesa,
+      prazoVencido, aguardandoParecer, aguardandoDecisao, cpisDecididasAgPublicacao,
+      referencias, cpisPublicadas, elogiososPublicados, cadernosPublicados,
       cpisArquivadas, elogiososArquivados,
     },
     zonaRisco: studentsWithNota.filter((s) => zonaDeRisco(s.nota)),
+    commsComPrazo,
   };
 }
 
@@ -164,7 +165,7 @@ export default async function DashboardPage({
       );
     }
 
-    const { aluno, nota, pendenteCiencia, prazoVencido, decididas, favoraveis, publicadas, totalCPIs, pendentes } = dados;
+    const { aluno, nota, notaProvisoria, temProvisorio, pendenteCiencia, prazoVencido, decididas, favoraveis, publicadas, totalCPIs, pendentes } = dados;
     const faixa = faixaNota(nota);
     const emRisco = zonaDeRisco(nota);
 
@@ -208,6 +209,15 @@ export default async function DashboardPage({
             <span className="text-red-600">{totalCPIs} CPI(s) registrada(s)</span>
             <span className="text-green-600">{favoraveis} registro(s) favorável(eis)</span>
           </div>
+          {temProvisorio && (
+            <div className="mt-3 pt-3 border-t border-gray-200 flex items-center gap-2">
+              <span className="text-xs text-gray-500">Nota provisória (incl. rascunho):</span>
+              <span className={`text-sm font-bold ${notaProvisoria < nota ? "text-red-600" : notaProvisoria > nota ? "text-green-700" : "text-gray-700"}`}>
+                {notaProvisoria.toFixed(2)}
+              </span>
+              <span className="text-xs text-gray-400">— sujeita a alteração após publicação</span>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
@@ -229,18 +239,29 @@ export default async function DashboardPage({
           <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
             <h2 className="text-base font-semibold text-gray-900 mb-3">Pendências — Ação necessária</h2>
             <div className="space-y-2">
-              {pendentes.map((c) => (
-                <Link key={c.id} href={`/comunicacoes/${c.id}`}
-                  className="flex items-center justify-between px-4 py-3 rounded-lg border border-yellow-200 bg-yellow-50 hover:bg-yellow-100 transition-colors">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900 font-mono">{c.protocolNumber}</p>
-                    <p className="text-xs text-gray-500">{c.type.name}</p>
-                  </div>
-                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${c.status === "PRAZO_EXPIRADO" ? "bg-red-200 text-red-900" : "bg-orange-200 text-orange-900"}`}>
-                    {c.status === "PRAZO_EXPIRADO" ? "Prazo de defesa vencido" : "Aguardando sua ciência/defesa"}
-                  </span>
-                </Link>
-              ))}
+              {pendentes.map((c) => {
+                const prazo = c.defenseDeadline ? new Date(c.defenseDeadline) : null;
+                const diasRestantes = prazo ? differenceInCalendarDays(prazo, new Date()) : null;
+                return (
+                  <Link key={c.id} href={`/comunicacoes/${c.id}`}
+                    className="flex items-center justify-between px-4 py-3 rounded-lg border border-yellow-200 bg-yellow-50 hover:bg-yellow-100 transition-colors">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900 font-mono">{c.protocolNumber}</p>
+                      <p className="text-xs text-gray-500">{c.type.name}</p>
+                      {prazo && (
+                        <p className={`text-xs font-medium mt-0.5 ${diasRestantes !== null && diasRestantes < 0 ? "text-red-600" : diasRestantes !== null && diasRestantes <= 2 ? "text-orange-600" : "text-gray-500"}`}>
+                          Prazo: {format(prazo, "dd/MM/yyyy", { locale: ptBR })}
+                          {diasRestantes !== null && diasRestantes >= 0 && ` (${diasRestantes} dia${diasRestantes !== 1 ? "s" : ""} restante${diasRestantes !== 1 ? "s" : ""})`}
+                          {diasRestantes !== null && diasRestantes < 0 && ` (vencido há ${Math.abs(diasRestantes)} dia${Math.abs(diasRestantes) !== 1 ? "s" : ""})`}
+                        </p>
+                      )}
+                    </div>
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${c.status === "PRAZO_EXPIRADO" ? "bg-red-200 text-red-900" : "bg-orange-200 text-orange-900"}`}>
+                      {c.status === "PRAZO_EXPIRADO" ? "Prazo de defesa vencido" : "Aguardando sua ciência/defesa"}
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         )}
@@ -256,50 +277,55 @@ export default async function DashboardPage({
   // ── DASHBOARD GERAL ───────────────────────────────────────────────────────
   const sp = await searchParams;
   const cursoId = sp.cursoId ?? "";
+  const plataoFiltro = sp.plataoId ?? "";
 
   const schoolFilter = getSchoolFilter(session.role, session.escola);
 
-  // Busca cursos disponíveis para este usuário (limitados pela escola)
   const cursosDisponiveis = await prisma.course.findMany({
     where: { active: true, ...(schoolFilter ? { school: schoolFilter } : {}) },
     orderBy: { name: "asc" },
     select: { id: true, name: true, school: true },
   });
 
-  // IDs no escopo: curso selecionado OU todos os disponíveis
-  const scopeCourseIds = cursoId
-    ? [cursoId]
-    : cursosDisponiveis.map((c) => c.id);
-
+  const scopeCourseIds = cursoId ? [cursoId] : cursosDisponiveis.map((c) => c.id);
   const cursoSelecionado = cursosDisponiveis.find((c) => c.id === cursoId);
   const labelEscopo = schoolFilter === "ESFAP" ? "EsFAP"
-    : schoolFilter === "ESFO"  ? "EsFO"
+    : schoolFilter === "ESFO" ? "EsFO"
     : "Todos os cursos";
 
   const data = await getDashboardGeral(session.role, session.userId, scopeCourseIds);
   const canCreate = session.role !== "ALUNO";
 
+  const zonaRiscoFiltrada = plataoFiltro
+    ? data.zonaRisco.filter((s) => s.platoonId === plataoFiltro)
+    : data.zonaRisco;
+
+  const platoesNaZona = Array.from(
+    new Map(data.zonaRisco.filter((s) => s.platoon).map((s) => [s.platoonId!, s.platoon!])).entries()
+  ).sort((a, b) => a[1].name.localeCompare(b[1].name));
+
   const cardsEmTramite = [
-    { label: "CPIs Registradas",              value: data.cards.totalCPIs,                    color: "bg-blue-600" },
-    { label: "Ag. Ciência/Defesa do Aluno",   value: data.cards.aguardandoCienciaDefesa,      color: "bg-yellow-500" },
-    { label: "Prazo Vencido",                 value: data.cards.prazoVencido,                 color: "bg-red-600" },
-    { label: "Aguardando Parecer",            value: data.cards.aguardandoParecer,            color: "bg-purple-600" },
-    { label: "Aguardando Decisão",            value: data.cards.aguardandoDecisao,            color: "bg-indigo-600" },
-    { label: "CPIs decididas ag. publicação", value: data.cards.cpisDecididasAgPublicacao,    color: "bg-green-600" },
-    { label: "Ref. elogiosa/Elogio",          value: data.cards.referencias,                 color: "bg-teal-600" },
+    { label: "CPIs Registradas",              value: data.cards.totalCPIs,                 color: "bg-blue-600" },
+    { label: "Ag. Ciência/Defesa do Aluno",   value: data.cards.aguardandoCienciaDefesa,   color: "bg-yellow-500" },
+    { label: "Prazo Vencido",                 value: data.cards.prazoVencido,              color: "bg-red-600" },
+    { label: "Aguardando Parecer",            value: data.cards.aguardandoParecer,         color: "bg-purple-600" },
+    { label: "Aguardando Decisão",            value: data.cards.aguardandoDecisao,         color: "bg-indigo-600" },
+    { label: "CPIs decididas ag. publicação", value: data.cards.cpisDecididasAgPublicacao, color: "bg-green-600" },
+    { label: "Ref. elogiosa/Elogio",          value: data.cards.referencias,               color: "bg-teal-600" },
   ];
 
   const cardsTramitadas = [
-    { label: "CPIs c/ sanção publicadas",                      value: data.cards.cpisPublicadas,      color: "bg-slate-700" },
-    { label: "Ref. elogiosa/Elogio publicados",                value: data.cards.elogiososPublicados, color: "bg-emerald-700" },
-    { label: "Cadernos publicados",                            value: data.cards.cadernosPublicados,  color: "bg-cyan-700" },
-    { label: "CPIs arquivadas (sem desconto)",                 value: data.cards.cpisArquivadas,      color: "bg-slate-500" },
-    { label: "Ref. elogiosa/Elogio arquivados (sem acréscimo)",value: data.cards.elogiososArquivados, color: "bg-emerald-500" },
+    { label: "CPIs c/ sanção publicadas",                       value: data.cards.cpisPublicadas,      color: "bg-slate-700" },
+    { label: "Ref. elogiosa/Elogio publicados",                 value: data.cards.elogiososPublicados, color: "bg-emerald-700" },
+    { label: "Cadernos publicados",                             value: data.cards.cadernosPublicados,  color: "bg-cyan-700" },
+    { label: "CPIs arquivadas (sem desconto)",                  value: data.cards.cpisArquivadas,      color: "bg-slate-500" },
+    { label: "Ref. elogiosa/Elogio arquivados (sem acréscimo)", value: data.cards.elogiososArquivados, color: "bg-emerald-500" },
   ];
+
+  const agora = new Date();
 
   return (
     <div className="p-6">
-      {/* Título */}
       <div className="mb-5">
         <h1 className="text-2xl font-bold text-gray-900">Painel de Controle</h1>
         <p className="text-sm text-gray-500">
@@ -312,31 +338,13 @@ export default async function DashboardPage({
         <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Filtrar por curso</p>
           <div className="flex flex-wrap gap-2">
-            {/* Opção "Todos" */}
-            <Link
-              href="/dashboard"
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                !cursoId
-                  ? "bg-[#1e3a5f] text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              {schoolFilter === "ESFAP" ? "Todos da EsFAP"
-                : schoolFilter === "ESFO" ? "Todos da EsFO"
-                : "Todos os cursos"}
+            <Link href="/dashboard"
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${!cursoId ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+              {schoolFilter === "ESFAP" ? "Todos da EsFAP" : schoolFilter === "ESFO" ? "Todos da EsFO" : "Todos os cursos"}
             </Link>
-
-            {/* Um botão por curso disponível */}
             {cursosDisponiveis.map((curso) => (
-              <Link
-                key={curso.id}
-                href={`/dashboard?cursoId=${curso.id}`}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  cursoId === curso.id
-                    ? "bg-[#1e3a5f] text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
+              <Link key={curso.id} href={`/dashboard?cursoId=${curso.id}`}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${cursoId === curso.id ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
                 {curso.name}
               </Link>
             ))}
@@ -360,7 +368,7 @@ export default async function DashboardPage({
       {/* Tramitadas */}
       <div className="mb-8">
         <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Tramitadas</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {cardsTramitadas.map((card) => (
             <div key={card.label} className={`${card.color} rounded-xl p-4 text-white`}>
               <p className="text-3xl font-bold">{card.value}</p>
@@ -370,23 +378,98 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      {/* Alunos com nota abaixo de 7,0 */}
+      {/* ── Prazos Expirados — Acompanhamento ──────────────────────────────── */}
+      {data.commsComPrazo.length > 0 && (
+        <div className="bg-white rounded-xl border border-red-200 mb-8">
+          <div className="px-5 py-4 border-b border-red-100 flex items-center justify-between bg-red-50 rounded-t-xl">
+            <div>
+              <h2 className="text-base font-semibold text-red-900">Prazos de Defesa Expirados — Acompanhamento</h2>
+              <p className="text-xs text-red-600 mt-0.5">Registros com prazo vencido há mais de 2 dias, ainda não encerrados.</p>
+            </div>
+            <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-red-200 text-red-900">
+              {data.commsComPrazo.length} registro(s)
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Protocolo</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Aluno</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipo</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Prazo vencido em</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Tempo vencido</th>
+                  <th className="px-4 py-2.5"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {data.commsComPrazo.map((c) => {
+                  const prazo = new Date(c.defenseDeadline!);
+                  const diasVencido = Math.abs(differenceInCalendarDays(prazo, agora));
+                  return (
+                    <tr key={c.id} className="bg-red-50 hover:bg-red-100 transition-colors">
+                      <td className="px-4 py-2.5 font-mono text-xs text-gray-600">{c.protocolNumber}</td>
+                      <td className="px-4 py-2.5 font-semibold text-gray-900">{c.student.warName}</td>
+                      <td className="px-4 py-2.5 text-xs text-gray-500">{c.type.name}</td>
+                      <td className="px-4 py-2.5 text-xs text-red-700 font-medium">
+                        {format(prazo, "dd/MM/yyyy", { locale: ptBR })}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-red-200 text-red-800 font-medium">
+                          {diasVencido} dia{diasVencido !== 1 ? "s" : ""}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <Link href={`/comunicacoes/${c.id}`}
+                          className="text-xs text-[#1e3a5f] border border-[#1e3a5f] rounded-lg px-2.5 py-1 hover:bg-blue-50 transition-colors font-medium">
+                          Ver
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ── Alunos com nota abaixo de 7,0 ──────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-gray-200 mb-8">
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-900">
-            Alunos com Nota de Conduta Abaixo de 7,0
-            {cursoSelecionado && <span className="text-sm font-normal text-gray-500 ml-2">— {cursoSelecionado.name}</span>}
-          </h2>
-          <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-            data.zonaRisco.length > 0 ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
-          }`}>
-            {data.zonaRisco.length > 0 ? `${data.zonaRisco.length} aluno(s)` : "Nenhum"}
-          </span>
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h2 className="text-base font-semibold text-gray-900">
+              Alunos com Nota de Conduta Abaixo de 7,0
+              {cursoSelecionado && <span className="text-sm font-normal text-gray-500 ml-2">— {cursoSelecionado.name}</span>}
+            </h2>
+            <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+              data.zonaRisco.length > 0 ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
+            }`}>
+              {data.zonaRisco.length > 0 ? `${data.zonaRisco.length} aluno(s)` : "Nenhum"}
+            </span>
+          </div>
+          {/* Filtro por pelotão */}
+          {platoesNaZona.length > 1 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-gray-500 font-medium">Pelotão:</span>
+              <Link href={cursoId ? `/dashboard?cursoId=${cursoId}` : "/dashboard"}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${!plataoFiltro ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+                Todos
+              </Link>
+              {platoesNaZona.map(([pid, pl]) => (
+                <Link key={pid}
+                  href={`/dashboard?${cursoId ? `cursoId=${cursoId}&` : ""}plataoId=${pid}`}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${plataoFiltro === pid ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+                  {pl.name}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
 
-        {data.zonaRisco.length === 0 ? (
+        {zonaRiscoFiltrada.length === 0 ? (
           <div className="px-5 py-10 text-center">
-            <p className="text-sm text-gray-400">Nenhum aluno com nota de conduta inferior a 7,0.</p>
+            <p className="text-sm text-gray-400">Nenhum aluno com nota de conduta inferior a 7,0{plataoFiltro ? " neste pelotão" : ""}.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -402,7 +485,7 @@ export default async function DashboardPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {[...data.zonaRisco]
+                {[...zonaRiscoFiltrada]
                   .sort((a, b) => a.nota - b.nota)
                   .map((s) => {
                     const faixa = faixaNota(s.nota);
@@ -411,9 +494,7 @@ export default async function DashboardPage({
                         <td className="px-4 py-2.5 text-xs text-gray-500">{s.platoon?.name ?? "—"}</td>
                         <td className="px-4 py-2.5 font-mono text-xs text-gray-600">{s.courseNumber}</td>
                         <td className="px-4 py-2.5 font-semibold text-gray-900">
-                          <Link href={`/alunos/${s.id}`} className="hover:text-[#1e3a5f] hover:underline">
-                            {s.warName}
-                          </Link>
+                          <Link href={`/alunos/${s.id}`} className="hover:text-[#1e3a5f] hover:underline">{s.warName}</Link>
                         </td>
                         <td className="px-4 py-2.5 text-xs text-gray-500">{s.course.name}</td>
                         <td className="px-4 py-2.5 text-center">
@@ -422,10 +503,8 @@ export default async function DashboardPage({
                           </span>
                         </td>
                         <td className="px-4 py-2.5 text-right">
-                          <Link
-                            href={`/alunos/${s.id}`}
-                            className="text-xs text-[#1e3a5f] border border-[#1e3a5f] rounded-lg px-2.5 py-1 hover:bg-blue-50 transition-colors font-medium"
-                          >
+                          <Link href={`/alunos/${s.id}`}
+                            className="text-xs text-[#1e3a5f] border border-[#1e3a5f] rounded-lg px-2.5 py-1 hover:bg-blue-50 transition-colors font-medium">
                             Ver
                           </Link>
                         </td>

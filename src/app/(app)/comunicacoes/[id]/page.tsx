@@ -147,6 +147,63 @@ export default async function ComunicacaoPage({
         </div>
       )}
 
+      {/* ── Timeline de tramitação ─────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Histórico de Tramitação</h2>
+        <ol className="relative border-l border-gray-200 ml-3 space-y-3">
+          {[
+            {
+              label: "Registrada",
+              date: comm.createdAt,
+              done: true,
+              color: "bg-blue-500",
+            },
+            ...(comm.defenseDeadline || comm.acknowledgements.length > 0 || comm.defenses.length > 0 ? [{
+              label: comm.defenseDeadline
+                ? `Enviada para Ciência/Defesa — Prazo: ${format(new Date(comm.defenseDeadline), "dd/MM/yyyy", { locale: ptBR })}`
+                : "Enviada para Ciência/Defesa do Aluno",
+              date: null as Date | null,
+              done: comm.acknowledgements.length > 0 || comm.defenses.length > 0 || !["REGISTRADA", "AGUARDANDO_CIENCIA", "AGUARDANDO_DEFESA"].includes(comm.status),
+              color: "bg-yellow-500",
+            }] : []),
+            ...(comm.acknowledgements.length > 0 || comm.defenses.length > 0 ? [{
+              label: comm.defenses.length > 0 ? "Defesa Apresentada pelo Aluno" : "Ciência Registrada (sem defesa)",
+              date: comm.defenses[0]?.submittedAt ?? comm.acknowledgements[0]?.acknowledgedAt ?? null,
+              done: true,
+              color: "bg-amber-500",
+            }] : []),
+            ...(comm.opinions.length > 0 ? [{
+              label: "Parecer Emitido",
+              date: comm.opinions[0].createdAt,
+              done: true,
+              color: "bg-purple-500",
+            }] : []),
+            ...(comm.decisions.length > 0 ? [{
+              label: comm.decisions[0].decisionType,
+              date: comm.decisions[0].decidedAt,
+              done: true,
+              color: "bg-green-500",
+            }] : []),
+            ...(cadernoPublicado ? [{
+              label: "Publicada em Caderno Disciplinar",
+              date: cadernoPublicado.publicationDate,
+              done: true,
+              color: "bg-teal-500",
+            }] : []),
+          ].map((step, idx) => (
+            <li key={idx} className="ml-4">
+              <span className={`absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full border-2 border-white ${step.done ? step.color : "bg-gray-200"}`} />
+              <p className={`text-sm font-medium ${step.done ? "text-gray-900" : "text-gray-400"}`}>{step.label}</p>
+              {step.date && (
+                <p className="text-xs text-gray-400">
+                  {format(new Date(step.date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                </p>
+              )}
+            </li>
+          ))}
+        </ol>
+      </div>
+
       {comm.article && (
         <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Dispositivo Legal</h2>

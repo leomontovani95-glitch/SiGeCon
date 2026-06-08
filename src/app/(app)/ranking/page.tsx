@@ -128,13 +128,21 @@ export default async function RankingPage({
             {" · "}notas baseadas nos cadernos publicados
           </p>
         </div>
-        <Link
-          href={`/ranking/imprimir${cursoId ? `?cursoId=${cursoId}` : ""}`}
-          target="_blank"
-          className="bg-[#1e3a5f] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#16304f] transition-colors flex items-center gap-2"
-        >
-          <span>📄</span> Gerar PDF
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href={`/ranking/imprimir${cursoId ? `?cursoId=${cursoId}` : ""}`}
+            target="_blank"
+            className="bg-[#1e3a5f] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#16304f] transition-colors flex items-center gap-2"
+          >
+            <span>📄</span> Gerar PDF
+          </Link>
+          <a
+            href={`/api/export/ranking${cursoId ? `?cursoId=${cursoId}` : ""}`}
+            className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
+          >
+            <span>⬇</span> Exportar CSV
+          </a>
+        </div>
       </div>
 
       {/* Campo de busca */}
