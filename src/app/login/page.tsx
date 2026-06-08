@@ -1,5 +1,6 @@
 "use client";
 import { useActionState, useState } from "react";
+import Image from "next/image";
 import { login } from "./actions";
 
 export default function LoginPage() {
@@ -10,14 +11,21 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#1e3a5f]">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-[#1e3a5f] rounded-full mb-4">
-            <span className="text-white text-2xl font-bold">SC</span>
+          <div className="flex justify-center mb-4">
+            <Image
+              src="/brasao-apm.png"
+              alt="Brasão APM/ES"
+              width={120}
+              height={140}
+              className="object-contain drop-shadow-md"
+              priority
+            />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">SiGeCon</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Sistema de Gestão de Conduta
+          <p className="text-sm text-gray-500 mt-1">Sistema de Gestão de Conduta</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Academia de Polícia Militar do Espírito Santo — APM/ES
           </p>
-          <p className="text-xs text-gray-400">EsFAP / EsFO / APM-ES</p>
         </div>
 
         <form action={action} className="space-y-5">
