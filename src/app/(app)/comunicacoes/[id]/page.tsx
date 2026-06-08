@@ -98,6 +98,10 @@ export default async function ComunicacaoPage({
           <p className="text-sm text-gray-600">{comm.student.fullName}</p>
           <p className="text-sm text-gray-500">{comm.student.course.name} — Nº {comm.courseNumber}</p>
           {comm.student.platoon && <p className="text-sm text-gray-500">{comm.student.platoon.name}</p>}
+          <p className="text-sm text-gray-500">RG: {comm.student.rg}</p>
+          {comm.student.functionalNumber && (
+            <p className="text-sm text-gray-500">NF: {comm.student.functionalNumber}</p>
+          )}
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Dados do Fato</h2>

@@ -18,6 +18,7 @@ type Regra = {
 type AlunoInfo = {
   id: string; warName: string; fullName: string;
   courseNumber: string; course: string; platoon: string | null;
+  rg: string; functionalNumber: string | null;
 };
 type Curso = { id: string; name: string };
 
@@ -123,7 +124,7 @@ export default function ComunicacaoForm({ tipos, regras, cursos }: Props) {
       const res = await fetch(`/api/alunos/por-numero?${params}`);
       const data = await res.json();
       if (data.aluno) { setAluno(data.aluno); setErroAluno(""); }
-      else { setAluno(null); setErroAluno("Nenhum aluno encontrado com este número de curso."); }
+      else { setAluno(null); setErroAluno("Nenhum aluno encontrado com este número ou nome de guerra."); }
     } catch { setErroAluno("Erro ao buscar aluno."); }
     finally { setBuscando(false); }
   }, [cursoSelecionadoId]);
@@ -174,11 +175,11 @@ export default function ComunicacaoForm({ tipos, regras, cursos }: Props) {
         <legend className="text-sm font-semibold text-blue-800 px-2">Identificação do Aluno</legend>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Número de curso *</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Número de curso ou nome de guerra *</label>
             <input
               value={numCurso}
               onChange={(e) => handleNumChange(e.target.value)}
-              placeholder={cursoOk ? "Digite o número (ex: 001)" : "Selecione o curso primeiro"}
+              placeholder={cursoOk ? "Ex: 001 ou SILVA" : "Selecione o curso primeiro"}
               disabled={!cursoOk}
               className="input disabled:cursor-not-allowed"
               autoComplete="off"
@@ -194,8 +195,14 @@ export default function ComunicacaoForm({ tipos, regras, cursos }: Props) {
                 <p className="input bg-gray-50 text-gray-700">{aluno.fullName}</p></div>
               <div><label className="block text-xs font-medium text-gray-600 mb-1">Curso</label>
                 <p className="input bg-gray-50 text-gray-700">{aluno.course}</p></div>
+              <div><label className="block text-xs font-medium text-gray-600 mb-1">Número de curso</label>
+                <p className="input bg-gray-50 text-gray-700">{aluno.courseNumber}</p></div>
               <div><label className="block text-xs font-medium text-gray-600 mb-1">Pelotão</label>
                 <p className="input bg-gray-50 text-gray-700">{aluno.platoon ?? "—"}</p></div>
+              <div><label className="block text-xs font-medium text-gray-600 mb-1">RG</label>
+                <p className="input bg-gray-50 text-gray-700">{aluno.rg}</p></div>
+              <div><label className="block text-xs font-medium text-gray-600 mb-1">NF (Número Funcional)</label>
+                <p className="input bg-gray-50 text-gray-700">{aluno.functionalNumber ?? "—"}</p></div>
             </>
           )}
         </div>

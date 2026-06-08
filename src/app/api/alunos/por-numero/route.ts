@@ -12,7 +12,10 @@ export async function GET(req: NextRequest) {
 
   const aluno = await prisma.student.findFirst({
     where: {
-      courseNumber: q,
+      OR: [
+        { courseNumber: q },
+        { warName: { contains: q } },
+      ],
       status: "ATIVO",
       ...(courseId ? { courseId } : {}),
     },
@@ -29,6 +32,8 @@ export async function GET(req: NextRequest) {
       courseNumber: aluno.courseNumber,
       course: aluno.course.name,
       platoon: aluno.platoon?.name ?? null,
+      rg: aluno.rg,
+      functionalNumber: aluno.functionalNumber ?? null,
     },
   });
 }

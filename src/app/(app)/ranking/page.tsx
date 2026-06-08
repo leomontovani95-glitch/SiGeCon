@@ -20,6 +20,7 @@ export default async function RankingPage({
   const cursoId = sp.cursoId ?? "";
   const ordem: Ordem = ORDENS_VALIDAS.includes(sp.ordem as Ordem) ? (sp.ordem as Ordem) : "desc";
   const pagina = Math.max(1, parseInt(sp.pagina ?? "1") || 1);
+  const busca = (sp.busca ?? "").trim().toLowerCase();
 
   const school = getSchoolFilter(session.role, session.escola);
 
@@ -76,11 +77,19 @@ export default async function RankingPage({
       return ordem === "asc" ? a.nota - b.nota : b.nota - a.nota;
     });
 
-  const totalAlunos  = ranking.length;
+  const rankingFiltrado = busca
+    ? ranking.filter(
+        (a) =>
+          a.warName.toLowerCase().includes(busca) ||
+          a.courseNumber.includes(busca)
+      )
+    : ranking;
+
+  const totalAlunos  = rankingFiltrado.length;
   const totalPaginas = Math.max(1, Math.ceil(totalAlunos / PER_PAGE));
   const paginaAtual  = Math.min(pagina, totalPaginas);
   const inicio       = (paginaAtual - 1) * PER_PAGE;
-  const paginaItems  = ranking.slice(inicio, inicio + PER_PAGE);
+  const paginaItems  = rankingFiltrado.slice(inicio, inicio + PER_PAGE);
 
   const cursoSelecionado = cursosDisponiveis.find((c) => c.id === cursoId);
   const labelEscopo = school === "ESFAP" ? "Todos da EsFAP"
@@ -93,6 +102,7 @@ export default async function RankingPage({
     if (cursoId) p.set("cursoId", cursoId);
     p.set("ordem", ordem);
     p.set("pagina", String(paginaAtual));
+    if (busca) p.set("busca", busca);
     for (const [k, v] of Object.entries(overrides)) p.set(k, String(v));
     return `/ranking?${p.toString()}`;
   }
@@ -126,6 +136,32 @@ export default async function RankingPage({
           <span>📄</span> Gerar PDF
         </Link>
       </div>
+
+      {/* Campo de busca */}
+      <form method="GET" action="/ranking" className="mb-5">
+        {cursoId && <input type="hidden" name="cursoId" value={cursoId} />}
+        <input type="hidden" name="ordem" value={ordem} />
+        <div className="flex gap-2">
+          <input
+            name="busca"
+            type="search"
+            defaultValue={busca}
+            placeholder="Buscar por nome de guerra ou número..."
+            className="input flex-1 max-w-sm"
+          />
+          <button type="submit" className="btn-primary px-4">Buscar</button>
+          {busca && (
+            <a href={mkUrl({ busca: "", pagina: 1 })} className="btn-secondary px-4">
+              Limpar
+            </a>
+          )}
+        </div>
+        {busca && (
+          <p className="text-xs text-gray-500 mt-1">
+            {totalAlunos} resultado(s) para &quot;{busca}&quot;
+          </p>
+        )}
+      </form>
 
       {/* Seletor de cursos */}
       {cursosDisponiveis.length > 1 && (
