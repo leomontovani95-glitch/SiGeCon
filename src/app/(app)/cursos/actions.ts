@@ -7,7 +7,7 @@ import { auditLog } from "@/lib/audit";
 type State = { error: string } | undefined;
 
 export async function adicionarPelotaoNoCurso(courseId: string, _prev: State, formData: FormData): Promise<State> {
-  const session = await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO");
+  const session = await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA", "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO");
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Nome do pelotão é obrigatório." };
   try {
@@ -20,7 +20,7 @@ export async function adicionarPelotaoNoCurso(courseId: string, _prev: State, fo
 }
 
 export async function excluirPelotaoNoCurso(courseId: string, platoonId: string, _prev: State, _fd: FormData): Promise<State> {
-  const session = await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO");
+  const session = await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA", "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO");
   const pelotao = await prisma.platoon.findUnique({
     where: { id: platoonId },
     include: { _count: { select: { students: true } } },
@@ -37,7 +37,7 @@ export async function excluirPelotaoNoCurso(courseId: string, platoonId: string,
 }
 
 export async function excluirCurso(id: string, _prev: { error: string } | undefined, _fd: FormData): Promise<{ error: string } | undefined> {
-  const session = await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO");
+  const session = await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA", "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO");
   const curso = await prisma.course.findUnique({
     where: { id },
     include: { _count: { select: { students: true, communications: true } } },
@@ -56,7 +56,7 @@ export async function excluirCurso(id: string, _prev: { error: string } | undefi
 }
 
 export async function salvarCurso(id: string | null, _prev: State, formData: FormData): Promise<State> {
-  const session = await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO");
+  const session = await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA", "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO");
   const name = String(formData.get("name") ?? "").trim();
   const acronym = String(formData.get("acronym") ?? "").trim();
   const school = String(formData.get("school") ?? "").trim() || null;

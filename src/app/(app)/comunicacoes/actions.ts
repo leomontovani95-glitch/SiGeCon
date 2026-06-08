@@ -363,3 +363,91 @@ export async function corrigirPontuacao(_prev: State, formData: FormData): Promi
   redirect(`/comunicacoes/${communicationId}`);
 }
 
+// ── Registrar Transgressão Disciplinar / TAC ─────────────────────────────────
+export async function registrarTransgressao(_prev: State, formData: FormData): Promise<State> {
+  const session = await verifySession();
+  if (session.role === "ALUNO") return { error: "Sem permissão." };
+
+  const studentId       = String(formData.get("studentId")       ?? "").trim();
+  const courseId        = String(formData.get("courseId")        ?? "").trim();
+  const tipoComunicacao = String(formData.get("tipoComunicacao") ?? "").trim();
+  const tacEquivalent   = String(formData.get("tacEquivalent")   ?? "").trim() || null;
+  const scoreRaw        = formData.get("score");
+  const score           = scoreRaw ? parseFloat(String(scoreRaw)) : NaN;
+  const bgpmNumber      = String(formData.get("bgpmNumber")      ?? "").trim();
+  const bgpmYear        = String(formData.get("bgpmYear")        ?? "").trim();
+
+  if (!studentId)       return { error: "Localize e selecione o aluno." };
+  if (!courseId)        return { error: "Selecione o curso." };
+  if (!tipoComunicacao) return { error: "Selecione o tipo de transgressão." };
+  if (tipoComunicacao === "TAC" && !tacEquivalent) return { error: "Selecione a transgressão equivalente do TAC." };
+  if (isNaN(score) || score <= 0) return { error: "Informe uma pontuação válida." };
+  if (!bgpmNumber)      return { error: "Informe o número do BGPM." };
+  if (!bgpmYear)        return { error: "Informe o ano do BGPM." };
+
+  const [aluno, tipo] = await Promise.all([
+    prisma.student.findUnique({ where: { id: studentId }, include: { course: true } }),
+    prisma.communicationType.findFirst({ where: { name: tipoComunicacao } }),
+  ]);
+  if (!aluno) return { error: "Aluno não encontrado." };
+  if (!tipo)  return { error: "Tipo de transgressão não cadastrado no sistema." };
+
+  const protocolo = await gerarProtocolo(tipoComunicacao, aluno.course.name);
+
+  const descricao = tipoComunicacao === "TAC"
+    ? `Termo de Ajuste de Conduta (equivalente a ${tacEquivalent}) — BGPM Nº ${bgpmNumber}/${bgpmYear}.`
+    : `${tipoComunicacao} — BGPM Nº ${bgpmNumber}/${bgpmYear}.`;
+
+  const comm = await prisma.communication.create({
+    data: {
+      protocolNumber:  protocolo,
+      typeId:          tipo.id,
+      studentId,
+      courseId,
+      courseNumber:    aluno.courseNumber,
+      platoonId:       aluno.platoonId ?? undefined,
+      reporterId:      session.userId,
+      factDate:        new Date(),
+      factDescription: descricao,
+      finalScore:      score,
+      status:          "DECIDIDA",
+      bgpmNumber,
+      bgpmYear,
+      tacEquivalent:   tacEquivalent ?? undefined,
+    },
+  });
+
+  let caderno = await prisma.disciplinaryBook.findFirst({
+    where: { status: "RASCUNHO", courseId },
+    orderBy: { number: "desc" },
+  });
+  if (!caderno) {
+    const ultimo = await prisma.disciplinaryBook.findFirst({
+      where: { courseId },
+      orderBy: { number: "desc" },
+    });
+    caderno = await prisma.disciplinaryBook.create({
+      data: { number: (ultimo?.number ?? 0) + 1, courseId, createdById: session.userId },
+    });
+  }
+
+  await prisma.disciplinaryBookItem.create({
+    data: {
+      disciplinaryBookId:  caderno.id,
+      communicationId:     comm.id,
+      studentId,
+      courseId,
+      platoonId:           aluno.platoonId ?? undefined,
+      studentCourseNumber: aluno.courseNumber,
+      studentWarName:      aluno.warName,
+      recordType:          tipoComunicacao,
+      factDate:            comm.factDate,
+      decisionSummary:     tipoComunicacao === "TAC" ? `TAC — ${tacEquivalent}` : tipoComunicacao,
+      score,
+    },
+  });
+
+  await auditLog(session.userId, "CREATE", "Communication", comm.id, protocolo);
+  redirect(`/comunicacoes/${comm.id}`);
+}
+

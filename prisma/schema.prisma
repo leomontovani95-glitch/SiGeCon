@@ -139,6 +139,9 @@ model Communication {
   status           String    @default("REGISTRADA")
   defenseDeadline  DateTime?
   communicantName  String?
+  bgpmNumber     String?
+  bgpmYear       String?
+  tacEquivalent  String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 

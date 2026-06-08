@@ -126,6 +126,27 @@ export default async function ComunicacaoPage({
         <p className="text-sm text-gray-700 whitespace-pre-wrap">{comm.factDescription}</p>
       </div>
 
+      {(comm.bgpmNumber || comm.tacEquivalent) && (
+        <div className="bg-orange-50 rounded-xl border border-orange-200 p-4 mb-4">
+          <h2 className="text-xs font-semibold text-orange-700 uppercase tracking-wide mb-2">Publicação em BGPM</h2>
+          {comm.bgpmNumber && comm.bgpmYear && (
+            <p className="text-sm text-gray-700">
+              <span className="font-medium">BGPM:</span> Nº {comm.bgpmNumber}/{comm.bgpmYear}
+            </p>
+          )}
+          {comm.tacEquivalent && (
+            <p className="text-sm text-gray-700 mt-1">
+              <span className="font-medium">TAC — Transgressão equivalente:</span> {comm.tacEquivalent}
+            </p>
+          )}
+          {comm.finalScore != null && (
+            <p className="text-sm text-gray-700 mt-1">
+              <span className="font-medium">Desconto aplicado:</span> {comm.finalScore.toFixed(1)} ponto(s)
+            </p>
+          )}
+        </div>
+      )}
+
       {comm.article && (
         <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Dispositivo Legal</h2>

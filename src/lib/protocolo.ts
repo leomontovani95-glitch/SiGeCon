@@ -9,6 +9,10 @@ const prefixos: Record<string, string> = {
   "Referência Elogiosa": "RE",
   "Elogio publicado em BI": "EBI",
   Arquivamento: "ARQ",
+  "TD Leve":  "TDL",
+  "TD Média": "TDM",
+  "TD Grave": "TDG",
+  "TAC":      "TAC",
 };
 
 export async function gerarProtocolo(typeName: string, courseName: string): Promise<string> {

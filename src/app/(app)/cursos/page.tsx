@@ -5,7 +5,7 @@ import ExcluirCursoBtn from "./_components/ExcluirCursoBtn";
 
 export default async function CursosPage() {
   const session = await verifySession();
-  const canManage = ["ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO"].includes(session.role);
+  const canManage = ["ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA", "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO"].includes(session.role);
   const cursos = await prisma.course.findMany({
     orderBy: { name: "asc" },
     include: { _count: { select: { students: true, platoons: true, communications: true } } },

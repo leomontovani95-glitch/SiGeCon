@@ -226,6 +226,7 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
             <Link href="/comunicacoes/nova/cpi" className="bg-[#1e3a5f] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#16304f] transition-colors">+ Nova CPI</Link>
             <Link href="/comunicacoes/nova/referencia" className="border border-[#1e3a5f] text-[#1e3a5f] px-4 py-2 rounded-lg text-sm hover:bg-blue-50 transition-colors">+ Ref. Elogiosa</Link>
             <Link href="/comunicacoes/nova/elogio-bi" className="border border-green-600 text-green-700 px-4 py-2 rounded-lg text-sm hover:bg-green-50 transition-colors">+ Elogio em BI</Link>
+            <Link href="/comunicacoes/nova/transgressao" className="border border-orange-600 text-orange-700 px-4 py-2 rounded-lg text-sm hover:bg-orange-50 transition-colors">+ Nova TD / TAC</Link>
           </div>
         )}
       </div>

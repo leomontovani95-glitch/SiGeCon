@@ -91,7 +91,10 @@ async function getDashboardGeral(
   ]);
 
   const [students, allPubItems] = await Promise.all([
-    prisma.student.findMany({ where: { status: "ATIVO", ...cf } }),
+    prisma.student.findMany({
+      where: { status: "ATIVO", ...cf },
+      include: { course: true, platoon: true },
+    }),
     prisma.disciplinaryBookItem.findMany({
       where: { disciplinaryBook: { status: "PUBLICADO" }, ...(scopeCourseIds.length ? { courseId: { in: scopeCourseIds } } : {}) },
       include: { communication: { include: { type: { select: { scoreNature: true } } } } },
@@ -171,6 +174,23 @@ export default async function DashboardPage({
           <h1 className="text-2xl font-bold text-gray-900">Olá, {aluno.warName}</h1>
           <p className="text-sm text-gray-500">{aluno.course.name} — Nº {aluno.courseNumber}{aluno.platoon ? ` — ${aluno.platoon.name}` : ""}</p>
         </div>
+
+        {emRisco && (
+          <div className={`rounded-xl border-l-4 p-4 mb-6 flex items-start gap-3 ${nota < 6 ? "border-red-700 bg-red-100" : "border-orange-500 bg-orange-50"}`}>
+            <span className="text-2xl leading-none">{nota < 6 ? "⛔" : "⚠️"}</span>
+            <div>
+              <p className={`font-bold text-sm ${nota < 6 ? "text-red-800" : "text-orange-800"}`}>
+                {nota < 6 ? "SITUAÇÃO CRÍTICA — Nota abaixo de 6,0" : "ATENÇÃO — Nota de Conduta Abaixo de 7,0"}
+              </p>
+              <p className={`text-sm mt-0.5 ${nota < 6 ? "text-red-700" : "text-orange-700"}`}>
+                {nota < 6
+                  ? `Sua nota atual é ${nota.toFixed(2)}. Você está abaixo da nota mínima de aprovação (6,0). Procure imediatamente seu Chefe de Curso.`
+                  : `Sua nota atual é ${nota.toFixed(2)}. Você está se aproximando da nota mínima de 6,0. Evite novas infrações e acompanhe seu histórico de conduta.`
+                }
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className={`rounded-xl border p-5 mb-6 ${emRisco ? "border-red-300 bg-red-50" : "border-gray-200 bg-white"}`}>
           <p className="text-sm font-medium text-gray-500 mb-2">Nota da Disciplina — Conduta Profissional</p>
@@ -350,29 +370,73 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      {/* Zona de risco */}
-      {data.zonaRisco.length > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-5 mb-8">
-          <h2 className="text-lg font-semibold text-red-800 mb-3">
-            ⚠ Alunos em Zona de Risco (nota {"<"} 7,0)
-            {cursoSelecionado && <span className="text-sm font-normal ml-2">— {cursoSelecionado.name}</span>}
+      {/* Alunos com nota abaixo de 7,0 */}
+      <div className="bg-white rounded-xl border border-gray-200 mb-8">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-gray-900">
+            Alunos com Nota de Conduta Abaixo de 7,0
+            {cursoSelecionado && <span className="text-sm font-normal text-gray-500 ml-2">— {cursoSelecionado.name}</span>}
           </h2>
-          <div className="space-y-2">
-            {data.zonaRisco.map((s) => {
-              const faixa = faixaNota(s.nota);
-              return (
-                <Link key={s.id} href={`/alunos/${s.id}`}
-                  className="flex items-center justify-between bg-white rounded-lg px-4 py-2 hover:bg-red-50 transition-colors">
-                  <span className="text-sm font-medium text-gray-900">{s.warName}</span>
-                  <span className={`text-sm font-bold px-2 py-0.5 rounded ${faixa.tailwind}`}>
-                    {s.nota.toFixed(2)}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
+          <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+            data.zonaRisco.length > 0 ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
+          }`}>
+            {data.zonaRisco.length > 0 ? `${data.zonaRisco.length} aluno(s)` : "Nenhum"}
+          </span>
         </div>
-      )}
+
+        {data.zonaRisco.length === 0 ? (
+          <div className="px-5 py-10 text-center">
+            <p className="text-sm text-gray-400">Nenhum aluno com nota de conduta inferior a 7,0.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Pelotão</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Nº</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Nome de Guerra</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Curso</th>
+                  <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Nota</th>
+                  <th className="px-4 py-2.5"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {[...data.zonaRisco]
+                  .sort((a, b) => a.nota - b.nota)
+                  .map((s) => {
+                    const faixa = faixaNota(s.nota);
+                    return (
+                      <tr key={s.id} className="hover:bg-red-50 transition-colors">
+                        <td className="px-4 py-2.5 text-xs text-gray-500">{s.platoon?.name ?? "—"}</td>
+                        <td className="px-4 py-2.5 font-mono text-xs text-gray-600">{s.courseNumber}</td>
+                        <td className="px-4 py-2.5 font-semibold text-gray-900">
+                          <Link href={`/alunos/${s.id}`} className="hover:text-[#1e3a5f] hover:underline">
+                            {s.warName}
+                          </Link>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-gray-500">{s.course.name}</td>
+                        <td className="px-4 py-2.5 text-center">
+                          <span className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-bold ${faixa.tailwind}`}>
+                            {s.nota.toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          <Link
+                            href={`/alunos/${s.id}`}
+                            className="text-xs text-[#1e3a5f] border border-[#1e3a5f] rounded-lg px-2.5 py-1 hover:bg-blue-50 transition-colors font-medium"
+                          >
+                            Ver
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {canCreate && (

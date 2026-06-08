@@ -5,7 +5,7 @@ import CursoForm from "../../_components/CursoForm";
 import GerenciarPelotoes from "../../_components/GerenciarPelotoes";
 
 export default async function EditarCursoPage({ params }: { params: Promise<{ id: string }> }) {
-  await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO");
+  await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA", "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO");
   const { id } = await params;
   const curso = await prisma.course.findUnique({
     where: { id },
