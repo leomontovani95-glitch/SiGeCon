@@ -433,6 +433,100 @@ export async function corrigirPontuacao(_prev: State, formData: FormData): Promi
   redirect(`/comunicacoes/${communicationId}`);
 }
 
+// ── Registrar Elogio Publicado em BI ─────────────────────────────────────────
+export async function registrarElogioBi(_prev: State, formData: FormData): Promise<State> {
+  const session = await verifySession();
+  if (session.role === "ALUNO") return { error: "Sem permissão." };
+
+  const studentId    = String(formData.get("studentId")    ?? "").trim();
+  const courseId     = String(formData.get("courseId")     ?? "").trim();
+  const manualRuleId = String(formData.get("manualRuleId") ?? "").trim();
+  const bgpmNumber   = String(formData.get("bgpmNumber")   ?? "").trim();
+  const bgpmYear     = String(formData.get("bgpmYear")     ?? "").trim();
+
+  if (!studentId)    return { error: "Localize e selecione o aluno." };
+  if (!courseId)     return { error: "Selecione o curso." };
+  if (!manualRuleId) return { error: "Selecione o dispositivo legal." };
+  if (!bgpmNumber)   return { error: "Informe o número do BGPM." };
+  if (!bgpmYear)     return { error: "Informe o ano do BGPM." };
+
+  const [aluno, tipo, regra] = await Promise.all([
+    prisma.student.findUnique({ where: { id: studentId }, include: { course: true } }),
+    prisma.communicationType.findFirst({ where: { name: "Elogio publicado em BI" } }),
+    prisma.manualRule.findUnique({ where: { id: manualRuleId } }),
+  ]);
+
+  if (!aluno)  return { error: "Aluno não encontrado." };
+  if (!tipo)   return { error: "Tipo 'Elogio publicado em BI' não cadastrado no sistema." };
+  if (!regra)  return { error: "Dispositivo legal não encontrado." };
+
+  const score = tipo.score; // 1.0 conforme seed
+
+  const protocolo = await gerarProtocolo("Elogio publicado em BI", aluno.course.name);
+
+  const descricao = [
+    `Elogio publicado em BI`,
+    `Art. ${regra.article}${regra.item ? `, Inc. ${regra.item}` : ""}${regra.letter ? `, Al. ${regra.letter}` : ""}`,
+    regra.description ? `— ${regra.description}` : "",
+    `BGPM Nº ${bgpmNumber}/${bgpmYear}.`,
+  ].filter(Boolean).join(" — ");
+
+  const comm = await prisma.communication.create({
+    data: {
+      protocolNumber:  protocolo,
+      typeId:          tipo.id,
+      studentId,
+      courseId,
+      courseNumber:    aluno.courseNumber,
+      platoonId:       aluno.platoonId ?? undefined,
+      reporterId:      session.userId,
+      factDate:        new Date(),
+      factDescription: descricao,
+      finalScore:      score,
+      status:          "DECIDIDA",
+      bgpmNumber,
+      bgpmYear,
+      manualRuleId:    regra.id,
+      article:         regra.article,
+      item:            regra.item,
+      letter:          regra.letter,
+    },
+  });
+
+  let caderno = await prisma.disciplinaryBook.findFirst({
+    where: { status: "RASCUNHO", courseId },
+    orderBy: { number: "desc" },
+  });
+  if (!caderno) {
+    const ultimo = await prisma.disciplinaryBook.findFirst({
+      where: { courseId },
+      orderBy: { number: "desc" },
+    });
+    caderno = await prisma.disciplinaryBook.create({
+      data: { number: (ultimo?.number ?? 0) + 1, courseId, createdById: session.userId },
+    });
+  }
+
+  await prisma.disciplinaryBookItem.create({
+    data: {
+      disciplinaryBookId:  caderno.id,
+      communicationId:     comm.id,
+      studentId,
+      courseId,
+      platoonId:           aluno.platoonId ?? undefined,
+      studentCourseNumber: aluno.courseNumber,
+      studentWarName:      aluno.warName,
+      recordType:          "Elogio publicado em BI",
+      factDate:            comm.factDate,
+      decisionSummary:     "Elogio publicado em BI",
+      score,
+    },
+  });
+
+  await auditLog(session.userId, "CREATE", "Communication", comm.id, protocolo);
+  redirect(`/comunicacoes/${comm.id}`);
+}
+
 // ── Registrar Transgressão Disciplinar / TAC ─────────────────────────────────
 export async function registrarTransgressao(_prev: State, formData: FormData): Promise<State> {
   const session = await verifySession();
