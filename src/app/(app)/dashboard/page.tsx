@@ -316,7 +316,7 @@ export default async function DashboardPage({
 
   const cardsTramitadas = [
     { label: "CPIs c/ sanção publicadas",                       value: data.cards.cpisPublicadas,      color: "bg-slate-700" },
-    { label: "Ref. elogiosa/Elogio publicados",                 value: data.cards.elogiososPublicados, color: "bg-emerald-700" },
+    { label: "Ref. elogiosa/Elogio homologados publicados",      value: data.cards.elogiososPublicados, color: "bg-emerald-700" },
     { label: "Cadernos publicados",                             value: data.cards.cadernosPublicados,  color: "bg-cyan-700" },
     { label: "CPIs arquivadas (sem desconto)",                  value: data.cards.cpisArquivadas,      color: "bg-slate-500" },
     { label: "Ref. elogiosa/Elogio arquivados (sem acréscimo)", value: data.cards.elogiososArquivados, color: "bg-emerald-500" },
