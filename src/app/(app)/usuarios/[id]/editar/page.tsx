@@ -1,31 +1,26 @@
 import { prisma } from "@/lib/db";
-import { verifyRole } from "@/lib/dal";
-import { notFound } from "next/navigation";
+import { verifyRole, canManageUserRole, manageableRoles, USER_MANAGERS } from "@/lib/dal";
+import { notFound, redirect } from "next/navigation";
 import UsuarioForm from "../../_components/UsuarioForm";
 import ResetarSenhaBtn from "../../_components/ResetarSenhaBtn";
 
-const PODE_RESETAR = [
-  "ADMINISTRADOR", "CHEFE_DIVISAO_ACADEMICA",
-  "COMANDANTE_ESFAP", "COMANDANTE_ESFO",
-  "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
-];
-
 export default async function EditarUsuarioPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await verifyRole(
-    "ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO",
-    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
-  );
+  const session = await verifyRole(...USER_MANAGERS);
   const { id } = await params;
   const usuario = await prisma.user.findUnique({ where: { id } });
   if (!usuario) notFound();
 
-  const podeResetar = PODE_RESETAR.includes(session.role);
+  if (!canManageUserRole(session.role, usuario.role)) redirect("/acesso-negado");
+
+  const allowedRoles = manageableRoles(session.role);
+  const podeResetar = canManageUserRole(session.role, usuario.role);
 
   return (
     <div className="p-6 max-w-2xl">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Editar Usuário</h1>
       <UsuarioForm
         id={usuario.id}
+        allowedRoles={allowedRoles}
         defaultValues={{
           fullName: usuario.fullName,
           warName: usuario.warName,

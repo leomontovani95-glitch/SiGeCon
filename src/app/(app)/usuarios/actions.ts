@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
-import { verifyRole } from "@/lib/dal";
+import { verifyRole, canManageUserRole, USER_MANAGERS } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
 
 type State = { error: string } | undefined;
@@ -12,10 +12,7 @@ function senhaInicial(functionalNumber: string, rg: string): string {
 }
 
 export async function salvarUsuario(id: string | null, _prev: State, formData: FormData): Promise<State> {
-  const session = await verifyRole(
-    "ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO",
-    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
-  );
+  const session = await verifyRole(...USER_MANAGERS);
 
   const fullName         = String(formData.get("fullName")         ?? "").trim();
   const warName          = String(formData.get("warName")          ?? "").trim();
@@ -25,10 +22,24 @@ export async function salvarUsuario(id: string | null, _prev: State, formData: F
   const functionalNumber = String(formData.get("functionalNumber") ?? "").trim();
   const password         = String(formData.get("password")         ?? "");
   const role             = String(formData.get("role")             ?? "PROTOCOLO");
+  // Filtra additionalRoles para aceitar apenas funções que o ator pode atribuir
   const additionalRoles  = (formData.getAll("additionalRoles") as string[])
-    .filter((r) => r && r !== role)
+    .filter((r) => r && r !== role && canManageUserRole(session.role, r))
     .join(",");
   const active = formData.get("active") === "true";
+
+  // Verifica se o ator pode atribuir a função principal
+  if (!canManageUserRole(session.role, role)) {
+    return { error: "Você não tem permissão para atribuir essa função." };
+  }
+  // Se for edição, verifica se o ator pode gerir a função atual do usuário
+  if (id) {
+    const target = await prisma.user.findUnique({ where: { id }, select: { role: true } });
+    if (!target) return { error: "Usuário não encontrado." };
+    if (!canManageUserRole(session.role, target.role)) {
+      return { error: "Você não tem permissão para editar este usuário." };
+    }
+  }
 
   if (!fullName || !warName || !rank || !rg || !functionalNumber) {
     return { error: "Preencha todos os campos obrigatórios." };
@@ -84,12 +95,12 @@ export async function salvarUsuario(id: string | null, _prev: State, formData: F
 type ResetState = { error?: string; success?: string } | undefined;
 
 export async function resetarSenha(userId: string, _prev: ResetState, _fd: FormData): Promise<ResetState> {
-  await verifyRole(
-    "ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO",
-    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
-  );
+  const session = await verifyRole(...USER_MANAGERS);
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return { error: "Usuário não encontrado." };
+  if (!canManageUserRole(session.role, user.role)) {
+    return { error: "Você não tem permissão para redefinir a senha deste usuário." };
+  }
   if (!user.functionalNumber) return { error: "Número Funcional não cadastrado. Não é possível redefinir a senha automaticamente." };
   const novaSenha = senhaInicial(user.functionalNumber, user.rg);
   await prisma.user.update({
@@ -100,15 +111,14 @@ export async function resetarSenha(userId: string, _prev: ResetState, _fd: FormD
 }
 
 export async function excluirUsuario(id: string, _prev: { error: string } | undefined, _fd: FormData): Promise<{ error: string } | undefined> {
-  const session = await verifyRole(
-    "ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO",
-    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
-  );
+  const session = await verifyRole(...USER_MANAGERS);
   if (session.userId === id) return { error: "Não é possível excluir o próprio usuário." };
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) return { error: "Usuário não encontrado." };
+  if (!canManageUserRole(session.role, user.role)) {
+    return { error: "Você não tem permissão para excluir este usuário." };
+  }
   if (user.role === "ADMINISTRADOR") {
-    if (session.role !== "ADMINISTRADOR") return { error: "Apenas o Administrador pode excluir outros administradores." };
     const adminCount = await prisma.user.count({ where: { role: "ADMINISTRADOR" } });
     if (adminCount <= 1) return { error: "Não é possível excluir o último administrador." };
   }

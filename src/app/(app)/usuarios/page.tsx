@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { verifyRole } from "@/lib/dal";
+import { verifyRole, canManageUserRole, USER_MANAGERS } from "@/lib/dal";
 import Link from "next/link";
 import ExcluirUsuarioBtn from "./_components/ExcluirUsuarioBtn";
 
@@ -20,10 +20,7 @@ const ROLES: Record<string, string> = {
 };
 
 export default async function UsuariosPage() {
-  const session = await verifyRole(
-    "ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO",
-    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
-  );
+  const session = await verifyRole(...USER_MANAGERS);
   // Alunos ficam apenas na aba Alunos — usuários são apenas o efetivo formado
   const usuarios = await prisma.user.findMany({ where: { role: { not: "ALUNO" } }, orderBy: { fullName: "asc" } });
 
@@ -77,12 +74,16 @@ export default async function UsuariosPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3 flex gap-4">
-                  <Link href={`/usuarios/${u.id}/editar`} className="text-[#1e3a5f] hover:underline text-xs">
-                    Editar
-                  </Link>
+                  {canManageUserRole(session.role, u.role) ? (
+                    <Link href={`/usuarios/${u.id}/editar`} className="text-[#1e3a5f] hover:underline text-xs">
+                      Editar
+                    </Link>
+                  ) : (
+                    <span className="text-xs text-gray-300 cursor-not-allowed">Editar</span>
+                  )}
                   <ExcluirUsuarioBtn
                     id={u.id}
-                    canDelete={session.role === "ADMINISTRADOR" || u.role !== "ADMINISTRADOR"}
+                    canDelete={canManageUserRole(session.role, u.role) && u.id !== session.userId}
                   />
                 </td>
               </tr>

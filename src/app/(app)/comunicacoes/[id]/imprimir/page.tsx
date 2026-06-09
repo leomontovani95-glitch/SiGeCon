@@ -110,7 +110,7 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
             <div key={o.id}>
               <p className="print-text">{o.text}</p>
               {o.recommendation && <p style={{ fontWeight: "bold", marginTop: 4, fontSize: "10pt" }}>Recomendação: {o.recommendation}</p>}
-              <p style={{ fontSize: "8pt", color: "#888" }}>{o.author.warName} ({o.authorRole}) — {format(new Date(o.createdAt), "dd/MM/yyyy", { locale: ptBR })}</p>
+              <p style={{ fontSize: "8pt", color: "#888" }}>{o.author.fullName} — {o.authorRole.replace(/_/g, " ")} — {format(new Date(o.createdAt), "dd/MM/yyyy", { locale: ptBR })}</p>
             </div>
           ))}
         </div>
@@ -126,7 +126,7 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
               {d.finalScore != null && (
                 <p style={{ fontWeight: "bold", marginTop: 6 }}>Pontuação aplicada: {d.finalScore.toFixed(1)} ponto(s)</p>
               )}
-              <p style={{ fontSize: "8pt", color: "#888", marginTop: 4 }}>{d.authority.warName} — {format(new Date(d.decidedAt), "dd/MM/yyyy", { locale: ptBR })}</p>
+              <p style={{ fontSize: "8pt", color: "#888", marginTop: 4 }}>{d.authority.fullName} — {d.authority.role.replace(/_/g, " ")} — {format(new Date(d.decidedAt), "dd/MM/yyyy", { locale: ptBR })}</p>
             </div>
           ))}
         </div>

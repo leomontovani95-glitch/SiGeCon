@@ -82,6 +82,56 @@ export function canViewAllCommunications(role: string) {
   ].includes(role);
 }
 
+// ── Hierarquia de gestão de usuários ─────────────────────────────────────────
+
+// Nível do ator (quem gerencia). Ausente = sem direito de gestão.
+export const USER_ACTOR_LEVEL: Partial<Record<UserRole, number>> = {
+  ADMINISTRADOR:           0,
+  CHEFE_DIVISAO_ACADEMICA: 1,
+  COMANDANTE_ESFAP:        2,
+  COMANDANTE_ESFO:         2,
+  SUBCOMANDANTE_ESFAP:     3,
+  SUBCOMANDANTE_ESFO:      3,
+  OFICIAL_ESFAP:           4,
+  OFICIAL_ESFO:            4,
+  CHEFE_CURSO:             5,
+};
+
+// Nível do alvo (qual função pode ser gerenciada). Ausente = não gerenciável pelos roles normais.
+export const USER_TARGET_LEVEL: Partial<Record<UserRole, number>> = {
+  ADMINISTRADOR:           0,
+  CHEFE_DIVISAO_ACADEMICA: 1,
+  COMANDANTE_APM:          1,
+  SUBCOMANDANTE_APM:       1,
+  COMANDANTE_ESFAP:        2,
+  COMANDANTE_ESFO:         2,
+  SUBCOMANDANTE_ESFAP:     3,
+  SUBCOMANDANTE_ESFO:      3,
+  OFICIAL_ESFAP:           4,
+  OFICIAL_ESFO:            4,
+  CHEFE_CURSO:             5,
+  PROTOCOLO:               6,
+};
+
+// Retorna true se `actorRole` pode criar/editar um usuário com `targetRole`.
+// Regra: actorLevel <= targetLevel (mesmo nível e abaixo).
+export function canManageUserRole(actorRole: string, targetRole: string): boolean {
+  const actorLevel = USER_ACTOR_LEVEL[actorRole as UserRole];
+  const targetLevel = USER_TARGET_LEVEL[targetRole as UserRole];
+  if (actorLevel === undefined || targetLevel === undefined) return false;
+  return actorLevel <= targetLevel;
+}
+
+// Retorna as funções que o ator pode atribuir.
+export function manageableRoles(actorRole: string): UserRole[] {
+  return (Object.keys(USER_TARGET_LEVEL) as UserRole[]).filter((r) =>
+    canManageUserRole(actorRole, r),
+  );
+}
+
+// Roles com acesso à gestão de usuários (pelo menos uma função gerenciável).
+export const USER_MANAGERS: UserRole[] = Object.keys(USER_ACTOR_LEVEL) as UserRole[];
+
 export function getSchoolFilter(role: string, escolaUsuario?: string | null): string | null {
   // Role-based filters sempre têm precedência (COMANDANTE_ESFAP etc.)
   if (["COMANDANTE_ESFAP", "SUBCOMANDANTE_ESFAP", "OFICIAL_ESFAP"].includes(role)) return "ESFAP";

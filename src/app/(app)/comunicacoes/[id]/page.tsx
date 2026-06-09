@@ -276,7 +276,7 @@ export default async function ComunicacaoPage({
               <p className="text-sm text-gray-700 whitespace-pre-wrap">{o.text}</p>
               {o.recommendation && <p className="text-sm font-medium text-purple-800 mt-2">Recomendação: {o.recommendation}</p>}
               <p className="text-xs text-gray-400 mt-2">
-                {o.author.warName} ({o.authorRole.replace(/_/g, " ")}) — {format(new Date(o.createdAt), "dd/MM/yyyy", { locale: ptBR })}
+                {o.author.fullName} — {o.authorRole.replace(/_/g, " ")} — {format(new Date(o.createdAt), "dd/MM/yyyy", { locale: ptBR })}
               </p>
             </div>
           ))}
@@ -294,7 +294,7 @@ export default async function ComunicacaoPage({
                 <p className="text-sm font-bold text-green-800 mt-2">Pontuação aplicada: {d.finalScore.toFixed(1)} pt</p>
               )}
               <p className="text-xs text-gray-400 mt-2">
-                {d.authority.warName} — {format(new Date(d.decidedAt), "dd/MM/yyyy", { locale: ptBR })}
+                {d.authority.fullName} — {d.authority.role.replace(/_/g, " ")} — {format(new Date(d.decidedAt), "dd/MM/yyyy", { locale: ptBR })}
               </p>
             </div>
           ))}

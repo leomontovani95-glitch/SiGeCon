@@ -64,7 +64,7 @@ export default async function ImprimirParecerPage({ params }: { params: Promise<
 
       <div className="print-signatures" style={{ marginTop: 48 }}>
         <div className="print-sig-line" style={{ gridColumn: "1 / -1", maxWidth: 320, margin: "0 auto" }}>
-          <p>{opinion.author.rank} {opinion.author.warName}</p>
+          <p>{opinion.author.rank} {opinion.author.fullName}</p>
           <p>{opinion.authorRole === "SUBCOMANDANTE" ? "Subcomandante da Escola" : "Oficial da Escola"}</p>
         </div>
       </div>

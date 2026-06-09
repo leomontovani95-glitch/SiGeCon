@@ -31,9 +31,13 @@ type Props = {
   defaultValues?: Record<string, string>;
   additionalRolesDefault?: string[];
   id?: string;
+  allowedRoles?: string[];
 };
 
-export default function UsuarioForm({ defaultValues, additionalRolesDefault = [], id }: Props) {
+export default function UsuarioForm({ defaultValues, additionalRolesDefault = [], id, allowedRoles }: Props) {
+  const visibleRoles = allowedRoles
+    ? ROLES.filter((r) => allowedRoles.includes(r.value))
+    : ROLES;
   const action = salvarUsuario.bind(null, id ?? null);
   const [state, formAction, pending] = useActionState(action, undefined);
 
@@ -103,7 +107,7 @@ export default function UsuarioForm({ defaultValues, additionalRolesDefault = []
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Função principal *</label>
           <select name="role" defaultValue={defaultValues?.role ?? "PROTOCOLO"} onChange={handleRoleChange} className="input">
-            {ROLES.map((r) => (
+            {visibleRoles.map((r) => (
               <option key={r.value} value={r.value}>{r.label}</option>
             ))}
           </select>
@@ -132,7 +136,7 @@ export default function UsuarioForm({ defaultValues, additionalRolesDefault = []
           <span className="text-xs text-gray-400 font-normal ml-2">(para militares com mais de uma função no sistema)</span>
         </label>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {ROLES.map((r) => (
+          {visibleRoles.map((r) => (
             <label key={r.value} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
               <input
                 type="checkbox"
