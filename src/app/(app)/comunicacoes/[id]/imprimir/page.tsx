@@ -19,8 +19,8 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
       witnesses: true,
       acknowledgements: true,
       defenses: true,
-      opinions: { include: { author: true } },
-      decisions: { include: { authority: true } },
+      opinions: { include: { author: true, attachments: true } },
+      decisions: { include: { authority: true, attachments: true } },
     },
   });
   if (!comm) notFound();
@@ -110,6 +110,11 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
             <div key={o.id}>
               <p className="print-text">{o.text}</p>
               {o.recommendation && <p style={{ fontWeight: "bold", marginTop: 4, fontSize: "10pt" }}>Recomendação: {o.recommendation}</p>}
+              {o.attachments.length > 0 && (
+                <p style={{ fontSize: "8pt", color: "#555", marginTop: 4 }}>
+                  Anexo(s): {o.attachments.map((a) => a.fileName).join(", ")}
+                </p>
+              )}
               <p style={{ fontSize: "8pt", color: "#888" }}>{o.author.fullName} — {o.authorRole.replace(/_/g, " ")} — {format(new Date(o.createdAt), "dd/MM/yyyy", { locale: ptBR })}</p>
             </div>
           ))}
@@ -125,6 +130,11 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
               <p className="print-text">{d.text}</p>
               {d.finalScore != null && (
                 <p style={{ fontWeight: "bold", marginTop: 6 }}>Pontuação aplicada: {d.finalScore.toFixed(1)} ponto(s)</p>
+              )}
+              {d.attachments.length > 0 && (
+                <p style={{ fontSize: "8pt", color: "#555", marginTop: 4 }}>
+                  Anexo(s): {d.attachments.map((a) => a.fileName).join(", ")}
+                </p>
               )}
               <p style={{ fontSize: "8pt", color: "#888", marginTop: 4 }}>{d.authority.fullName} — {d.authority.role.replace(/_/g, " ")} — {format(new Date(d.decidedAt), "dd/MM/yyyy", { locale: ptBR })}</p>
             </div>

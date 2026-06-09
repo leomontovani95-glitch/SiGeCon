@@ -218,6 +218,18 @@ export async function emitirParecer(_prev: State, formData: FormData): Promise<S
     return { error: "Selecione o artigo sugerido para reenquadramento." };
   }
 
+  // Processar anexos (opcionais)
+  const arquivosParecer = (formData.getAll("file") as File[]).filter((f) => f && f.size > 0);
+  if (arquivosParecer.length > 0) {
+    for (const f of arquivosParecer) {
+      if (!TIPOS_PERMITIDOS.includes(f.type))
+        return { error: `Tipo de arquivo não permitido (${f.name}). Use PNG, JPEG ou PDF.` };
+    }
+    const totalBytes = arquivosParecer.reduce((s, f) => s + f.size, 0);
+    if (totalBytes > LIMITE_TOTAL_BYTES)
+      return { error: `O total dos arquivos excede o limite de 5 MB (${(totalBytes / 1024 / 1024).toFixed(1)} MB enviado).` };
+  }
+
   const existente = await prisma.opinion.findFirst({ where: { communicationId } });
   if (existente) return { error: "Já existe um parecer registrado para esta comunicação." };
 
@@ -230,9 +242,32 @@ export async function emitirParecer(_prev: State, formData: FormData): Promise<S
     }
   }
 
-  await prisma.opinion.create({
+  const opinion = await prisma.opinion.create({
     data: { communicationId, authorId: session.userId, authorRole: session.role, text, recommendation: recommendationFinal },
   });
+
+  // Salvar anexos vinculados ao parecer
+  if (arquivosParecer.length > 0) {
+    const dir = path.join(process.cwd(), "public", "uploads", communicationId);
+    await mkdir(dir, { recursive: true });
+    for (const arquivo of arquivosParecer) {
+      const ext = arquivo.name.split(".").pop() ?? "bin";
+      const savedName = `${Date.now()}-${Math.random().toString(36).slice(2)}-parecer.${ext}`;
+      const buffer = Buffer.from(await arquivo.arrayBuffer());
+      await writeFile(path.join(dir, savedName), buffer);
+      await prisma.attachment.create({
+        data: {
+          communicationId,
+          opinionId: opinion.id,
+          fileName: arquivo.name,
+          filePath: `/uploads/${communicationId}/${savedName}`,
+          fileType: arquivo.type,
+          uploadedBy: session.userId,
+        },
+      });
+    }
+  }
+
   await prisma.communication.update({
     where: { id: communicationId },
     data: { status: "AGUARDANDO_DECISAO" },
@@ -274,9 +309,44 @@ export async function proferirDecisao(_prev: State, formData: FormData): Promise
     commUpdate.letter = regra.letter ?? null;
   }
 
-  await prisma.decision.create({
+  // Processar anexos da decisão (opcionais)
+  const arquivosDecisao = (formData.getAll("fileDecisao") as File[]).filter((f) => f && f.size > 0);
+  if (arquivosDecisao.length > 0) {
+    for (const f of arquivosDecisao) {
+      if (!TIPOS_PERMITIDOS.includes(f.type))
+        return { error: `Tipo de arquivo não permitido (${f.name}). Use PNG, JPEG ou PDF.` };
+    }
+    const totalBytes = arquivosDecisao.reduce((s, f) => s + f.size, 0);
+    if (totalBytes > LIMITE_TOTAL_BYTES)
+      return { error: `O total dos arquivos excede o limite de 5 MB (${(totalBytes / 1024 / 1024).toFixed(1)} MB enviado).` };
+  }
+
+  const decision = await prisma.decision.create({
     data: { communicationId, authorityId: session.userId, decisionType, text, finalScore },
   });
+
+  // Salvar anexos vinculados à decisão
+  if (arquivosDecisao.length > 0) {
+    const dir = path.join(process.cwd(), "public", "uploads", communicationId);
+    await mkdir(dir, { recursive: true });
+    for (const arquivo of arquivosDecisao) {
+      const ext = arquivo.name.split(".").pop() ?? "bin";
+      const savedName = `${Date.now()}-${Math.random().toString(36).slice(2)}-decisao.${ext}`;
+      const buffer = Buffer.from(await arquivo.arrayBuffer());
+      await writeFile(path.join(dir, savedName), buffer);
+      await prisma.attachment.create({
+        data: {
+          communicationId,
+          decisionId: decision.id,
+          fileName: arquivo.name,
+          filePath: `/uploads/${communicationId}/${savedName}`,
+          fileType: arquivo.type,
+          uploadedBy: session.userId,
+        },
+      });
+    }
+  }
+
   await prisma.communication.update({ where: { id: communicationId }, data: commUpdate });
   await auditLog(session.userId, "DECISAO", "Communication", communicationId, decisionType);
 

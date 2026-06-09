@@ -176,6 +176,8 @@ model Attachment {
   id              String   @id @default(cuid())
   communicationId String
   defenseId       String?
+  opinionId       String?
+  decisionId      String?
   fileName        String
   filePath        String
   fileType        String?
@@ -184,6 +186,8 @@ model Attachment {
 
   communication Communication @relation(fields: [communicationId], references: [id])
   defense       Defense?      @relation(fields: [defenseId], references: [id])
+  opinion       Opinion?      @relation(fields: [opinionId], references: [id])
+  decision      Decision?     @relation(fields: [decisionId], references: [id])
 }
 
 model StudentAcknowledgement {
@@ -222,6 +226,7 @@ model Opinion {
 
   communication Communication @relation(fields: [communicationId], references: [id])
   author        User          @relation(fields: [authorId], references: [id])
+  attachments   Attachment[]
 }
 
 model Decision {
@@ -235,6 +240,7 @@ model Decision {
 
   communication Communication @relation(fields: [communicationId], references: [id])
   authority     User          @relation(fields: [authorityId], references: [id])
+  attachments   Attachment[]
 }
 
 model DisciplinaryBook {

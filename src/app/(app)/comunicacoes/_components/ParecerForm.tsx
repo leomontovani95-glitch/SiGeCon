@@ -1,5 +1,5 @@
 "use client";
-import { useActionState, useState } from "react";
+import { useActionState, useState, useRef } from "react";
 import { emitirParecer } from "../actions";
 
 type Sugestao = { titulo: string; texto: string };
@@ -55,6 +55,32 @@ export default function ParecerForm({ communicationId, manualRules }: Props) {
   const [recomendacao, setRecomendacao] = useState("");
   const [texto, setTexto] = useState("");
   const [ruleId, setRuleId] = useState("");
+  const [arquivos, setArquivos] = useState<File[]>([]);
+  const [arquivoErro, setArquivoErro] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function validarArquivos(files: FileList | null) {
+    if (!files || files.length === 0) { setArquivoErro(""); setArquivos([]); return; }
+    const lista = Array.from(files);
+    const tiposOk = ["image/png", "image/jpeg", "application/pdf"];
+    for (const f of lista) {
+      if (!tiposOk.includes(f.type)) {
+        setArquivoErro(`Formato inválido (${f.name}). Use PNG, JPEG ou PDF.`);
+        setArquivos([]);
+        if (fileRef.current) fileRef.current.value = "";
+        return;
+      }
+    }
+    const totalBytes = lista.reduce((s, f) => s + f.size, 0);
+    if (totalBytes > 5 * 1024 * 1024) {
+      setArquivoErro(`Total excede 5 MB (${(totalBytes / 1024 / 1024).toFixed(1)} MB).`);
+      setArquivos([]);
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+    setArquivoErro("");
+    setArquivos(lista);
+  }
 
   const sugestoes = SUGESTOES[recomendacao] ?? [];
   const isReenquadramento = recomendacao === "Sugiro reenquadramento de artigo";
@@ -144,9 +170,37 @@ export default function ParecerForm({ communicationId, manualRules }: Props) {
           />
         </div>
 
+        {/* Anexo(s) */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Anexar documento(s){" "}
+            <span className="text-gray-400 font-normal">(opcional — PNG, JPEG ou PDF — máx. 5 MB no total)</span>
+          </label>
+          <input
+            ref={fileRef}
+            type="file"
+            name="file"
+            accept=".png,.jpg,.jpeg,.pdf"
+            multiple
+            onChange={(e) => validarArquivos(e.target.files)}
+            className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-purple-700 file:text-white hover:file:bg-purple-800 cursor-pointer"
+          />
+          {arquivoErro && <p className="text-sm text-red-600 mt-1">{arquivoErro}</p>}
+          {arquivos.length > 0 && !arquivoErro && (
+            <div className="mt-1 space-y-0.5">
+              {arquivos.map((f, i) => (
+                <p key={i} className="text-sm text-green-700">✓ {f.name} ({(f.size / 1024 / 1024).toFixed(2)} MB)</p>
+              ))}
+              <p className="text-xs text-gray-500">
+                Total: {(arquivos.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(2)} MB
+              </p>
+            </div>
+          )}
+        </div>
+
         {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
 
-        <button type="submit" disabled={pending} className="btn-primary">
+        <button type="submit" disabled={pending || !!arquivoErro} className="btn-primary">
           {pending ? "Emitindo..." : "Emitir Parecer"}
         </button>
       </form>

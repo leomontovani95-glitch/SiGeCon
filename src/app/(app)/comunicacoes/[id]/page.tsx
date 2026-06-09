@@ -40,8 +40,8 @@ export default async function ComunicacaoPage({
         witnesses: true, attachments: true,
         acknowledgements: true,
         defenses: { include: { attachments: true } },
-        opinions: { include: { author: true } },
-        decisions: { include: { authority: true } },
+        opinions: { include: { author: true, attachments: true } },
+        decisions: { include: { authority: true, attachments: true } },
       },
     }),
   ]);
@@ -275,6 +275,22 @@ export default async function ComunicacaoPage({
             <div key={o.id}>
               <p className="text-sm text-gray-700 whitespace-pre-wrap">{o.text}</p>
               {o.recommendation && <p className="text-sm font-medium text-purple-800 mt-2">Recomendação: {o.recommendation}</p>}
+              {o.attachments.length > 0 && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-gray-500">Anexo(s):</span>
+                  {o.attachments.map((a) => (
+                    <a
+                      key={a.id}
+                      href={a.filePath}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-purple-700 bg-white border border-purple-300 rounded-lg px-3 py-1.5 hover:bg-purple-50 transition-colors"
+                    >
+                      📎 {a.fileName}
+                    </a>
+                  ))}
+                </div>
+              )}
               <p className="text-xs text-gray-400 mt-2">
                 {o.author.fullName} — {o.authorRole.replace(/_/g, " ")} — {format(new Date(o.createdAt), "dd/MM/yyyy", { locale: ptBR })}
               </p>
@@ -292,6 +308,22 @@ export default async function ComunicacaoPage({
               <p className="text-sm text-gray-700 whitespace-pre-wrap mt-1">{d.text}</p>
               {d.finalScore != null && (
                 <p className="text-sm font-bold text-green-800 mt-2">Pontuação aplicada: {d.finalScore.toFixed(1)} pt</p>
+              )}
+              {d.attachments.length > 0 && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-gray-500">Anexo(s):</span>
+                  {d.attachments.map((a) => (
+                    <a
+                      key={a.id}
+                      href={a.filePath}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-green-700 bg-white border border-green-300 rounded-lg px-3 py-1.5 hover:bg-green-50 transition-colors"
+                    >
+                      📎 {a.fileName}
+                    </a>
+                  ))}
+                </div>
               )}
               <p className="text-xs text-gray-400 mt-2">
                 {d.authority.fullName} — {d.authority.role.replace(/_/g, " ")} — {format(new Date(d.decidedAt), "dd/MM/yyyy", { locale: ptBR })}

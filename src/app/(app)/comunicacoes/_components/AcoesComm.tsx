@@ -102,6 +102,9 @@ export default function AcoesComm({
 }) {
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [arquivoErro, setArquivoErro] = useState("");
+  const [arquivosDecisao, setArquivosDecisao] = useState<File[]>([]);
+  const [arquivoErroDecisao, setArquivoErroDecisao] = useState("");
+  const fileDecisaoRef = useRef<HTMLInputElement>(null);
   const [decisaoTipo, setDecisaoTipo] = useState("");
   const [decisaoTexto, setDecisaoTexto] = useState("");
   const [finalScoreDecisao, setFinalScoreDecisao] = useState<string>(() => {
@@ -149,6 +152,29 @@ export default function AcoesComm({
     }
     setArquivoErro("");
     setArquivos(lista);
+  }
+
+  function validarArquivosDecisao(files: FileList | null) {
+    if (!files || files.length === 0) { setArquivoErroDecisao(""); setArquivosDecisao([]); return; }
+    const lista = Array.from(files);
+    const tiposOk = ["image/png", "image/jpeg", "application/pdf"];
+    for (const f of lista) {
+      if (!tiposOk.includes(f.type)) {
+        setArquivoErroDecisao(`Formato inválido (${f.name}). Use PNG, JPEG ou PDF.`);
+        setArquivosDecisao([]);
+        if (fileDecisaoRef.current) fileDecisaoRef.current.value = "";
+        return;
+      }
+    }
+    const totalBytes = lista.reduce((s, f) => s + f.size, 0);
+    if (totalBytes > 5 * 1024 * 1024) {
+      setArquivoErroDecisao(`Total excede 5 MB (${(totalBytes / 1024 / 1024).toFixed(1)} MB).`);
+      setArquivosDecisao([]);
+      if (fileDecisaoRef.current) fileDecisaoRef.current.value = "";
+      return;
+    }
+    setArquivoErroDecisao("");
+    setArquivosDecisao(lista);
   }
 
   return (
@@ -460,10 +486,38 @@ export default function AcoesComm({
                 Deixe em branco para pontuação zero (ex: arquivamento).
               </p>
             </div>
+            {/* Anexo(s) da decisão */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Anexar documento(s){" "}
+                <span className="text-gray-400 font-normal">(opcional — PNG, JPEG ou PDF — máx. 5 MB no total)</span>
+              </label>
+              <input
+                ref={fileDecisaoRef}
+                type="file"
+                name="fileDecisao"
+                accept=".png,.jpg,.jpeg,.pdf"
+                multiple
+                onChange={(e) => validarArquivosDecisao(e.target.files)}
+                className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-green-700 file:text-white hover:file:bg-green-800 cursor-pointer"
+              />
+              {arquivoErroDecisao && <p className="text-sm text-red-600 mt-1">{arquivoErroDecisao}</p>}
+              {arquivosDecisao.length > 0 && !arquivoErroDecisao && (
+                <div className="mt-1 space-y-0.5">
+                  {arquivosDecisao.map((f, i) => (
+                    <p key={i} className="text-sm text-green-700">✓ {f.name} ({(f.size / 1024 / 1024).toFixed(2)} MB)</p>
+                  ))}
+                  <p className="text-xs text-gray-500">
+                    Total: {(arquivosDecisao.reduce((s, f) => s + f.size, 0) / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                </div>
+              )}
+            </div>
+
             {decisaoState?.error && (
               <p className="text-sm text-red-600">{decisaoState.error}</p>
             )}
-            <button type="submit" disabled={decisaoPending} className="btn-primary">
+            <button type="submit" disabled={decisaoPending || !!arquivoErroDecisao} className="btn-primary">
               {decisaoPending ? "Registrando..." : "Registrar Decisão"}
             </button>
           </form>
