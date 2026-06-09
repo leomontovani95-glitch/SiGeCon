@@ -21,6 +21,10 @@ type AlunoInfo = {
   rg: string; functionalNumber: string | null;
 };
 type Curso = { id: string; name: string };
+type CommResult = {
+  key: string; rank: string; name: string; fullName: string;
+  detail: string; tipo: "Usuário" | "Aluno";
+};
 
 type Props = { tipos: Tipo[]; regras: Regra[]; cursos?: Curso[] };
 
@@ -64,6 +68,16 @@ export default function ComunicacaoForm({ tipos, regras, cursos }: Props) {
   const [buscando, setBuscando] = useState(false);
   const [erroAluno, setErroAluno] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Comunicante
+  const commDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [commTab, setCommTab] = useState<"buscar" | "manual">("buscar");
+  const [commQuery, setCommQuery] = useState("");
+  const [commResults, setCommResults] = useState<CommResult[]>([]);
+  const [commBuscando, setCommBuscando] = useState(false);
+  const [commSelecionado, setCommSelecionado] = useState<CommResult | null>(null);
+  const [commRank, setCommRank] = useState("");
+  const [commName, setCommName] = useState("");
 
   // Cascata dispositivo legal
   const [artigo, setArtigo] = useState("");
@@ -135,10 +149,41 @@ export default function ComunicacaoForm({ tipos, regras, cursos }: Props) {
     debounceRef.current = setTimeout(() => buscarAluno(val), 600);
   }
 
+  async function buscarComunicante(q: string) {
+    if (q.length < 2) { setCommResults([]); return; }
+    setCommBuscando(true);
+    try {
+      const res = await fetch(`/api/comunicante/buscar?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      setCommResults(data.results ?? []);
+    } catch { setCommResults([]); }
+    finally { setCommBuscando(false); }
+  }
+  function handleCommQueryChange(val: string) {
+    setCommQuery(val);
+    setCommSelecionado(null);
+    setCommResults([]);
+    if (commDebounceRef.current) clearTimeout(commDebounceRef.current);
+    commDebounceRef.current = setTimeout(() => buscarComunicante(val), 400);
+  }
+  function selecionarComunicante(r: CommResult) {
+    setCommSelecionado(r);
+    setCommRank(r.rank);
+    setCommName(r.name);
+    setCommResults([]);
+    setCommQuery("");
+  }
+  function limparComunicante() {
+    setCommSelecionado(null);
+    setCommRank("");
+    setCommName("");
+  }
+
   const dispositivoCompleto = !!ruleId;
 
   const cursoObrigatorio = cursos && cursos.length > 0;
   const cursoOk = !cursoObrigatorio || !!cursoSelecionadoId;
+  const commOk = !!commName.trim();
 
   return (
     <form action={formAction} className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
@@ -415,24 +460,125 @@ export default function ComunicacaoForm({ tipos, regras, cursos }: Props) {
         <legend className="text-sm font-semibold text-gray-700 px-2">
           Comunicante <span className="text-red-500">*</span>
         </legend>
-        <div className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-3 mt-2">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Posto/Graduação *</label>
-            <select name="communicantRank" required className="input text-sm">
-              <option value="">Selecione</option>
-              {POSTOS.map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Nome *</label>
-            <input
-              name="communicantName"
-              required
-              className="input text-sm"
-              placeholder="Nome de quem verificou a transgressão ou propõe o registro"
-            />
-          </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 mt-2 mb-3">
+          <button
+            type="button"
+            onClick={() => setCommTab("buscar")}
+            className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors ${
+              commTab === "buscar"
+                ? "bg-[#1e3a5f] text-white"
+                : "bg-white border border-gray-300 text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Buscar cadastrado
+          </button>
+          <button
+            type="button"
+            onClick={() => setCommTab("manual")}
+            className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors ${
+              commTab === "manual"
+                ? "bg-[#1e3a5f] text-white"
+                : "bg-white border border-gray-300 text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            Preencher manualmente
+          </button>
         </div>
+
+        {/* Hidden inputs always submitted */}
+        <input type="hidden" name="communicantRank" value={commRank} />
+        <input type="hidden" name="communicantName" value={commName} />
+
+        {commTab === "buscar" && (
+          <div className="space-y-2">
+            {!commSelecionado ? (
+              <>
+                <input
+                  value={commQuery}
+                  onChange={(e) => handleCommQueryChange(e.target.value)}
+                  placeholder="Pesquise por nome, RG ou NF..."
+                  className="input text-sm"
+                  autoComplete="off"
+                />
+                {commBuscando && <p className="text-xs text-blue-600">Buscando...</p>}
+                {!commBuscando && commQuery.length >= 2 && commResults.length === 0 && (
+                  <p className="text-xs text-gray-400">Nenhum resultado encontrado. Use &quot;Preencher manualmente&quot;.</p>
+                )}
+                {commResults.length > 0 && (
+                  <ul className="border border-gray-200 rounded-lg bg-white divide-y divide-gray-100 max-h-48 overflow-y-auto">
+                    {commResults.map((r) => (
+                      <li
+                        key={r.key}
+                        onClick={() => selecionarComunicante(r)}
+                        className="px-3 py-2 hover:bg-blue-50 cursor-pointer flex items-center gap-2"
+                      >
+                        <span className="inline-block bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded font-mono whitespace-nowrap">
+                          {r.rank || "—"}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-900 truncate">{r.name}</p>
+                          <p className="text-xs text-gray-500 truncate">{r.fullName} · {r.detail}</p>
+                        </div>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap ${
+                          r.tipo === "Usuário" ? "bg-indigo-100 text-indigo-700" : "bg-blue-100 text-blue-700"
+                        }`}>{r.tipo}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center gap-3 bg-white border border-green-200 rounded-lg px-3 py-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900">
+                    {commRank && (
+                      <span className="font-mono text-xs bg-gray-100 px-1 mr-1.5 rounded">{commRank}</span>
+                    )}
+                    {commName}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">{commSelecionado.fullName} · {commSelecionado.detail}</p>
+                </div>
+                <span className={`text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap ${
+                  commSelecionado.tipo === "Usuário" ? "bg-indigo-100 text-indigo-700" : "bg-blue-100 text-blue-700"
+                }`}>{commSelecionado.tipo}</span>
+                <button
+                  type="button"
+                  onClick={limparComunicante}
+                  className="text-xs text-red-500 hover:text-red-700 font-medium whitespace-nowrap"
+                >
+                  Alterar
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {commTab === "manual" && (
+          <div className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Posto/Graduação</label>
+              <select
+                value={commRank}
+                onChange={(e) => setCommRank(e.target.value)}
+                className="input text-sm"
+              >
+                <option value="">Selecione</option>
+                {POSTOS.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Nome *</label>
+              <input
+                value={commName}
+                onChange={(e) => setCommName(e.target.value)}
+                className="input text-sm"
+                placeholder="Nome de quem verificou a transgressão ou propõe o registro"
+              />
+            </div>
+          </div>
+        )}
       </fieldset>
 
       {state?.error && (
@@ -444,18 +590,19 @@ export default function ComunicacaoForm({ tipos, regras, cursos }: Props) {
       <div className="flex gap-3 pt-2">
         <button
           type="submit"
-          disabled={pending || !cursoOk || !aluno || !dispositivoCompleto}
+          disabled={pending || !cursoOk || !aluno || !dispositivoCompleto || !commOk}
           className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {pending ? "Registrando..." : "Registrar Comunicação"}
         </button>
         <a href="/comunicacoes" className="btn-secondary">Cancelar</a>
       </div>
-      {(!cursoOk || !aluno || !dispositivoCompleto) && (
+      {(!cursoOk || !aluno || !dispositivoCompleto || !commOk) && (
         <p className="text-xs text-gray-400">
           {!cursoOk ? "Selecione o curso antes de localizar o aluno. " : ""}
           {cursoOk && !aluno ? "Localize o aluno pelo número de curso. " : ""}
-          {!dispositivoCompleto ? "Selecione o dispositivo legal completo." : ""}
+          {!dispositivoCompleto ? "Selecione o dispositivo legal completo. " : ""}
+          {dispositivoCompleto && !commOk ? "Informe o comunicante." : ""}
         </p>
       )}
     </form>
