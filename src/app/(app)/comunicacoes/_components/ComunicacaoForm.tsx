@@ -22,7 +22,7 @@ type AlunoInfo = {
 };
 type Curso = { id: string; name: string };
 type CommResult = {
-  key: string; rank: string; name: string; fullName: string;
+  key: string; userId: string; rank: string; name: string; fullName: string;
   detail: string; tipo: "Usuário" | "Aluno";
 };
 
@@ -78,6 +78,7 @@ export default function ComunicacaoForm({ tipos, regras, cursos }: Props) {
   const [commSelecionado, setCommSelecionado] = useState<CommResult | null>(null);
   const [commRank, setCommRank] = useState("");
   const [commName, setCommName] = useState("");
+  const [commUserId, setCommUserId] = useState("");
 
   // Cascata dispositivo legal
   const [artigo, setArtigo] = useState("");
@@ -170,6 +171,7 @@ export default function ComunicacaoForm({ tipos, regras, cursos }: Props) {
     setCommSelecionado(r);
     setCommRank(r.rank);
     setCommName(r.name);
+    setCommUserId(r.userId);
     setCommResults([]);
     setCommQuery("");
   }
@@ -177,6 +179,7 @@ export default function ComunicacaoForm({ tipos, regras, cursos }: Props) {
     setCommSelecionado(null);
     setCommRank("");
     setCommName("");
+    setCommUserId("");
   }
 
   const dispositivoCompleto = !!ruleId;
@@ -490,6 +493,7 @@ export default function ComunicacaoForm({ tipos, regras, cursos }: Props) {
         {/* Hidden inputs always submitted */}
         <input type="hidden" name="communicantRank" value={commRank} />
         <input type="hidden" name="communicantName" value={commName} />
+        <input type="hidden" name="communicantUserId" value={commUserId} />
 
         {commTab === "buscar" && (
           <div className="space-y-2">

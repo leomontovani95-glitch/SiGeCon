@@ -25,6 +25,7 @@ const STAFF = [
   ...COMANDANTES, ...PARECERISTAS, ...VIEWERS_APM, "CHEFE_CURSO", "PROTOCOLO",
 ];
 
+const RANKING_COMUNICANTES_ROLES = [...COMANDANTES, ...VIEWERS_APM];
 const TIPOS_ROLES = [...COMANDANTES, ...PARECERISTAS];
 
 const DESPACHOS_ROLES = [...COMANDANTES.filter((r) => r !== "ADMINISTRADOR"), ...PARECERISTAS, ...VIEWERS_APM];
@@ -51,7 +52,8 @@ const nav: NavItem[] = [
   { href: "/despachos",    label: "Despachos",            icon: "📨", roles: DESPACHOS_ROLES, hasBadge: true },
   { href: "/alunos",       label: "Alunos",               icon: "👤", roles: STAFF },
   { href: "/caderno",      label: "Caderno Disciplinar",  icon: "📖", roles: STAFF },
-  { href: "/ranking",      label: "Ranking de Conduta",   icon: "🏆", roles: STAFF },
+  { href: "/ranking",             label: "Ranking de Conduta",      icon: "🏆", roles: STAFF },
+  { href: "/ranking/comunicantes", label: "Ranking de Comunicantes", icon: "📣", roles: RANKING_COMUNICANTES_ROLES },
   { href: "/relatorios",   label: "Relatórios",           icon: "📈", roles: STAFF },
   { href: "/usuarios",     label: "Usuários",             icon: "👥", roles: COMANDANTES },
   { href: "/cursos",       label: "Cursos",               icon: "🎓", roles: COMANDANTES },

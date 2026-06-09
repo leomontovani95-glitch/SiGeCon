@@ -26,7 +26,8 @@ model User {
 
   opinions          Opinion[]
   decisions         Decision[]
-  reportedComms     Communication[] @relation("Reporter")
+  reportedComms     Communication[]    @relation("Reporter")
+  communicantComms  Communication[]    @relation("Communicant")
   auditLogs         AuditLog[]
   disciplinaryBooks DisciplinaryBook[]
   publishedBooks    DisciplinaryBook[] @relation("Publisher")
@@ -138,7 +139,8 @@ model Communication {
   finalScore       Float?
   status           String    @default("REGISTRADA")
   defenseDeadline  DateTime?
-  communicantName  String?
+  communicantName   String?
+  communicantUserId String?
   bgpmNumber     String?
   bgpmYear       String?
   tacEquivalent  String?
@@ -150,6 +152,7 @@ model Communication {
   course                Course                   @relation(fields: [courseId], references: [id])
   platoon               Platoon?                 @relation(fields: [platoonId], references: [id])
   reporter              User                     @relation("Reporter", fields: [reporterId], references: [id])
+  communicantUser       User?                    @relation("Communicant", fields: [communicantUserId], references: [id])
   manualRule            ManualRule?              @relation(fields: [manualRuleId], references: [id])
   witnesses             Witness[]
   attachments           Attachment[]

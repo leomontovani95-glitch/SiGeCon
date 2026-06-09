@@ -31,6 +31,7 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
   const communicantName = communicantRank
     ? `${communicantRank} ${communicantNameRaw}`.trim()
     : communicantNameRaw || null;
+  const communicantUserId = String(formData.get("communicantUserId") ?? "").trim() || null;
 
   // Validações obrigatórias
   if (!studentId)       return { error: "Localize e selecione o aluno pelo número de curso." };
@@ -71,7 +72,7 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
         article: regra.article,
         item: regra.item,
         letter: regra.letter,
-        suggestedScore, communicantName,
+        suggestedScore, communicantName, communicantUserId,
         status: "AGUARDANDO_CIENCIA",
         defenseDeadline: calcularPrazoDefesa(new Date()),
       },
