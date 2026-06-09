@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -30,13 +31,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="theme-color" content="#1e3a5f" />
         <link rel="icon" href="/brasao-apm.png" type="image/png" />
         <link rel="apple-touch-icon" href="/brasao-apm.png" />
-        <script
+      </head>
+      <body className={`${inter.className} h-full bg-gray-50`}>
+        {children}
+        <Script
+          id="sw-register"
+          strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: `if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js'))}`,
           }}
         />
-      </head>
-      <body className={`${inter.className} h-full bg-gray-50`}>{children}</body>
+      </body>
     </html>
   );
 }
