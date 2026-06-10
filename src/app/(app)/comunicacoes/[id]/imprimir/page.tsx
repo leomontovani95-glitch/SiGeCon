@@ -169,7 +169,11 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
             <div className="print-field"><label>Comunicante</label><span>{comm.communicantName ?? "—"}</span></div>
           </div>
         )}
-        <div className="print-grid" style={{ marginTop: 8 }}>
+      </div>
+
+      <div className="print-section">
+        <h2>Registro da Comunicação</h2>
+        <div className="print-grid">
           <div className="print-field"><label>Registrado por</label><span>{comm.reporter.rank} {comm.reporter.warName}</span></div>
           <div className="print-field"><label>Data do registro</label><span>{format(new Date(comm.createdAt), "dd/MM/yyyy", { locale: ptBR })}</span></div>
         </div>
