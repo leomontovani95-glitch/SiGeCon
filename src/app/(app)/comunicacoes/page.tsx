@@ -105,6 +105,18 @@ const COLS: Record<string, (d: Dir) => object> = {
   status:         (d) => ({ status: d }),
 };
 
+const PAGE_SIZE = 30;
+
+function getPageNumbers(current: number, total: number): (number | "...")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | "...")[] = [1];
+  if (current > 3) pages.push("...");
+  for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) pages.push(i);
+  if (current < total - 2) pages.push("...");
+  pages.push(total);
+  return pages;
+}
+
 export default async function ComunicacoesPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const session = await verifySession();
   const sp = await searchParams;
@@ -114,6 +126,8 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
   const tipo    = sp.tipo    ?? "";
   const col     = sp.col in COLS ? sp.col : "";
   const dir: Dir = sp.dir === "asc" ? "asc" : "desc";
+  const pageRaw  = parseInt(sp.page ?? "1", 10);
+  const page     = isNaN(pageRaw) || pageRaw < 1 ? 1 : pageRaw;
 
   const school = getSchoolFilter(session.role, session.escola);
 
@@ -164,8 +178,9 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
     disciplinaryBookItems: { include: { disciplinaryBook: { select: { status: true } } } },
   } as const;
 
-  const [comunicacoes, comunicacoesRegistradas] = await Promise.all([
-    prisma.communication.findMany({ where, orderBy, include: includeComm, take: 200 }),
+  const [comunicacoes, totalComms, comunicacoesRegistradas] = await Promise.all([
+    prisma.communication.findMany({ where, orderBy, include: includeComm, skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
+    prisma.communication.count({ where }),
     isEsfoCFO
       ? prisma.communication.findMany({
           where: { communicantUserId: session.userId },
@@ -184,6 +199,8 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
     if (!porCurso.has(cid)) { cursosOrdem.push(cid); porCurso.set(cid, { nome: c.course.name, itens: [] }); }
     porCurso.get(cid)!.itens.push(c);
   }
+
+  const totalPages = Math.ceil(totalComms / PAGE_SIZE);
 
   const canCreate = session.role !== "ALUNO";
   const cursoSelecionado = cursosDisponiveis.find((c) => c.id === cursoId);
@@ -232,7 +249,7 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
           <h1 className="text-2xl font-bold text-gray-900">Comunicações</h1>
           <p className="text-sm text-gray-500">
             {cursoSelecionado ? cursoSelecionado.name : labelEscopo}
-            {" · "}{comunicacoes.length} resultado(s)
+            {" · "}{totalComms} resultado(s)
           </p>
         </div>
         {canCreate && (
@@ -363,6 +380,44 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
           </div>
         );
       })}
+
+      {/* Paginação */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-2 mb-8">
+          <p className="text-sm text-gray-500">
+            Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, totalComms)} de {totalComms} registro(s)
+          </p>
+          <div className="flex items-center gap-1">
+            <Link
+              href={page > 1 ? buildUrl({ page: String(page - 1) }) : "#"}
+              className={`px-3 py-1.5 rounded text-sm border ${page <= 1 ? "border-gray-100 text-gray-300 pointer-events-none" : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"}`}
+              aria-disabled={page <= 1}
+            >
+              ← Anterior
+            </Link>
+            {getPageNumbers(page, totalPages).map((p, i) =>
+              p === "..." ? (
+                <span key={`el-${i}`} className="px-2 text-sm text-gray-400">…</span>
+              ) : (
+                <Link
+                  key={p}
+                  href={buildUrl({ page: String(p) })}
+                  className={`w-9 h-9 flex items-center justify-center rounded text-sm border ${p === page ? "bg-[#1e3a5f] text-white border-[#1e3a5f] font-semibold" : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"}`}
+                >
+                  {p}
+                </Link>
+              )
+            )}
+            <Link
+              href={page < totalPages ? buildUrl({ page: String(page + 1) }) : "#"}
+              className={`px-3 py-1.5 rounded text-sm border ${page >= totalPages ? "border-gray-100 text-gray-300 pointer-events-none" : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"}`}
+              aria-disabled={page >= totalPages}
+            >
+              Próxima →
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* ── Comunicações registradas como comunicante (CFO EsFO) ────────── */}
       {isEsfoCFO && (() => {
