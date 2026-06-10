@@ -21,7 +21,10 @@ const ROLE_LABELS: Record<string, string> = {
 export default async function PerfilPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const session = await verifySession();
   const sp = await searchParams;
-  const user = await prisma.user.findUnique({ where: { id: session.userId } });
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId },
+    include: { student: { include: { course: true } } },
+  });
   if (!user) return null;
 
   const mustChange = sp.mustChange === "1" || user.mustChangePassword;
@@ -33,6 +36,10 @@ export default async function PerfilPage({ searchParams }: { searchParams: Promi
     { label: "RG",              value: user.rg },
     { label: "Nº Funcional",    value: user.functionalNumber },
     { label: "Função",          value: ROLE_LABELS[user.role] ?? user.role },
+    ...(user.role === "ALUNO"
+      ? [{ label: "Curso", value: user.student?.course?.name ?? "—" }]
+      : []
+    ),
     { label: "Situação",        value: user.active ? "Ativo" : "Inativo" },
   ];
 
