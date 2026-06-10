@@ -21,6 +21,7 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
       defenses: true,
       opinions: { include: { author: true, attachments: true } },
       decisions: { include: { authority: true, attachments: true } },
+      communicantUser: { include: { student: { include: { course: true, platoon: true } } } },
     },
   });
   if (!comm) notFound();
@@ -144,8 +145,31 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
 
       <div className="print-section">
         <h2>Comunicante</h2>
-        <div className="print-grid">
-          <div className="print-field"><label>Comunicante</label><span>{comm.communicantName ?? "—"}</span></div>
+        {comm.communicantUser ? (
+          /* Comunicante cadastrado — exibir dados completos */
+          <div className="print-grid">
+            <div className="print-field"><label>Nome completo</label><span>{comm.communicantUser.fullName}</span></div>
+            <div className="print-field"><label>Nome de guerra</label><span>{comm.communicantUser.warName}</span></div>
+            <div className="print-field"><label>Posto/Graduação</label><span>{comm.communicantUser.rank}</span></div>
+            <div className="print-field"><label>RG</label><span>{comm.communicantUser.rg}</span></div>
+            {comm.communicantUser.functionalNumber && (
+              <div className="print-field"><label>Nº Funcional</label><span>{comm.communicantUser.functionalNumber}</span></div>
+            )}
+            {comm.communicantUser.student && (
+              <>
+                <div className="print-field"><label>Curso</label><span>{comm.communicantUser.student.course.name}</span></div>
+                <div className="print-field"><label>Nº de curso</label><span>{comm.communicantUser.student.courseNumber}</span></div>
+                <div className="print-field"><label>Pelotão</label><span>{comm.communicantUser.student.platoon?.name ?? "—"}</span></div>
+              </>
+            )}
+          </div>
+        ) : (
+          /* Comunicante preenchido manualmente */
+          <div className="print-grid">
+            <div className="print-field"><label>Comunicante</label><span>{comm.communicantName ?? "—"}</span></div>
+          </div>
+        )}
+        <div className="print-grid" style={{ marginTop: 8 }}>
           <div className="print-field"><label>Registrado por</label><span>{comm.reporter.rank} {comm.reporter.warName}</span></div>
           <div className="print-field"><label>Data do registro</label><span>{format(new Date(comm.createdAt), "dd/MM/yyyy", { locale: ptBR })}</span></div>
         </div>
