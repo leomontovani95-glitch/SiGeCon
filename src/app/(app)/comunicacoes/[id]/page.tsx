@@ -49,8 +49,14 @@ export default async function ComunicacaoPage({
 
   if (session.role === "ALUNO") {
     const ehEsteAluno = comm.student.userId === session.userId;
-    if (!ehEsteAluno) notFound();
+    const ehComunicanteRegistrado = comm.communicantUserId === session.userId;
+    if (!ehEsteAluno && !ehComunicanteRegistrado) notFound();
   }
+
+  // True quando o ALUNO logado é o comunicante (não o aluno comunicado)
+  const ehComunicante = session.role === "ALUNO"
+    && comm.communicantUserId === session.userId
+    && comm.student.userId !== session.userId;
 
   const cadernoPublicado = comm.status === "PUBLICADA_CADERNO"
     ? await prisma.disciplinaryBook.findFirst({
@@ -64,6 +70,47 @@ export default async function ComunicacaoPage({
   const tomouCienciaComDefesa = comm.defenses.length > 0;
   const tomouCienciaSemDefesa = comm.acknowledgements.some((a) => a.method === "SEM_DEFESA");
   const mostrarSecaoDefesa = tomouCienciaComDefesa || tomouCienciaSemDefesa;
+
+  const timelineSteps = [
+    { label: "Registrada", date: comm.createdAt as Date | null, done: true, color: "bg-blue-500", hideComunicante: false },
+    ...(comm.defenseDeadline || comm.acknowledgements.length > 0 || comm.defenses.length > 0 ? [{
+      label: comm.defenseDeadline
+        ? `Enviada para Ciência/Defesa — Prazo: ${format(new Date(comm.defenseDeadline), "dd/MM/yyyy", { locale: ptBR })}`
+        : "Enviada para Ciência/Defesa do Aluno",
+      date: null as Date | null,
+      done: comm.acknowledgements.length > 0 || comm.defenses.length > 0 || !["REGISTRADA", "AGUARDANDO_CIENCIA", "AGUARDANDO_DEFESA"].includes(comm.status),
+      color: "bg-yellow-500",
+      hideComunicante: false,
+    }] : []),
+    ...(comm.acknowledgements.length > 0 || comm.defenses.length > 0 ? [{
+      label: comm.defenses.length > 0 ? "Defesa Apresentada pelo Aluno" : "Ciência Registrada (sem defesa)",
+      date: comm.defenses[0]?.submittedAt ?? comm.acknowledgements[0]?.acknowledgedAt ?? null,
+      done: true,
+      color: "bg-amber-500",
+      hideComunicante: true,
+    }] : []),
+    ...(comm.opinions.length > 0 ? [{
+      label: "Parecer Emitido",
+      date: comm.opinions[0].createdAt as Date | null,
+      done: true,
+      color: "bg-purple-500",
+      hideComunicante: true,
+    }] : []),
+    ...(comm.decisions.length > 0 ? [{
+      label: comm.decisions[0].decisionType,
+      date: comm.decisions[0].decidedAt as Date | null,
+      done: true,
+      color: "bg-green-500",
+      hideComunicante: true,
+    }] : []),
+    ...(cadernoPublicado ? [{
+      label: "Publicada em Caderno Disciplinar",
+      date: cadernoPublicado.publicationDate as Date | null,
+      done: true,
+      color: "bg-teal-500",
+      hideComunicante: false,
+    }] : []),
+  ].filter((s) => !ehComunicante || !s.hideComunicante);
 
   return (
     <div className="p-6 max-w-4xl">
@@ -84,12 +131,23 @@ export default async function ComunicacaoPage({
             )}
           </div>
         </div>
+        {!ehComunicante && (
         <div className="flex gap-2 flex-wrap justify-end">
           <Link href={`/comunicacoes/${comm.id}/imprimir`} target="_blank" className="btn-secondary text-xs">
             Gerar PDF
           </Link>
         </div>
+      )}
       </div>
+
+      {ehComunicante && (
+        <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl px-5 py-4 flex items-start gap-3">
+          <span className="text-blue-500 text-lg mt-0.5">ℹ</span>
+          <p className="text-sm text-blue-800">
+            Você está visualizando esta comunicação como <strong>comunicante</strong>. A defesa do aluno, o parecer e a decisão do Comandante são restritos ao processo interno.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
@@ -126,7 +184,7 @@ export default async function ComunicacaoPage({
         <p className="text-sm text-gray-700 whitespace-pre-wrap">{comm.factDescription}</p>
       </div>
 
-      {(comm.bgpmNumber || comm.tacEquivalent) && (
+      {!ehComunicante && (comm.bgpmNumber || comm.tacEquivalent) && (
         <div className="bg-orange-50 rounded-xl border border-orange-200 p-4 mb-4">
           <h2 className="text-xs font-semibold text-orange-700 uppercase tracking-wide mb-2">Publicação em BGPM</h2>
           {comm.bgpmNumber && comm.bgpmYear && (
@@ -151,46 +209,7 @@ export default async function ComunicacaoPage({
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
         <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Histórico de Tramitação</h2>
         <ol className="relative border-l border-gray-200 ml-3 space-y-3">
-          {[
-            {
-              label: "Registrada",
-              date: comm.createdAt,
-              done: true,
-              color: "bg-blue-500",
-            },
-            ...(comm.defenseDeadline || comm.acknowledgements.length > 0 || comm.defenses.length > 0 ? [{
-              label: comm.defenseDeadline
-                ? `Enviada para Ciência/Defesa — Prazo: ${format(new Date(comm.defenseDeadline), "dd/MM/yyyy", { locale: ptBR })}`
-                : "Enviada para Ciência/Defesa do Aluno",
-              date: null as Date | null,
-              done: comm.acknowledgements.length > 0 || comm.defenses.length > 0 || !["REGISTRADA", "AGUARDANDO_CIENCIA", "AGUARDANDO_DEFESA"].includes(comm.status),
-              color: "bg-yellow-500",
-            }] : []),
-            ...(comm.acknowledgements.length > 0 || comm.defenses.length > 0 ? [{
-              label: comm.defenses.length > 0 ? "Defesa Apresentada pelo Aluno" : "Ciência Registrada (sem defesa)",
-              date: comm.defenses[0]?.submittedAt ?? comm.acknowledgements[0]?.acknowledgedAt ?? null,
-              done: true,
-              color: "bg-amber-500",
-            }] : []),
-            ...(comm.opinions.length > 0 ? [{
-              label: "Parecer Emitido",
-              date: comm.opinions[0].createdAt,
-              done: true,
-              color: "bg-purple-500",
-            }] : []),
-            ...(comm.decisions.length > 0 ? [{
-              label: comm.decisions[0].decisionType,
-              date: comm.decisions[0].decidedAt,
-              done: true,
-              color: "bg-green-500",
-            }] : []),
-            ...(cadernoPublicado ? [{
-              label: "Publicada em Caderno Disciplinar",
-              date: cadernoPublicado.publicationDate,
-              done: true,
-              color: "bg-teal-500",
-            }] : []),
-          ].map((step, idx) => (
+          {timelineSteps.map((step, idx) => (
             <li key={idx} className="ml-4">
               <span className={`absolute -left-1.5 mt-1.5 h-3 w-3 rounded-full border-2 border-white ${step.done ? step.color : "bg-gray-200"}`} />
               <p className={`text-sm font-medium ${step.done ? "text-gray-900" : "text-gray-400"}`}>{step.label}</p>
@@ -214,7 +233,7 @@ export default async function ComunicacaoPage({
         </div>
       )}
 
-      {comm.acknowledgements.some((a) => a.method === "PRAZO_EXPIRADO") && (
+      {!ehComunicante && comm.acknowledgements.some((a) => a.method === "PRAZO_EXPIRADO") && (
         <div className="bg-red-50 rounded-xl border border-red-300 p-4 mb-4">
           <h2 className="text-xs font-semibold text-red-700 uppercase tracking-wide mb-1">
             ⚠ Encaminhamento Automático por Prazo Expirado
@@ -230,8 +249,8 @@ export default async function ComunicacaoPage({
         </div>
       )}
 
-      {/* Posição do aluno — visível para todos após a ciência */}
-      {mostrarSecaoDefesa && (
+      {/* Posição do aluno — oculto para o comunicante */}
+      {!ehComunicante && mostrarSecaoDefesa && (
         <div className="bg-amber-50 rounded-xl border border-amber-200 p-4 mb-4">
           <h2 className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">Posição do Aluno</h2>
           {tomouCienciaComDefesa ? (
@@ -268,7 +287,7 @@ export default async function ComunicacaoPage({
         </div>
       )}
 
-      {comm.opinions.length > 0 && (
+      {!ehComunicante && comm.opinions.length > 0 && (
         <div className="bg-purple-50 rounded-xl border border-purple-200 p-4 mb-4">
           <h2 className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-2">Parecer</h2>
           {comm.opinions.map((o) => (
@@ -299,7 +318,7 @@ export default async function ComunicacaoPage({
         </div>
       )}
 
-      {comm.decisions.length > 0 && (
+      {!ehComunicante && comm.decisions.length > 0 && (
         <div className="bg-green-50 rounded-xl border border-green-200 p-4 mb-4">
           <h2 className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-2">Decisão do Comandante</h2>
           {comm.decisions.map((d) => (
@@ -334,7 +353,7 @@ export default async function ComunicacaoPage({
       )}
 
       {/* Formulário de parecer — componente independente para hidratação isolada */}
-      {canEmitOpinion(session.role, session.additionalRoles) &&
+      {!ehComunicante && canEmitOpinion(session.role, session.additionalRoles) &&
         comm.status === "AGUARDANDO_PARECER" &&
         comm.opinions.length === 0 && (
           <ParecerForm
@@ -349,7 +368,7 @@ export default async function ComunicacaoPage({
           />
         )}
 
-      <AcoesComm
+      {!ehComunicante && <AcoesComm
         comm={{
           id: comm.id,
           status: comm.status,
@@ -372,7 +391,7 @@ export default async function ComunicacaoPage({
           letter: r.letter ?? null,
           description: r.description,
         }))}
-      />
+      />}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { verifySession, getSchoolFilter } from "@/lib/dal";
+import { verifySession, getSchoolFilter, ESFO_CFO_RANK } from "@/lib/dal";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import Link from "next/link";
@@ -141,9 +141,16 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
   }
   if (cursoId)      where.courseId = cursoId;
   else if (school)  where.course   = { school };
+  let isEsfoCFO = false;
   if (session.role === "ALUNO") {
-    const aluno = await prisma.student.findFirst({ where: { userId: session.userId } });
-    if (aluno) where.studentId = aluno.id;
+    const aluno = await prisma.student.findFirst({
+      where: { userId: session.userId },
+      include: { course: true },
+    });
+    if (aluno) {
+      where.studentId = aluno.id;
+      isEsfoCFO = aluno.course.name in ESFO_CFO_RANK;
+    }
   }
 
   // orderBy: coluna escolhida → courseId → createdAt
@@ -151,16 +158,23 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
     ? [COLS[col](dir), { courseId: "asc" as const }, { createdAt: "desc" as const }]
     : [{ courseId: "asc" as const }, { createdAt: "desc" as const }];
 
-  const comunicacoes = await prisma.communication.findMany({
-    where,
-    orderBy,
-    include: {
-      type: true, student: true, reporter: true, course: true,
-      decisions: { select: { decisionType: true } },
-      disciplinaryBookItems: { include: { disciplinaryBook: { select: { status: true } } } },
-    },
-    take: 200,
-  });
+  const includeComm = {
+    type: true, student: true, reporter: true, course: true,
+    decisions: { select: { decisionType: true } },
+    disciplinaryBookItems: { include: { disciplinaryBook: { select: { status: true } } } },
+  } as const;
+
+  const [comunicacoes, comunicacoesRegistradas] = await Promise.all([
+    prisma.communication.findMany({ where, orderBy, include: includeComm, take: 200 }),
+    isEsfoCFO
+      ? prisma.communication.findMany({
+          where: { communicantUserId: session.userId },
+          orderBy: [{ courseId: "asc" as const }, { createdAt: "desc" as const }],
+          include: includeComm,
+          take: 100,
+        })
+      : Promise.resolve([] as Awaited<ReturnType<typeof prisma.communication.findMany<{ include: typeof includeComm }>>>),
+  ]);
 
   // Agrupa por curso
   const cursosOrdem: string[] = [];
@@ -349,6 +363,86 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
           </div>
         );
       })}
+
+      {/* ── Comunicações registradas como comunicante (CFO EsFO) ────────── */}
+      {isEsfoCFO && (() => {
+        const regOrdem: string[] = [];
+        const regPorCurso = new Map<string, { nome: string; itens: typeof comunicacoesRegistradas }>();
+        for (const c of comunicacoesRegistradas) {
+          const cid = c.courseId;
+          if (!regPorCurso.has(cid)) { regOrdem.push(cid); regPorCurso.set(cid, { nome: c.course.name, itens: [] }); }
+          regPorCurso.get(cid)!.itens.push(c);
+        }
+        return (
+          <div className="mt-10">
+            <div className="flex items-start justify-between mb-5 flex-wrap gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Comunicações que registrei</h1>
+                <p className="text-sm text-gray-500">{comunicacoesRegistradas.length} registro(s)</p>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <Link href="/comunicacoes/nova/cpi" className="bg-[#1e3a5f] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#16304f] transition-colors">+ Nova CPI</Link>
+                <Link href="/comunicacoes/nova/referencia" className="border border-[#1e3a5f] text-[#1e3a5f] px-4 py-2 rounded-lg text-sm hover:bg-blue-50 transition-colors">+ Ref. Elogiosa</Link>
+              </div>
+            </div>
+
+            {comunicacoesRegistradas.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-200 px-6 py-10 text-center text-gray-400">
+                Você ainda não registrou nenhuma comunicação como comunicante.
+              </div>
+            ) : (
+              regOrdem.map((cid) => {
+                const grupo = regPorCurso.get(cid)!;
+                return (
+                  <div key={cid} className="mb-8">
+                    {regOrdem.length > 1 && (
+                      <div className="flex items-center gap-3 mb-2">
+                        <h2 className="text-base font-bold text-[#1e3a5f] uppercase tracking-wide">{grupo.nome}</h2>
+                        <span className="text-xs text-gray-400 font-normal">{grupo.itens.length} registro(s)</span>
+                      </div>
+                    )}
+                    <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+                      <table className="w-full text-sm min-w-max">
+                        <thead className="bg-gray-50 border-b border-gray-200">
+                          <tr>
+                            <th className={thBase}>Protocolo</th>
+                            <th className={thBase}>Tipo</th>
+                            <th className={thBase}>Nº</th>
+                            <th className={thBase}>Aluno comunicado</th>
+                            <th className={thBase}>Data do Fato</th>
+                            <th className={thBase}>Status</th>
+                            <th className="px-3 py-2.5 w-10"></th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {grupo.itens.map((c) => {
+                            const ds = derivedStatus(c);
+                            return (
+                              <tr key={c.id} className="hover:bg-gray-50">
+                                <td className="px-3 py-2.5 font-mono text-xs text-gray-600 whitespace-nowrap">{c.protocolNumber}</td>
+                                <td className="px-3 py-2.5 text-xs text-gray-600 whitespace-nowrap">{c.type.name}</td>
+                                <td className="px-3 py-2.5 font-mono text-xs text-gray-500 whitespace-nowrap text-center">{c.courseNumber}</td>
+                                <td className="px-3 py-2.5 font-medium text-gray-900 text-xs whitespace-nowrap">{c.student.warName}</td>
+                                <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
+                                <td className="px-3 py-2.5 whitespace-nowrap">
+                                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ds.color}`}>{ds.label}</span>
+                                </td>
+                                <td className="px-3 py-2.5 whitespace-nowrap">
+                                  <Link href={`/comunicacoes/${c.id}`} className="text-xs text-[#1e3a5f] hover:underline font-medium">Ver</Link>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
