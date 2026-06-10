@@ -8,6 +8,7 @@ type NavItem = {
   icon: string;
   roles?: string[];
   hasBadge?: boolean;
+  cfoOnly?: boolean;
 };
 
 const COMANDANTES = [
@@ -48,7 +49,9 @@ const ROLE_LABELS: Record<string, string> = {
 
 const nav: NavItem[] = [
   { href: "/dashboard",    label: "Painel",               icon: "📊" },
-  { href: "/comunicacoes", label: "Comunicações",         icon: "📋", hasBadge: true },
+  { href: "/comunicacoes",             label: "Comunicações",         icon: "📋", hasBadge: true },
+  { href: "/comunicacoes/nova/cpi",       label: "Nova CPI",             icon: "📝", cfoOnly: true },
+  { href: "/comunicacoes/nova/referencia", label: "Nova Ref. Elogiosa",  icon: "⭐", cfoOnly: true },
   { href: "/despachos",    label: "Despachos",            icon: "📨", roles: DESPACHOS_ROLES, hasBadge: true },
   { href: "/alunos",       label: "Alunos",               icon: "👤", roles: STAFF },
   { href: "/caderno",      label: "Caderno Disciplinar",  icon: "📖", roles: STAFF },
@@ -67,15 +70,20 @@ export default function Sidebar({
   rank,
   warName,
   badgeCounts = {},
+  canCreateComm = false,
 }: {
   role: string;
   rank: string;
   warName: string;
   badgeCounts?: Record<string, number>;
+  canCreateComm?: boolean;
 }) {
   const pathname = usePathname();
   const isUnrestricted = ["ADMINISTRADOR", "CHEFE_DIVISAO_ACADEMICA"].includes(role);
-  const visibleNav = nav.filter((item) => isUnrestricted || !item.roles || item.roles.includes(role));
+  const visibleNav = nav.filter((item) =>
+    (isUnrestricted || !item.roles || item.roles.includes(role)) &&
+    (!item.cfoOnly || canCreateComm)
+  );
 
   return (
     <div className="flex flex-col w-64 bg-[#1e3a5f] min-h-screen">

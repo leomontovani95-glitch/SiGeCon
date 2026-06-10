@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/db";
-import { verifyRole, verifySession, canEmitOpinion, canDecide } from "@/lib/dal";
+import { verifyRole, verifySession, canEmitOpinion, canDecide, ESFO_CFO_RANK, cursosPermitidosParaCPI } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
 import { gerarProtocolo } from "@/lib/protocolo";
 import { calcularPrazoDefesa } from "@/lib/prazos";
@@ -16,7 +16,7 @@ const LIMITE_TOTAL_BYTES = 5 * 1024 * 1024; // 5 MB total
 // ── Registrar comunicação (CPI / Referência Elogiosa / Elogio BI) ────────
 export async function registrarComunicacao(_prev: State, formData: FormData): Promise<State> {
   const session = await verifySession();
-  if (session.role === "ALUNO") return { error: "Sem permissão." };
+  const isAluno = session.role === "ALUNO";
 
   const typeId          = String(formData.get("typeId") ?? "").trim();
   const studentId       = String(formData.get("studentId") ?? "").trim();
@@ -51,6 +51,33 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
   ]);
   if (!tipo)  return { error: "Tipo de comunicação não encontrado." };
   if (!aluno) return { error: "Aluno não encontrado." };
+
+  if (isAluno) {
+    // Apenas CPI e Referência Elogiosa são permitidos para alunos
+    const TIPOS_ALUNO = ["CPI 0", "CPI 1", "CPI 2", "CPI 3", "Referência Elogiosa"];
+    if (!TIPOS_ALUNO.includes(tipo.name)) return { error: "Tipo de comunicação não permitido." };
+
+    // Verificar se o aluno comunicante é do CFO (EsFO) e obter seu curso
+    const reporter = await prisma.student.findFirst({
+      where: { userId: session.userId },
+      include: { course: true },
+    });
+    if (!reporter || !(reporter.course.name in ESFO_CFO_RANK)) return { error: "Sem permissão para registrar comunicações." };
+
+    // Comunicante deve ser o próprio aluno
+    if (communicantUserId !== session.userId) return { error: "O comunicante deve ser o próprio aluno." };
+
+    // Aluno não pode comunicar a si mesmo
+    if (aluno.userId === session.userId) return { error: "Não é possível registrar comunicação do próprio aluno." };
+
+    // Verificar se o aluno-alvo está em um curso permitido pela hierarquia
+    const allCourses = await prisma.course.findMany({ where: { active: true }, select: { id: true, name: true, school: true } });
+    const allowedIds = cursosPermitidosParaCPI(reporter.course.name, allCourses);
+    if (!allowedIds.includes(aluno.courseId)) return { error: "Você não tem permissão para comunicar um aluno deste curso." };
+  } else if (session.role === "ALUNO") {
+    // Segurança: garante que nenhum outro aluno chegue aqui
+    return { error: "Sem permissão." };
+  }
 
   const protocolNumber = await gerarProtocolo(tipo.name, aluno.course.name);
   // Testemunhas

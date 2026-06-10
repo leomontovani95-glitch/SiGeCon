@@ -132,6 +132,34 @@ export function manageableRoles(actorRole: string): UserRole[] {
 // Roles com acesso à gestão de usuários (pelo menos uma função gerenciável).
 export const USER_MANAGERS: UserRole[] = Object.keys(USER_ACTOR_LEVEL) as UserRole[];
 
+// ── CPI / Ref. Elogiosa entre alunos da EsFO ─────────────────────────────
+
+// Hierarquia de cursos EsFO (valor maior = posto mais elevado)
+export const ESFO_CFO_RANK: Record<string, number> = {
+  "CFO 3": 3,
+  "CFO 2": 2,
+  "CFO 1": 1,
+};
+
+// Retorna os IDs dos cursos que o aluno pode comunicar, com base no seu curso
+export function cursosPermitidosParaCPI(
+  studentCourseName: string,
+  allCourses: { id: string; name: string; school: string | null }[]
+): string[] {
+  const myRank = ESFO_CFO_RANK[studentCourseName];
+  if (myRank === undefined) return [];
+  return allCourses
+    .filter((c) => {
+      if (c.school === "ESFAP") return true;
+      if (c.school === "ESFO") {
+        const targetRank = ESFO_CFO_RANK[c.name];
+        return targetRank !== undefined && targetRank < myRank;
+      }
+      return false;
+    })
+    .map((c) => c.id);
+}
+
 export function getSchoolFilter(role: string, escolaUsuario?: string | null): string | null {
   // Role-based filters sempre têm precedência (COMANDANTE_ESFAP etc.)
   if (["COMANDANTE_ESFAP", "SUBCOMANDANTE_ESFAP", "OFICIAL_ESFAP"].includes(role)) return "ESFAP";

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { ESFO_CFO_RANK, cursosPermitidosParaCPI } from "@/lib/dal";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -9,6 +10,18 @@ export async function GET(req: NextRequest) {
   const q        = (req.nextUrl.searchParams.get("q")        ?? "").trim();
   const courseId = (req.nextUrl.searchParams.get("courseId") ?? "").trim();
   if (!q) return NextResponse.json({ aluno: null });
+
+  // Aluno CFO: validar se o courseId solicitado está nos cursos permitidos
+  if (session.role === "ALUNO") {
+    if (!courseId) return NextResponse.json({ aluno: null });
+    const [reporter, allCourses] = await Promise.all([
+      prisma.student.findFirst({ where: { userId: session.userId }, include: { course: true } }),
+      prisma.course.findMany({ where: { active: true }, select: { id: true, name: true, school: true } }),
+    ]);
+    if (!reporter || !(reporter.course.name in ESFO_CFO_RANK)) return NextResponse.json({ aluno: null });
+    const allowedIds = cursosPermitidosParaCPI(reporter.course.name, allCourses);
+    if (!allowedIds.includes(courseId)) return NextResponse.json({ aluno: null });
+  }
 
   const aluno = await prisma.student.findFirst({
     where: {

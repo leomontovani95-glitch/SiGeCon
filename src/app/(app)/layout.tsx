@@ -1,4 +1,4 @@
-import { verifySession, getSchoolFilter, COMANDANTES, PARECERISTAS, VIEWERS_APM } from "@/lib/dal";
+import { verifySession, getSchoolFilter, COMANDANTES, PARECERISTAS, VIEWERS_APM, ESFO_CFO_RANK } from "@/lib/dal";
 import { prisma } from "@/lib/db";
 import Sidebar from "@/components/Sidebar";
 
@@ -13,6 +13,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const school = getSchoolFilter(role, session.escola);
   const schoolFilter = school ? { course: { school } } : {};
   const badgeCounts: Record<string, number> = {};
+  let canCreateComm = false;
 
   // ── /despachos badge ─────────────────────────────────────────────────────
   if ((PARECERISTAS as string[]).includes(role)) {
@@ -40,10 +41,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     });
     if (n > 0) badgeCounts["/comunicacoes"] = n;
   } else if (role === "ALUNO") {
-    // Comunicações do aluno aguardando sua ação
+    // Comunicações do aluno aguardando sua ação + verificar se pode criar comunicação
     const student = await prisma.student.findFirst({
       where: { userId: session.userId },
-      select: { id: true },
+      select: { id: true, course: { select: { name: true } } },
     });
     if (student) {
       const n = await prisma.communication.count({
@@ -53,12 +54,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         },
       });
       if (n > 0) badgeCounts["/comunicacoes"] = n;
+      canCreateComm = student.course.name in ESFO_CFO_RANK;
     }
   }
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar role={role} rank={userRank} warName={session.warName} badgeCounts={badgeCounts} />
+      <Sidebar role={role} rank={userRank} warName={session.warName} badgeCounts={badgeCounts} canCreateComm={canCreateComm} />
       <main className="flex-1 overflow-auto bg-gray-50">
         {children}
       </main>

@@ -1,15 +1,43 @@
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { verifyStaff } from "@/lib/dal";
+import { verifySession, verifyStaff, ESFO_CFO_RANK, cursosPermitidosParaCPI } from "@/lib/dal";
 import ComunicacaoForm from "../../_components/ComunicacaoForm";
 
 export default async function NovaCPIPage() {
-  await verifyStaff();
+  const session = await verifySession();
+  const isAluno = session.role === "ALUNO";
+
+  let comunicanteFixo: { userId: string; rank: string; name: string; fullName: string; detail: string } | undefined;
+  let allowedCourseIds: string[] | undefined;
+
+  if (isAluno) {
+    const [student, allCourses] = await Promise.all([
+      prisma.student.findFirst({
+        where: { userId: session.userId },
+        include: { course: true, user: true },
+      }),
+      prisma.course.findMany({ where: { active: true }, select: { id: true, name: true, school: true } }),
+    ]);
+    if (!student) redirect("/acesso-negado");
+    if (!(student.course.name in ESFO_CFO_RANK)) redirect("/acesso-negado");
+
+    allowedCourseIds = cursosPermitidosParaCPI(student.course.name, allCourses);
+    comunicanteFixo = {
+      userId: session.userId,
+      rank: student.user?.rank ?? "",
+      name: student.warName,
+      fullName: student.fullName,
+      detail: `Nº ${student.courseNumber} | ${student.course.name}`,
+    };
+  } else {
+    await verifyStaff();
+  }
+
   const [tipos, regras, cursos] = await Promise.all([
     prisma.communicationType.findMany({
       where: { active: true, name: { in: ["CPI 0", "CPI 1", "CPI 2", "CPI 3"] } },
       orderBy: { name: "asc" },
     }),
-    // Art. 142 a 154 — transgressões escolares
     prisma.manualRule.findMany({
       where: {
         active: true,
@@ -18,14 +46,18 @@ export default async function NovaCPIPage() {
       orderBy: [{ article: "asc" }, { item: "asc" }, { letter: "asc" }],
     }),
     prisma.course.findMany({
-      where: { active: true },
+      where: {
+        active: true,
+        ...(allowedCourseIds !== undefined ? { id: { in: allowedCourseIds } } : {}),
+      },
       orderBy: { name: "asc" },
     }),
   ]);
+
   return (
     <div className="p-6 max-w-3xl">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Nova CPI</h1>
-      <ComunicacaoForm tipos={tipos} regras={regras} cursos={cursos} />
+      <ComunicacaoForm tipos={tipos} regras={regras} cursos={cursos} comunicanteFixo={comunicanteFixo} />
     </div>
   );
 }
