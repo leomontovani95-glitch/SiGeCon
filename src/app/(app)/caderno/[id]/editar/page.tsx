@@ -3,10 +3,10 @@ import { verifyRole, getSchoolFilter } from "@/lib/dal";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import Link from "next/link";
 import PublicarBtn from "../../_components/PublicarBtn";
 import RemoverItemBtn from "../../_components/RemoverItemBtn";
 import AdicionarItemBtn from "../../_components/AdicionarItemBtn";
-import Link from "next/link";
 
 export default async function EditarCadernoPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await verifyRole(
@@ -180,7 +180,9 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
                   {pendentesDisponiveis.map((c) => (
                     <tr key={c.id} className="hover:bg-yellow-50">
                       <td className="px-3 py-2 font-mono text-xs text-gray-500">{c.protocolNumber}</td>
-                      <td className="px-3 py-2 font-medium text-gray-900">{c.student.warName}</td>
+                      <td className="px-3 py-2 font-medium text-gray-900">
+                        <Link href={`/alunos/${c.student.id}`} className="hover:text-[#1e3a5f] hover:underline">{c.student.warName}</Link>
+                      </td>
                       <td className="px-3 py-2 text-xs text-gray-600">{c.student.course.name}</td>
                       <td className="px-3 py-2 text-xs text-gray-600">{c.type.name}</td>
                       <td className="px-3 py-2 text-xs text-gray-600">{c.decisions[0]?.decisionType ?? "—"}</td>

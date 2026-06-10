@@ -20,11 +20,6 @@ export default async function AlunoPage({ params }: { params: Promise<{ id: stri
   const session = await verifySession();
   const { id } = await params;
 
-  if (session.role === "ALUNO") {
-    const aluno = await prisma.student.findFirst({ where: { id, userId: session.userId } });
-    if (!aluno) notFound();
-  }
-
   const [aluno, pubItems, provisItems] = await Promise.all([
     prisma.student.findUnique({
       where: { id },
@@ -78,6 +73,24 @@ export default async function AlunoPage({ params }: { params: Promise<{ id: stri
             <Link href={`/alunos/${aluno.id}/editar`} className="btn-secondary text-xs">Editar</Link>
           )}
         </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Dados Cadastrais</h2>
+        <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3">
+          {[
+            { label: "RG",           value: aluno.rg },
+            { label: "Nº Funcional", value: aluno.functionalNumber },
+            { label: "CPF",          value: aluno.cpf },
+            { label: "E-mail",       value: aluno.email },
+            { label: "Situação",     value: aluno.status === "ATIVO" ? "Ativo" : aluno.status === "INATIVO" ? "Inativo" : aluno.status },
+          ].map(({ label, value }) => (
+            <div key={label}>
+              <dt className="text-xs text-gray-500">{label}</dt>
+              <dd className="mt-0.5 text-sm font-medium text-gray-900">{value ?? "—"}</dd>
+            </div>
+          ))}
+        </dl>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">

@@ -22,6 +22,7 @@ type CommEntry = {
     id: string; rank: string; warName: string; fullName: string;
     rg: string; functionalNumber: string; role: string;
     student: {
+      id: string;
       courseNumber: string;
       course: { name: string };
       platoon: { name: string } | null;
@@ -81,6 +82,7 @@ export default async function RankingComunicantesPage({
           rg: true, functionalNumber: true, role: true,
           student: {
             select: {
+              id: true,
               courseNumber: true,
               course: { select: { name: true } },
               platoon: { select: { name: true } },
@@ -278,9 +280,18 @@ export default async function RankingComunicantesPage({
                       </span>
                     </td>
                     <td className="px-3 py-2.5 font-medium text-gray-900 whitespace-nowrap">
-                      {nomeGuerra}
-                      {isManual && (
-                        <span className="ml-1.5 text-xs text-amber-600 font-normal">(manual)</span>
+                      {!isManual ? (
+                        <Link
+                          href={isAluno && u!.student?.id ? `/alunos/${u!.student.id}` : `/usuarios/${u!.id}`}
+                          className="hover:text-[#1e3a5f] hover:underline"
+                        >
+                          {nomeGuerra}
+                        </Link>
+                      ) : (
+                        <>
+                          {nomeGuerra}
+                          <span className="ml-1.5 text-xs text-amber-600 font-normal">(manual)</span>
+                        </>
                       )}
                     </td>
                     <td className="px-3 py-2.5 text-gray-600 font-mono text-xs">{rg}</td>

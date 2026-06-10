@@ -409,7 +409,9 @@ export default async function DashboardPage({
                   return (
                     <tr key={c.id} className="bg-red-50 hover:bg-red-100 transition-colors">
                       <td className="px-4 py-2.5 font-mono text-xs text-gray-600">{c.protocolNumber}</td>
-                      <td className="px-4 py-2.5 font-semibold text-gray-900">{c.student.warName}</td>
+                      <td className="px-4 py-2.5 font-semibold text-gray-900">
+                        <Link href={`/alunos/${c.student.id}`} className="hover:text-[#1e3a5f] hover:underline">{c.student.warName}</Link>
+                      </td>
                       <td className="px-4 py-2.5 text-xs text-gray-500">{c.type.name}</td>
                       <td className="px-4 py-2.5 text-xs text-red-700 font-medium">
                         {format(prazo, "dd/MM/yyyy", { locale: ptBR })}

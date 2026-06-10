@@ -55,8 +55,12 @@ export default async function UsuariosPage() {
           <tbody className="divide-y divide-gray-100">
             {usuarios.map((u) => (
               <tr key={u.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium text-gray-900">{u.fullName}</td>
-                <td className="px-4 py-3 text-gray-600">{u.warName}</td>
+                <td className="px-4 py-3 font-medium text-gray-900">
+                  <Link href={`/usuarios/${u.id}`} className="hover:text-[#1e3a5f] hover:underline">{u.fullName}</Link>
+                </td>
+                <td className="px-4 py-3 text-gray-600">
+                  <Link href={`/usuarios/${u.id}`} className="hover:text-[#1e3a5f] hover:underline">{u.warName}</Link>
+                </td>
                 <td className="px-4 py-3 text-gray-600">{u.rank}</td>
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">

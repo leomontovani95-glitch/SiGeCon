@@ -426,7 +426,9 @@ export default async function RelatoriosPage({
                   </td>
                   <td className="px-3 py-2.5 text-xs text-gray-600 whitespace-nowrap">{c.type.name}</td>
                   <td className="px-3 py-2.5 text-xs font-mono text-gray-500 whitespace-nowrap">{dispositivo}</td>
-                  <td className="px-3 py-2.5 text-xs font-medium text-gray-900 whitespace-nowrap">{c.student.warName}</td>
+                  <td className="px-3 py-2.5 text-xs font-medium text-gray-900 whitespace-nowrap">
+                    <Link href={`/alunos/${c.student.id}`} className="hover:text-[#1e3a5f] hover:underline">{c.student.warName}</Link>
+                  </td>
                   <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{c.student.course.name}</td>
                   <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">
                     {format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}

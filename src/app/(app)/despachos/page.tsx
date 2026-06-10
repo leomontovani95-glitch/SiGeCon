@@ -152,7 +152,9 @@ export default async function DespachoPage({
                 <tr key={c.id} className="hover:bg-gray-50">
                   <td className="px-3 py-2.5 font-mono text-xs text-gray-700 whitespace-nowrap">{c.protocolNumber}</td>
                   <td className="px-3 py-2.5 text-xs text-gray-600 whitespace-nowrap">{c.type.name}</td>
-                  <td className="px-3 py-2.5 text-xs font-medium text-gray-900 whitespace-nowrap">{c.student.warName}</td>
+                  <td className="px-3 py-2.5 text-xs font-medium text-gray-900 whitespace-nowrap">
+                    <Link href={`/alunos/${c.student.id}`} className="hover:text-[#1e3a5f] hover:underline">{c.student.warName}</Link>
+                  </td>
                   <td className="px-3 py-2.5 font-mono text-xs text-gray-500 whitespace-nowrap">{c.courseNumber}</td>
                   <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">
                     {format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}

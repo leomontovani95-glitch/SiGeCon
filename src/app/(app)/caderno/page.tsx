@@ -203,7 +203,9 @@ export default async function CadernoPage({
                 {naoIncluidos.map((c) => (
                   <tr key={c.id} className="hover:bg-yellow-50">
                     <td className="px-4 py-2.5 font-mono text-xs text-gray-500">{c.protocolNumber}</td>
-                    <td className="px-4 py-2.5 font-medium text-gray-900">{c.student.warName}</td>
+                    <td className="px-4 py-2.5 font-medium text-gray-900">
+                      <Link href={`/alunos/${c.student.id}`} className="hover:text-[#1e3a5f] hover:underline">{c.student.warName}</Link>
+                    </td>
                     <td className="px-4 py-2.5 text-xs text-gray-600">{c.student.course.name}</td>
                     <td className="px-4 py-2.5 text-xs text-gray-600">{c.type.name}</td>
                     <td className="px-4 py-2.5 text-xs text-gray-600">{c.decisions[0]?.decisionType ?? "—"}</td>

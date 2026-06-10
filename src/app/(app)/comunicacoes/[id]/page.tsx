@@ -42,6 +42,7 @@ export default async function ComunicacaoPage({
         defenses: { include: { attachments: true } },
         opinions: { include: { author: true, attachments: true } },
         decisions: { include: { authority: true, attachments: true } },
+        communicantUser: { select: { id: true, role: true, student: { select: { id: true } } } },
       },
     }),
   ]);
@@ -152,7 +153,7 @@ export default async function ComunicacaoPage({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Aluno / Comunicado</h2>
-          <p className="font-semibold text-gray-900">{comm.student.warName}</p>
+          <Link href={`/alunos/${comm.student.id}`} className="font-semibold text-gray-900 hover:text-[#1e3a5f] hover:underline">{comm.student.warName}</Link>
           <p className="text-sm text-gray-600">{comm.student.fullName}</p>
           <p className="text-sm text-gray-500">{comm.student.course.name} — Nº {comm.courseNumber}</p>
           {comm.student.platoon && <p className="text-sm text-gray-500">{comm.student.platoon.name}</p>}
@@ -166,7 +167,27 @@ export default async function ComunicacaoPage({
           <p className="text-sm text-gray-700"><span className="font-medium">Data:</span> {format(new Date(comm.factDate), "dd/MM/yyyy", { locale: ptBR })}</p>
           {comm.factTime && <p className="text-sm text-gray-700"><span className="font-medium">Hora:</span> {comm.factTime}</p>}
           {comm.factPlace && <p className="text-sm text-gray-700"><span className="font-medium">Local:</span> {comm.factPlace}</p>}
-          <p className="text-sm text-gray-700"><span className="font-medium">Comunicante:</span> {comm.communicantName ?? comm.reporter.warName}</p>
+          <p className="text-sm text-gray-700">
+            <span className="font-medium">Comunicante:</span>{" "}
+            {comm.communicantName ? (
+              comm.communicantUserId ? (
+                <Link
+                  href={comm.communicantUser?.role === "ALUNO" && comm.communicantUser.student?.id
+                    ? `/alunos/${comm.communicantUser.student.id}`
+                    : `/usuarios/${comm.communicantUserId}`}
+                  className="text-[#1e3a5f] hover:underline"
+                >
+                  {comm.communicantName}
+                </Link>
+              ) : (
+                comm.communicantName
+              )
+            ) : (
+              <Link href={`/usuarios/${comm.reporter.id}`} className="text-[#1e3a5f] hover:underline">
+                {comm.reporter.warName}
+              </Link>
+            )}
+          </p>
           {comm.defenseDeadline && (
             <p className="text-sm text-gray-700">
               <span className="font-medium">Prazo ciência/defesa:</span>{" "}

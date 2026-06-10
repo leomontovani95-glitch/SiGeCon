@@ -171,7 +171,7 @@ export default async function CursoAlunosPage({
                 <tr key={a.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">
                     <span className="text-xs text-gray-400 font-normal mr-1">{rankAluno(course.name)}</span>
-                    {a.warName}
+                    <Link href={`/alunos/${a.id}`} className="hover:text-[#1e3a5f] hover:underline">{a.warName}</Link>
                   </td>
                   <td className="px-4 py-3 text-gray-600 font-mono text-xs">{a.courseNumber}</td>
                   <td className="px-4 py-3 text-gray-600">{a.platoon?.name ?? "—"}</td>

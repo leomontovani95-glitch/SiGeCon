@@ -61,6 +61,7 @@ export default async function RankingPage({
 
   const ranking = rankingStudents
     .map((a) => ({
+      id:           a.id,
       warName:      a.warName,
       fullName:     a.fullName,
       courseNumber: a.courseNumber,
@@ -267,7 +268,9 @@ export default async function RankingPage({
                     {posicaoGlobal}º
                   </td>
                   <td className="px-3 py-2.5 font-mono text-xs text-gray-600">{a.courseNumber}</td>
-                  <td className="px-3 py-2.5 font-semibold text-gray-900">{a.warName}</td>
+                  <td className="px-3 py-2.5 font-semibold text-gray-900">
+                    <Link href={`/alunos/${a.id}`} className="hover:text-[#1e3a5f] hover:underline">{a.warName}</Link>
+                  </td>
                   {!cursoId && cursosDisponiveis.length > 1 && (
                     <td className="px-3 py-2.5 text-xs text-gray-600">{a.courseName}</td>
                   )}
