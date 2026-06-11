@@ -63,7 +63,8 @@ const nav: NavItem[] = [
   { href: "/cursos",       label: "Cursos",               icon: "🎓", roles: COMANDANTES },
   { href: "/tipos",        label: "Tipos de Comunicação", icon: "⚙️", roles: TIPOS_ROLES },
   { href: "/auditoria",    label: "Auditoria",            icon: "🔍", roles: ["ADMINISTRADOR"] },
-  { href: "/perfil",       label: "Meu Perfil",           icon: "👤" },
+  { href: "/meus-registros", label: "Meus Registros",       icon: "✍️" },
+  { href: "/perfil",         label: "Meu Perfil",           icon: "👤" },
 ];
 
 export default function Sidebar({
