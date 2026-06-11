@@ -11,6 +11,14 @@ function senhaInicial(functionalNumber: string, rg: string): string {
   return functionalNumber + rg.replace(/[^a-zA-Z0-9]/g, "");
 }
 
+function rankDeAluno(courseName: string): string {
+  const u = courseName.toUpperCase();
+  if (u.startsWith("CFO"))  return "AL OF PM";
+  if (u.startsWith("CFSD")) return "AL SD PM";
+  if (u.startsWith("CHS"))  return "AL SGT PM";
+  return "AL PM";
+}
+
 export async function salvarAluno(id: string | null, _prev: State, formData: FormData): Promise<State> {
   const session = await verifyStaff();
 
@@ -31,21 +39,24 @@ export async function salvarAluno(id: string | null, _prev: State, formData: For
   const course = await prisma.course.findUnique({ where: { id: courseId } });
   if (!course) return { error: "Curso selecionado não encontrado." };
 
-  function rankDeAluno(courseName: string): string {
-    const u = courseName.toUpperCase();
-    if (u.startsWith("CFO")) return "AL OF PM";
-    if (u.startsWith("CFSD")) return "AL SD PM";
-    if (u.startsWith("CHS")) return "AL SGT PM";
-    return "AL PM";
-  }
   const rank = rankDeAluno(course.name);
 
   try {
     if (id) {
+      const existing = await prisma.student.findUnique({ where: { id }, select: { userId: true } });
       await prisma.student.update({
         where: { id },
         data: { fullName, warName, courseId, courseNumber, platoonId, rg, functionalNumber, status },
       });
+      if (!existing?.userId && functionalNumber) {
+        try {
+          const passwordHash = await bcrypt.hash(senhaInicial(functionalNumber, rg), 10);
+          const userAluno = await prisma.user.create({
+            data: { fullName, warName, rank, rg, functionalNumber, passwordHash, role: "ALUNO", escola: "TODAS", active: true, mustChangePassword: true },
+          });
+          await prisma.student.update({ where: { id }, data: { userId: userAluno.id } });
+        } catch { /* conta já existe — admin pode usar o botão explícito */ }
+      }
       await auditLog(session.userId, "UPDATE", "Student", id, fullName);
     } else {
       const passwordHash = await bcrypt.hash(senhaInicial(functionalNumber, rg), 10);
@@ -77,6 +88,51 @@ export async function salvarAluno(id: string | null, _prev: State, formData: For
 }
 
 type ResetState = { error?: string; success?: string } | undefined;
+
+export async function criarContaAluno(studentId: string, _prev: ResetState, _fd: FormData): Promise<ResetState> {
+  await verifyRole("ADMINISTRADOR", "CHEFE_DIVISAO_ACADEMICA", "COMANDANTE_ESFAP", "COMANDANTE_ESFO");
+  const student = await prisma.student.findUnique({
+    where: { id: studentId },
+    include: { user: true, course: true },
+  });
+  if (!student) return { error: "Aluno não encontrado." };
+  if (student.userId) return { error: "Este aluno já possui conta de acesso cadastrada." };
+  if (!student.functionalNumber) return { error: "Cadastre o Número Funcional antes de criar a conta de acesso." };
+
+  const passwordHash = await bcrypt.hash(senhaInicial(student.functionalNumber, student.rg), 10);
+  try {
+    const userAluno = await prisma.user.create({
+      data: {
+        fullName:          student.fullName,
+        warName:           student.warName,
+        rank:              rankDeAluno(student.course.name),
+        rg:                student.rg,
+        functionalNumber:  student.functionalNumber,
+        passwordHash,
+        role:              "ALUNO",
+        escola:            "TODAS",
+        active:            true,
+        mustChangePassword: true,
+      },
+    });
+    await prisma.student.update({ where: { id: studentId }, data: { userId: userAluno.id } });
+    return { success: `Conta criada para ${student.warName}. Senha inicial: Nº Funcional + RG sem pontuação. O aluno deverá alterá-la no primeiro acesso.` };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "";
+    if (msg.toLowerCase().includes("unique")) {
+      const existingUser = await prisma.user.findFirst({
+        where: { functionalNumber: student.functionalNumber, role: "ALUNO" },
+        include: { student: { select: { id: true } } },
+      });
+      if (existingUser && !existingUser.student) {
+        await prisma.student.update({ where: { id: studentId }, data: { userId: existingUser.id } });
+        return { success: `Conta existente vinculada a ${student.warName}.` };
+      }
+      return { error: "Número Funcional ou RG já está em uso por outro cadastro." };
+    }
+    return { error: "Erro ao criar conta de acesso." };
+  }
+}
 
 export async function resetarSenhaAluno(studentId: string, _prev: ResetState, _fd: FormData): Promise<ResetState> {
   await verifyRole("ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO");

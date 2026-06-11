@@ -77,12 +77,10 @@ export default async function AlunoPage({ params }: { params: Promise<{ id: stri
 
       <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
         <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Dados Cadastrais</h2>
-        <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3">
+        <dl className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-3">
           {[
             { label: "RG",           value: aluno.rg },
             { label: "Nº Funcional", value: aluno.functionalNumber },
-            { label: "CPF",          value: aluno.cpf },
-            { label: "E-mail",       value: aluno.email },
             { label: "Situação",     value: aluno.status === "ATIVO" ? "Ativo" : aluno.status === "INATIVO" ? "Inativo" : aluno.status },
           ].map(({ label, value }) => (
             <div key={label}>

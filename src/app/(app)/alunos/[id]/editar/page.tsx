@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { notFound } from "next/navigation";
 import AlunoForm from "../../_components/AlunoForm";
 import ResetarSenhaAlunoBtn from "../../_components/ResetarSenhaAlunoBtn";
+import CriarContaAlunoBtn from "../../_components/CriarContaAlunoBtn";
 
 const PODE_RESETAR = ["ADMINISTRADOR", "CHEFE_DIVISAO_ACADEMICA", "COMANDANTE_ESFAP", "COMANDANTE_ESFO"];
 
@@ -44,7 +45,11 @@ export default async function EditarAlunoPage({ params }: { params: Promise<{ id
           platoonId: aluno.platoonId ?? "",
         }}
       />
-      {podeResetar && <ResetarSenhaAlunoBtn studentId={aluno.id} />}
+      {podeResetar && (
+        aluno.userId
+          ? <ResetarSenhaAlunoBtn studentId={aluno.id} />
+          : <CriarContaAlunoBtn   studentId={aluno.id} />
+      )}
     </div>
   );
 }

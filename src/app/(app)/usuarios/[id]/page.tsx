@@ -35,13 +35,11 @@ export default async function UsuarioPage({ params }: { params: Promise<{ id: st
     && canManageUserRole(session.role, usuario.role);
 
   const camposPrincipais = [
-    { label: "Nome completo",   value: usuario.fullName },
+    { label: "Nome completo",   value: usuario.fullName,      wide: true },
     { label: "Nome de guerra",  value: usuario.warName },
     { label: "Posto/Graduação", value: usuario.rank },
     { label: "RG",              value: usuario.rg },
     { label: "Nº Funcional",    value: usuario.functionalNumber },
-    { label: "E-mail",          value: usuario.email },
-    { label: "CPF",             value: usuario.cpf },
     { label: "Escola",          value: ESCOLA_LABELS[usuario.escola] ?? usuario.escola },
     { label: "Situação",        value: usuario.active ? "Ativo" : "Inativo" },
   ];
@@ -67,8 +65,8 @@ export default async function UsuarioPage({ params }: { params: Promise<{ id: st
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-4">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Dados Cadastrais</h2>
         <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-          {camposPrincipais.map(({ label, value }) => (
-            <div key={label}>
+          {camposPrincipais.map(({ label, value, wide }) => (
+            <div key={label} className={wide ? "sm:col-span-2" : ""}>
               <dt className="text-xs font-medium text-gray-500">{label}</dt>
               <dd className="mt-0.5 text-sm font-medium text-gray-900">{value ?? "—"}</dd>
             </div>
