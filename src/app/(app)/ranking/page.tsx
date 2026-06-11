@@ -146,7 +146,7 @@ export default async function RankingPage({
         </div>
         <div className="flex gap-2">
           <Link
-            href={`/ranking/imprimir${cursoId ? `?cursoId=${cursoId}` : ""}`}
+            href={`/ranking/imprimir?ordem=${ordem}${cursoId ? `&cursoId=${cursoId}` : ""}`}
             target="_blank"
             className="bg-[#1e3a5f] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#16304f] transition-colors flex items-center gap-2"
           >
