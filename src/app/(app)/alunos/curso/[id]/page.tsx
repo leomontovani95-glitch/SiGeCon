@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { verifySession, getSchoolFilter, VIEWERS_APM } from "@/lib/dal";
 import { redirect, notFound } from "next/navigation";
 import { calcularNotaPublicada, faixaNota } from "@/lib/score";
+import { abreviarPelotao } from "@/lib/utils";
 import Link from "next/link";
 import { Suspense } from "react";
 import SortableHeader from "../../_components/SortableHeader";
@@ -184,7 +185,7 @@ export default async function CursoAlunosPage({
                     <Link href={`/alunos/${a.id}`} className="hover:text-[#1e3a5f] hover:underline">{a.warName}</Link>
                   </td>
                   <td className="px-4 py-3 text-gray-600 font-mono text-xs">{a.courseNumber}</td>
-                  <td className="px-4 py-3 text-gray-600">{a.platoon?.name ?? "—"}</td>
+                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{abreviarPelotao(a.platoon?.name)}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${faixa.tailwind}`}>
                       {nota.toFixed(2)}

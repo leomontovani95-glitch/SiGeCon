@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { verifyRole, getSchoolFilter } from "@/lib/dal";
 import type { UserRole } from "@/lib/dal";
+import { abreviarPelotao } from "@/lib/utils";
 import Link from "next/link";
 
 const ALLOWED: UserRole[] = [
@@ -246,7 +247,7 @@ export default async function RankingComunicantesPage({
                 <Th col="rg"       label="RG" />
                 <Th col="nf"       label="NF" />
                 <Th col="curso"    label="Curso" />
-                <Th col="pelotao"  label="Pelotão" />
+                <Th col="pelotao"  label="Pel." />
                 <Th col="numcurso" label="Nº Curso" center />
                 <Th col="total"    label="Total"    center />
                 <Th col="cpi0"     label="CPI 0"    center />
@@ -294,10 +295,10 @@ export default async function RankingComunicantesPage({
                         </>
                       )}
                     </td>
-                    <td className="px-3 py-2.5 text-gray-600 font-mono text-xs">{rg}</td>
-                    <td className="px-3 py-2.5 text-gray-600 font-mono text-xs">{nf}</td>
+                    <td className="px-3 py-2.5 text-gray-600 font-mono text-xs whitespace-nowrap">{rg}</td>
+                    <td className="px-3 py-2.5 text-gray-600 font-mono text-xs whitespace-nowrap">{nf}</td>
                     <td className="px-3 py-2.5 text-gray-600 text-xs whitespace-nowrap">{curso}</td>
-                    <td className="px-3 py-2.5 text-gray-600 text-xs">{pelotao}</td>
+                    <td className="px-3 py-2.5 text-gray-600 text-xs whitespace-nowrap">{abreviarPelotao(pelotao)}</td>
                     <td className="px-3 py-2.5 text-gray-600 text-xs text-center">{numCurso}</td>
                     <td className="px-3 py-2.5 text-center">
                       <span className="font-bold text-gray-900">{e.total}</span>

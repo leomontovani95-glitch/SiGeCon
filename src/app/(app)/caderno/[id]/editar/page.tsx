@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { abreviarPelotao } from "@/lib/utils";
 import { verifyRole, getSchoolFilter } from "@/lib/dal";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
@@ -116,7 +117,7 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
                         {fmtEnq(item.communication.article, item.communication.item, item.communication.letter)}
                       </td>
                       <td className="px-3 py-2.5 text-xs">{item.student.course.name}</td>
-                      <td className="px-3 py-2.5 text-xs text-gray-600">{item.student.platoon?.name ?? "—"}</td>
+                      <td className="px-3 py-2.5 text-xs text-gray-600 whitespace-nowrap">{abreviarPelotao(item.student.platoon?.name)}</td>
                       <td className="px-3 py-2.5 font-mono text-xs">{item.studentCourseNumber}</td>
                       <td className="px-3 py-2.5 font-semibold">{item.studentWarName}</td>
                       <td className="px-3 py-2.5 text-xs text-gray-700">{item.recordType}</td>

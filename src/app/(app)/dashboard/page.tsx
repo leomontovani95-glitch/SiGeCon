@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { verifySession, getSchoolFilter } from "@/lib/dal";
 import { calcularNotaPublicada, faixaNota, zonaDeRisco } from "@/lib/score";
+import { abreviarPelotao } from "@/lib/utils";
 import Link from "next/link";
 import { format, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -493,7 +494,7 @@ export default async function DashboardPage({
                     const faixa = faixaNota(s.nota);
                     return (
                       <tr key={s.id} className="hover:bg-red-50 transition-colors">
-                        <td className="px-4 py-2.5 text-xs text-gray-500">{s.platoon?.name ?? "—"}</td>
+                        <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{abreviarPelotao(s.platoon?.name)}</td>
                         <td className="px-4 py-2.5 font-mono text-xs text-gray-600">{s.courseNumber}</td>
                         <td className="px-4 py-2.5 font-semibold text-gray-900">
                           <Link href={`/alunos/${s.id}`} className="hover:text-[#1e3a5f] hover:underline">{s.warName}</Link>

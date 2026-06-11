@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { verifySession, getSchoolFilter } from "@/lib/dal";
 import { redirect } from "next/navigation";
 import { calcularNotaPublicada, faixaNota } from "@/lib/score";
+import { abreviarPelotao } from "@/lib/utils";
 import Link from "next/link";
 import FaixaNotaChart from "./_components/FaixaNotaChart";
 
@@ -297,7 +298,7 @@ export default async function RankingPage({
                   {!cursoId && cursosDisponiveis.length > 1 && (
                     <td className="px-3 py-2.5 text-xs text-gray-600">{a.courseName}</td>
                   )}
-                  <td className="px-3 py-2.5 text-xs text-gray-500">{a.platoonName ?? "—"}</td>
+                  <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{abreviarPelotao(a.platoonName)}</td>
                   <td className="px-3 py-2.5 text-center">
                     <span className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-bold ${faixa.tailwind}`}>
                       {a.nota.toFixed(2)}

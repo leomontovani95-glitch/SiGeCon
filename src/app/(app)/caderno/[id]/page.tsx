@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { abreviarPelotao } from "@/lib/utils";
 import { verifySession } from "@/lib/dal";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
@@ -79,7 +80,7 @@ function TabelaGrupo({ items, thBase, tdBase }: { items: GrupoItem[]; thBase: st
                 </a>
               </td>
               <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{fmtEnq(item.communication.article, item.communication.item, item.communication.letter)}</td>
-              <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{item.student.platoon?.name ?? "—"}</td>
+              <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{abreviarPelotao(item.student.platoon?.name)}</td>
               <td className={`${tdBase} font-mono text-gray-700 whitespace-nowrap`}>{item.studentCourseNumber}</td>
               <td className={`${tdBase} font-semibold text-gray-900 whitespace-nowrap`}>{item.studentWarName}</td>
               <td className={`${tdBase} text-gray-700 whitespace-nowrap`}>{item.recordType}</td>
@@ -259,7 +260,7 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
                         </a>
                       </td>
                       <td className={`${tdBase} text-gray-700 whitespace-nowrap font-medium`}>{item.decisionSummary}</td>
-                      <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{item.student.platoon?.name ?? "—"}</td>
+                      <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{abreviarPelotao(item.student.platoon?.name)}</td>
                       <td className={`${tdBase} font-mono text-gray-700 whitespace-nowrap`}>{item.studentCourseNumber}</td>
                       <td className={`${tdBase} font-semibold text-gray-900 whitespace-nowrap`}>{item.studentWarName}</td>
                       <td className={`${tdBase} text-gray-500 whitespace-nowrap`}>{new Date(item.factDate).toLocaleDateString("pt-BR")}</td>
@@ -311,7 +312,7 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
                       </td>
                       <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{fmtEnq(item.originalArticle, item.originalItem, item.originalLetter)}</td>
                       <td className={`${tdBase} font-semibold text-orange-700 whitespace-nowrap`}>{fmtEnq(item.communication.article, item.communication.item, item.communication.letter)}</td>
-                      <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{item.student.platoon?.name ?? "—"}</td>
+                      <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{abreviarPelotao(item.student.platoon?.name)}</td>
                       <td className={`${tdBase} font-mono text-gray-700 whitespace-nowrap`}>{item.studentCourseNumber}</td>
                       <td className={`${tdBase} font-semibold text-gray-900 whitespace-nowrap`}>{item.studentWarName}</td>
                       <td className={`${tdBase} text-gray-700 whitespace-nowrap`}>{item.recordType}</td>
@@ -370,7 +371,7 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
                         </Link>
                       </td>
                       <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{fmtEnq(item.communication.article, item.communication.item, item.communication.letter)}</td>
-                      <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{item.student.platoon?.name ?? "—"}</td>
+                      <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{abreviarPelotao(item.student.platoon?.name)}</td>
                       <td className={`${tdBase} font-mono text-gray-700 whitespace-nowrap`}>{item.studentCourseNumber}</td>
                       <td className={`${tdBase} font-semibold text-gray-900 whitespace-nowrap`}>{item.studentWarName}</td>
                       <td className={`${tdBase} text-gray-500 whitespace-nowrap`}>{item.recordType}</td>
