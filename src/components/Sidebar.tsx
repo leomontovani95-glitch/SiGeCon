@@ -59,7 +59,7 @@ const nav: NavItem[] = [
   { href: "/ranking/comunicantes", label: "Ranking de Comunicantes", icon: "📣", roles: RANKING_COMUNICANTES_ROLES },
   { href: "/relatorios",   label: "Relatórios",           icon: "📈", roles: STAFF },
   { href: "/analise",      label: "Análise",              icon: "📊", roles: STAFF },
-  { href: "/usuarios",     label: "Usuários",             icon: "👥", roles: COMANDANTES },
+  { href: "/usuarios",     label: "Usuários",             icon: "👥", roles: [...COMANDANTES, ...VIEWERS_APM] },
   { href: "/cursos",       label: "Cursos",               icon: "🎓", roles: COMANDANTES },
   { href: "/tipos",        label: "Tipos de Comunicação", icon: "⚙️", roles: TIPOS_ROLES },
   { href: "/auditoria",    label: "Auditoria",            icon: "🔍", roles: ["ADMINISTRADOR"] },

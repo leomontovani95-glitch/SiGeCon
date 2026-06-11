@@ -3,6 +3,7 @@ import { verifySession, getSchoolFilter } from "@/lib/dal";
 import { redirect } from "next/navigation";
 import { calcularNotaPublicada, faixaNota } from "@/lib/score";
 import Link from "next/link";
+import FaixaNotaChart from "./_components/FaixaNotaChart";
 
 const PER_PAGE = 50;
 const ORDENS_VALIDAS = ["desc", "asc", "numAsc", "numDesc"] as const;
@@ -77,6 +78,19 @@ export default async function RankingPage({
       }
       return ordem === "asc" ? a.nota - b.nota : b.nota - a.nota;
     });
+
+  const FAIXAS_CORES: Record<string, string> = {
+    Excelente: "#166534",
+    Bom:       "#16a34a",
+    Regular:   "#ca8a04",
+    Atenção:   "#f87171",
+    Reprovado: "#b91c1c",
+  };
+  const faixaCount: Record<string, number> = { Excelente: 0, Bom: 0, Regular: 0, Atenção: 0, Reprovado: 0 };
+  for (const a of ranking) faixaCount[faixaNota(a.nota).label]++;
+  const faixaNotaData = (["Excelente", "Bom", "Regular", "Atenção", "Reprovado"] as const).map(
+    (faixa) => ({ faixa, quantidade: faixaCount[faixa], cor: FAIXAS_CORES[faixa] }),
+  );
 
   const rankingFiltrado = busca
     ? ranking.filter(
@@ -199,6 +213,15 @@ export default async function RankingPage({
           </div>
         </div>
       )}
+
+      {/* Distribuição por faixa de nota */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-5">
+        <h2 className="text-sm font-semibold text-gray-900 mb-0.5">Distribuição por Faixa de Nota</h2>
+        <p className="text-xs text-gray-500 mb-4">
+          {ranking.length} aluno(s) · notas baseadas nos cadernos publicados
+        </p>
+        <FaixaNotaChart data={faixaNotaData} />
+      </div>
 
       {/* Controles de ordenação */}
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">

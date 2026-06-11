@@ -73,7 +73,7 @@ export default async function UsuarioPage({ params }: { params: Promise<{ id: st
           ))}
           <div className="sm:col-span-2">
             <dt className="text-xs font-medium text-gray-500">Função(ões)</dt>
-            <dd className="mt-0.5 text-sm font-medium text-gray-900">{funcoes.join(" · ")}</dd>
+            <dd className="mt-0.5 text-sm font-medium text-gray-900">{funcoes.join("/")}</dd>
           </div>
         </dl>
       </div>

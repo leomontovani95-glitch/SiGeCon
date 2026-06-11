@@ -1,9 +1,11 @@
-import { verifyStaff } from "@/lib/dal";
+import { verifyStaff, VIEWERS_APM } from "@/lib/dal";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import AlunoForm from "../_components/AlunoForm";
 
 export default async function NovoAlunoPage() {
-  await verifyStaff();
+  const session = await verifyStaff();
+  if ((VIEWERS_APM as string[]).includes(session.role)) redirect("/acesso-negado");
   const courses = await prisma.course.findMany({
     where: { active: true },
     orderBy: { name: "asc" },

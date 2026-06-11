@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
-import { verifyStaff, verifyRole } from "@/lib/dal";
+import { verifyStaff, verifyRole, VIEWERS_APM } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
 
 type State = { error: string } | undefined;
@@ -21,6 +21,9 @@ function rankDeAluno(courseName: string): string {
 
 export async function salvarAluno(id: string | null, _prev: State, formData: FormData): Promise<State> {
   const session = await verifyStaff();
+  if (id === null && (VIEWERS_APM as string[]).includes(session.role)) {
+    return { error: "Sem permissão para cadastrar novos alunos." };
+  }
 
   const fullName         = String(formData.get("fullName") ?? "").trim();
   const warName          = String(formData.get("warName") ?? "").trim();

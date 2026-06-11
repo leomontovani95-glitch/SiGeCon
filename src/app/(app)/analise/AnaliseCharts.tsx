@@ -218,9 +218,10 @@ export default function AnaliseCharts({
             <Vazio />
           )}
         </Panel>
+
       </div>
 
-      {/* 5 — Top artigos infringidos */}
+      {/* 6 — Top artigos infringidos */}
       <Panel
         title="Top 10 Artigos Infringidos"
         subtitle="Dispositivos legais mais frequentes nas comunicações do período"
@@ -247,7 +248,7 @@ export default function AnaliseCharts({
         )}
       </Panel>
 
-      {/* 6 — Top 10 alunos */}
+      {/* 7 — Top 10 alunos */}
       <Panel
         title="Top 10 Alunos com Mais Sanções"
         subtitle="Alunos com maior número de comunicações no período filtrado"

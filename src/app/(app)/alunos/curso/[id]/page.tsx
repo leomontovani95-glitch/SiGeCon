@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { verifySession, getSchoolFilter } from "@/lib/dal";
+import { verifySession, getSchoolFilter, VIEWERS_APM } from "@/lib/dal";
 import { redirect, notFound } from "next/navigation";
 import { calcularNotaPublicada, faixaNota } from "@/lib/score";
 import Link from "next/link";
@@ -42,7 +42,7 @@ export default async function CursoAlunosPage({
 }) {
   const session = await verifySession();
   if (session.role === "ALUNO") redirect("/acesso-negado");
-  const canManage = session.role !== "ALUNO";
+  const canManage = session.role !== "ALUNO" && !(VIEWERS_APM as string[]).includes(session.role);
 
   const { id } = await params;
   const sp = await searchParams;

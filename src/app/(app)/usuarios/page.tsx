@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { verifyRole, canManageUserRole, USER_MANAGERS } from "@/lib/dal";
+import { verifyRole, canManageUserRole, USER_MANAGERS, VIEWERS_APM } from "@/lib/dal";
 import Link from "next/link";
 import ExcluirUsuarioBtn from "./_components/ExcluirUsuarioBtn";
 
@@ -19,8 +19,14 @@ const ROLES: Record<string, string> = {
   ALUNO:                   "Aluno",
 };
 
+function formatFuncoes(role: string, additionalRoles: string): string {
+  const all = [role, ...additionalRoles.split(",").map((r) => r.trim()).filter(Boolean)];
+  return all.map((r) => ROLES[r] ?? r).join("/");
+}
+
 export default async function UsuariosPage() {
-  const session = await verifyRole(...USER_MANAGERS);
+  const session = await verifyRole(...USER_MANAGERS, ...VIEWERS_APM);
+  const canCreate = (USER_MANAGERS as string[]).includes(session.role);
   // Alunos ficam apenas na aba Alunos — usuários são apenas o efetivo formado
   const usuarios = await prisma.user.findMany({ where: { role: { not: "ALUNO" } }, orderBy: { fullName: "asc" } });
 
@@ -31,12 +37,14 @@ export default async function UsuariosPage() {
           <h1 className="text-2xl font-bold text-gray-900">Usuários</h1>
           <p className="text-sm text-gray-500">{usuarios.length} usuário(s) cadastrado(s)</p>
         </div>
-        <Link
-          href="/usuarios/novo"
-          className="bg-[#1e3a5f] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#16304f] transition-colors"
-        >
-          + Novo Usuário
-        </Link>
+        {canCreate && (
+          <Link
+            href="/usuarios/novo"
+            className="bg-[#1e3a5f] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#16304f] transition-colors"
+          >
+            + Novo Usuário
+          </Link>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -64,7 +72,7 @@ export default async function UsuariosPage() {
                 <td className="px-4 py-3 text-gray-600">{u.rank}</td>
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    {ROLES[u.role] ?? u.role}
+                    {formatFuncoes(u.role, u.additionalRoles)}
                   </span>
                 </td>
                 <td className="px-4 py-3">

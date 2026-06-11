@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { verifySession, getSchoolFilter } from "@/lib/dal";
+import { verifySession, getSchoolFilter, VIEWERS_APM } from "@/lib/dal";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
@@ -26,7 +26,7 @@ export default async function AlunosPage() {
   });
 
   const total = courses.reduce((s, c) => s + c._count.students, 0);
-  const canManage = session.role !== "ALUNO";
+  const canManage = session.role !== "ALUNO" && !(VIEWERS_APM as string[]).includes(session.role);
 
   return (
     <div className="p-6">
