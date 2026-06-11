@@ -35,7 +35,12 @@ export default async function PerfilPage({ searchParams }: { searchParams: Promi
     { label: "Posto/Graduação", value: user.rank },
     { label: "RG",              value: user.rg },
     { label: "Nº Funcional",    value: user.functionalNumber },
-    { label: "Função",          value: ROLE_LABELS[user.role] ?? user.role },
+    {
+      label: "Função",
+      value: [user.role, ...(user.additionalRoles ?? "").split(",").map((r) => r.trim()).filter(Boolean)]
+        .map((r) => ROLE_LABELS[r] ?? r)
+        .join("/"),
+    },
     ...(user.role === "ALUNO"
       ? [{ label: "Curso", value: user.student?.course?.name ?? "—" }]
       : []

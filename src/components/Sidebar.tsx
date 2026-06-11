@@ -68,17 +68,21 @@ const nav: NavItem[] = [
 
 export default function Sidebar({
   role,
+  additionalRoles = "",
   rank,
   warName,
   badgeCounts = {},
   canCreateComm = false,
 }: {
   role: string;
+  additionalRoles?: string;
   rank: string;
   warName: string;
   badgeCounts?: Record<string, number>;
   canCreateComm?: boolean;
 }) {
+  const allRoles = [role, ...additionalRoles.split(",").map((r) => r.trim()).filter(Boolean)];
+  const roleLabel = allRoles.map((r) => ROLE_LABELS[r] ?? r.replace(/_/g, " ")).join("/");
   const pathname = usePathname();
   const isUnrestricted = ["ADMINISTRADOR", "CHEFE_DIVISAO_ACADEMICA"].includes(role);
   const visibleNav = nav.filter((item) =>
@@ -135,7 +139,7 @@ export default function Sidebar({
               {rank && <span className="text-blue-200 font-normal">{rank} </span>}
               {warName}
             </p>
-            <p className="text-blue-300 text-xs truncate">{ROLE_LABELS[role] ?? role.replace(/_/g, " ")}</p>
+            <p className="text-blue-300 text-xs truncate">{roleLabel}</p>
           </div>
         </div>
         <form action="/logout" method="POST">

@@ -60,7 +60,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar role={role} rank={userRank} warName={session.warName} badgeCounts={badgeCounts} canCreateComm={canCreateComm} />
+      <Sidebar role={role} additionalRoles={session.additionalRoles} rank={userRank} warName={session.warName} badgeCounts={badgeCounts} canCreateComm={canCreateComm} />
       <main className="flex-1 overflow-auto bg-gray-50">
         {children}
       </main>

@@ -143,7 +143,15 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
     : escolaEfetiva === "ESFO" ? "COMANDANTE_ESFO"
     : null;
   const comandante = schoolRole
-    ? await prisma.user.findFirst({ where: { role: schoolRole, active: true } })
+    ? await prisma.user.findFirst({
+        where: {
+          active: true,
+          OR: [
+            { role: schoolRole },
+            { additionalRoles: { contains: schoolRole } },
+          ],
+        },
+      })
     : caderno.publishedBy ?? null;
 
   const schoolLabel = escolaEfetiva === "ESFAP" ? "EsFAP"
