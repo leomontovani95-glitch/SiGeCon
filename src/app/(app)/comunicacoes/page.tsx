@@ -40,16 +40,17 @@ type CommItem = {
 };
 
 function derivedStatus(c: CommItem): { key: string; label: string; color: string } {
-  // PUBLICADA_CADERNO é status legado — semanticamente equivale a Decidida/Publicada
+  const arquivada = c.decisions.some((d) => d.decisionType.toLowerCase().includes("arquiv"));
+  const publicada = c.disciplinaryBookItems.some((i) => i.disciplinaryBook.status === "PUBLICADO");
   if (c.status === "PUBLICADA_CADERNO") {
+    if (arquivada) return { key: "ARQUIVADA_PUBLICADA", label: "Arquivada/Publicada", color: "bg-gray-200 text-gray-700" };
     return { key: "DECIDIDA_PUBLICADA", label: "Decidida/Publicada", color: "bg-teal-100 text-teal-700" };
   }
   if (c.status === "DECIDIDA") {
-    const arquivada = c.decisions.some((d) => d.decisionType.toLowerCase().includes("arquiv"));
-    if (arquivada) return { key: "ARQUIVADA_DEC", label: "Arquivada", color: "bg-gray-100 text-gray-700" };
-    const publicada = c.disciplinaryBookItems.some((i) => i.disciplinaryBook.status === "PUBLICADO");
-    if (publicada) return { key: "DECIDIDA_PUBLICADA", label: "Decidida/Publicada", color: "bg-teal-100 text-teal-700" };
-    return { key: "DECIDIDA_NAO_PUBLICADA", label: "Decidida/Não publicada", color: "bg-green-100 text-green-700" };
+    if (arquivada && publicada)  return { key: "ARQUIVADA_PUBLICADA",     label: "Arquivada/Publicada",     color: "bg-gray-200 text-gray-700" };
+    if (arquivada && !publicada) return { key: "ARQUIVADA_NAO_PUBLICADA", label: "Arquivada/Não publicada", color: "bg-gray-100 text-gray-500" };
+    if (publicada)               return { key: "DECIDIDA_PUBLICADA",      label: "Decidida/Publicada",      color: "bg-teal-100 text-teal-700" };
+    return                              { key: "DECIDIDA_NAO_PUBLICADA",  label: "Decidida/Não publicada",  color: "bg-green-100 text-green-700" };
   }
   return {
     key: c.status,
@@ -59,36 +60,49 @@ function derivedStatus(c: CommItem): { key: string; label: string; color: string
 }
 
 const FILTER_OPTIONS = [
-  { value: "",                       label: "Todos os status" },
-  { value: "AGUARDANDO_CIENCIA",     label: "Ag. Ciência/Defesa" },
-  { value: "PRAZO_EXPIRADO",         label: "Prazo Expirado" },
+  { value: "",                        label: "Todos os status" },
+  { value: "AGUARDANDO_CIENCIA",      label: "Ag. Ciência/Defesa" },
+  { value: "PRAZO_EXPIRADO",          label: "Prazo Expirado" },
   { value: "JUSTIFICATIVA_APRESENTADA", label: "Defesa Apresentada" },
-  { value: "AGUARDANDO_PARECER",     label: "Ag. Parecer" },
-  { value: "AGUARDANDO_DECISAO",     label: "Ag. Decisão" },
-  { value: "DECIDIDA_PUBLICADA",     label: "Decidida/Publicada" },
-  { value: "DECIDIDA_NAO_PUBLICADA", label: "Decidida/Não publicada" },
-  { value: "ARQUIVADA_DEC",          label: "Arquivada" },
+  { value: "AGUARDANDO_PARECER",      label: "Ag. Parecer" },
+  { value: "AGUARDANDO_DECISAO",      label: "Ag. Decisão" },
+  { value: "DECIDIDA_PUBLICADA",      label: "Decidida/Publicada" },
+  { value: "DECIDIDA_NAO_PUBLICADA",  label: "Decidida/Não publicada" },
+  { value: "ARQUIVADA_NAO_PUBLICADA", label: "Arquivada/Não publicada" },
+  { value: "ARQUIVADA_PUBLICADA",     label: "Arquivada/Publicada" },
 ];
 
 function buildStatusWhere(status: string): Record<string, unknown> | null {
   if (!status) return null;
+  const naoArquivada = { decisions: { none: { decisionType: { contains: "rquiv" } } } };
+  const arquivada    = { decisions: { some: { decisionType: { contains: "rquiv" } } } };
   switch (status) {
     case "DECIDIDA_PUBLICADA":
-      // Inclui tanto DECIDIDA (com item publicado) quanto o status legado PUBLICADA_CADERNO
       return {
         OR: [
-          { status: "PUBLICADA_CADERNO" },
-          { status: "DECIDIDA", disciplinaryBookItems: { some: { disciplinaryBook: { status: "PUBLICADO" } } } },
+          { status: "PUBLICADA_CADERNO", ...naoArquivada },
+          { status: "DECIDIDA", disciplinaryBookItems: { some: { disciplinaryBook: { status: "PUBLICADO" } } }, ...naoArquivada },
         ],
       };
     case "DECIDIDA_NAO_PUBLICADA":
       return {
         status: "DECIDIDA",
         disciplinaryBookItems: { none: { disciplinaryBook: { status: "PUBLICADO" } } },
-        decisions: { none: { decisionType: { contains: "rquiv" } } },
+        ...naoArquivada,
       };
-    case "ARQUIVADA_DEC":
-      return { status: "DECIDIDA", decisions: { some: { decisionType: { contains: "rquiv" } } } };
+    case "ARQUIVADA_NAO_PUBLICADA":
+      return {
+        status: "DECIDIDA",
+        ...arquivada,
+        disciplinaryBookItems: { none: { disciplinaryBook: { status: "PUBLICADO" } } },
+      };
+    case "ARQUIVADA_PUBLICADA":
+      return {
+        OR: [
+          { status: "DECIDIDA", ...arquivada, disciplinaryBookItems: { some: { disciplinaryBook: { status: "PUBLICADO" } } } },
+          { status: "PUBLICADA_CADERNO", ...arquivada },
+        ],
+      };
     default:
       return { status };
   }
@@ -123,7 +137,8 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
   const busca   = sp.busca   ?? "";
   const status  = sp.status  ?? "";
   const cursoId = sp.cursoId ?? "";
-  const tipo    = sp.tipo    ?? "";
+  const nat     = sp.nat     ?? "";   // CPI | REFERENCIA | ELOGIO | TD_TAC | FAVORAVEL
+  const subtipo = sp.subtipo ?? "";   // CPI 0 | CPI 1 | CPI 2 | CPI 3 (só quando nat=CPI)
   const col     = sp.col in COLS ? sp.col : "";
   const dir: Dir = sp.dir === "asc" ? "asc" : "desc";
   const pageRaw  = parseInt(sp.page ?? "1", 10);
@@ -131,21 +146,29 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
 
   const school = getSchoolFilter(session.role, session.escola);
 
-  const [cursosDisponiveis, tipos] = await Promise.all([
-    session.role !== "ALUNO"
-      ? prisma.course.findMany({
-          where: { active: true, ...(school ? { school } : {}) },
-          orderBy: { name: "asc" },
-          select: { id: true, name: true },
-        })
-      : Promise.resolve([]),
-    prisma.communicationType.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
-  ]);
+  const cursosDisponiveis = session.role !== "ALUNO"
+    ? await prisma.course.findMany({
+        where: { active: true, ...(school ? { school } : {}) },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+      })
+    : [];
+
+  const CPI_TYPES = ["CPI 0", "CPI 1", "CPI 2", "CPI 3"] as const;
+  const FAV_TYPES = ["Referência Elogiosa", "Elogio publicado em BI"] as const;
+  const OTHER_TYPES = [...CPI_TYPES, ...FAV_TYPES] as string[];
 
   const where: Record<string, unknown> = {};
   const statusWhere = buildStatusWhere(status);
   if (statusWhere) Object.assign(where, statusWhere);
-  if (tipo)   where.type = { name: tipo };
+
+  // Filtro por natureza
+  if (nat === "CPI")       where.type = subtipo ? { name: subtipo } : { name: { in: [...CPI_TYPES] } };
+  else if (nat === "REFERENCIA") where.type = { name: "Referência Elogiosa" };
+  else if (nat === "ELOGIO")     where.type = { name: "Elogio publicado em BI" };
+  else if (nat === "FAVORAVEL")  where.type = { name: { in: [...FAV_TYPES] } };
+  else if (nat === "TD_TAC")     where.type = { name: { notIn: OTHER_TYPES } };
+
   if (busca) {
     where.OR = [
       { protocolNumber: { contains: busca } },
@@ -209,12 +232,13 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
   // Constrói URL preservando todos os filtros
   function buildUrl(overrides: Record<string, string>) {
     const p = new URLSearchParams();
-    if (cursoId)  p.set("cursoId",  cursoId);
-    if (busca)    p.set("busca",    busca);
-    if (status)   p.set("status",   status);
-    if (tipo)     p.set("tipo",     tipo);
-    if (col)      p.set("col",      col);
-    if (dir)      p.set("dir",      dir);
+    if (cursoId) p.set("cursoId", cursoId);
+    if (busca)   p.set("busca",   busca);
+    if (status)  p.set("status",  status);
+    if (nat)     p.set("nat",     nat);
+    if (subtipo) p.set("subtipo", subtipo);
+    if (col)     p.set("col",     col);
+    if (dir)     p.set("dir",     dir);
     for (const [k, v] of Object.entries(overrides)) {
       if (v) p.set(k, v); else p.delete(k);
     }
@@ -279,23 +303,68 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
         </div>
       )}
 
-      {/* Filtros de busca, tipo e status */}
+      {/* Filtro por natureza */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-3">
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Tipo de registro</p>
+        <div className="flex flex-wrap gap-2">
+          {([
+            { value: "",           label: "Todos" },
+            { value: "CPI",        label: "CPI" },
+            { value: "REFERENCIA", label: "Ref. Elogiosa" },
+            { value: "ELOGIO",     label: "Elogio em BI" },
+            { value: "TD_TAC",     label: "TD / TAC" },
+          ] as const).map((opt) => (
+            <Link
+              key={opt.value}
+              href={buildUrl({ nat: opt.value, subtipo: "", page: "1" })}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                nat === opt.value
+                  ? "bg-[#1e3a5f] text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              {opt.label}
+            </Link>
+          ))}
+        </div>
+
+        {/* Sub-filtro CPI */}
+        {nat === "CPI" && (
+          <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
+            <span className="text-xs font-medium text-gray-500 self-center">Nível:</span>
+            {([
+              { value: "",      label: "Todos" },
+              { value: "CPI 0", label: "CPI 0" },
+              { value: "CPI 1", label: "CPI 1" },
+              { value: "CPI 2", label: "CPI 2" },
+              { value: "CPI 3", label: "CPI 3" },
+            ] as const).map((opt) => (
+              <Link
+                key={opt.value}
+                href={buildUrl({ subtipo: opt.value, page: "1" })}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                  subtipo === opt.value
+                    ? "bg-blue-600 text-white"
+                    : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                }`}
+              >
+                {opt.label}
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Filtros de busca e status */}
       <form method="GET" className="bg-white rounded-xl border border-gray-200 p-4 mb-5 flex flex-wrap gap-3 items-end">
         {cursoId && <input type="hidden" name="cursoId" value={cursoId} />}
+        {nat     && <input type="hidden" name="nat"     value={nat} />}
+        {subtipo && <input type="hidden" name="subtipo" value={subtipo} />}
         {col     && <input type="hidden" name="col"     value={col} />}
         {dir     && <input type="hidden" name="dir"     value={dir} />}
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Busca</label>
           <input name="busca" defaultValue={busca} placeholder="Protocolo, nome de guerra..." className="input text-sm w-52" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Tipo</label>
-          <select name="tipo" defaultValue={tipo} className="input text-sm">
-            <option value="">Todos os tipos</option>
-            {tipos.map((t) => (
-              <option key={t.id} value={t.name}>{t.name}</option>
-            ))}
-          </select>
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
@@ -307,8 +376,8 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
         </div>
         <div className="flex gap-2">
           <button type="submit" className="btn-primary">Filtrar</button>
-          {(busca || tipo || status) && (
-            <Link href={buildUrl({ busca: "", tipo: "", status: "" })} className="btn-secondary text-sm">Limpar</Link>
+          {(busca || status) && (
+            <Link href={buildUrl({ busca: "", status: "", page: "1" })} className="btn-secondary text-sm">Limpar</Link>
           )}
         </div>
       </form>

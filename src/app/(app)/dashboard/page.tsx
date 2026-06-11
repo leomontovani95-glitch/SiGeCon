@@ -102,7 +102,14 @@ async function getDashboardGeral(role: string, userId: string, scopeCourseIds: s
     }),
   ]);
 
-  const [students, allPubItems] = await Promise.all([
+  // Mesma lógica dos filtros de comunicações: usa CommunicationDecision.decisionType
+  const CPI_TYPES = ["CPI 0", "CPI 1", "CPI 2", "CPI 3"] as const;
+  const FAV_TYPES = ["Referência Elogiosa", "Elogio publicado em BI"] as const;
+  const arquivadaDec    = { decisions: { some: { decisionType: { contains: "rquiv" } } } };
+  const naoArquivadaDec = { decisions: { none: { decisionType: { contains: "rquiv" } } } };
+  const pubCaderno      = { disciplinaryBookItems: { some: { disciplinaryBook: { status: "PUBLICADO" } } } };
+
+  const [students, allPubItems, cpisPublicadas, cpisArquivadas, elogiososPublicados, elogiososArquivados] = await Promise.all([
     prisma.student.findMany({
       where: { status: "ATIVO", ...cf },
       include: { course: true, platoon: true },
@@ -111,17 +118,41 @@ async function getDashboardGeral(role: string, userId: string, scopeCourseIds: s
       where: { disciplinaryBook: { status: "PUBLICADO" }, ...(scopeCourseIds.length ? { courseId: { in: scopeCourseIds } } : {}) },
       include: { communication: { include: { type: { select: { scoreNature: true } } } } },
     }),
+    // DECIDIDA_PUBLICADA sem arquivamento (alinha com filtro da aba Comunicações)
+    prisma.communication.count({ where: {
+      ...filtroReporter, ...cf,
+      type: { name: { in: [...CPI_TYPES] } },
+      OR: [
+        { status: "PUBLICADA_CADERNO", ...naoArquivadaDec },
+        { status: "DECIDIDA", ...pubCaderno, ...naoArquivadaDec },
+      ],
+    } }),
+    // ARQUIVADA_PUBLICADA (alinha com filtro da aba Comunicações)
+    prisma.communication.count({ where: {
+      ...filtroReporter, ...cf,
+      type: { name: { in: [...CPI_TYPES] } },
+      OR: [
+        { status: "DECIDIDA", ...arquivadaDec, ...pubCaderno },
+        { status: "PUBLICADA_CADERNO", ...arquivadaDec },
+      ],
+    } }),
+    prisma.communication.count({ where: {
+      ...filtroReporter, ...cf,
+      type: { name: { in: [...FAV_TYPES] } },
+      OR: [
+        { status: "PUBLICADA_CADERNO", ...naoArquivadaDec },
+        { status: "DECIDIDA", ...pubCaderno, ...naoArquivadaDec },
+      ],
+    } }),
+    prisma.communication.count({ where: {
+      ...filtroReporter, ...cf,
+      type: { name: { in: [...FAV_TYPES] } },
+      OR: [
+        { status: "DECIDIDA", ...arquivadaDec, ...pubCaderno },
+        { status: "PUBLICADA_CADERNO", ...arquivadaDec },
+      ],
+    } }),
   ]);
-
-  const isArquivado = (summary: string | null) => (summary ?? "").toLowerCase().includes("arquiv");
-  const cpisPublicadas      = allPubItems.filter(i => i.recordType.startsWith("CPI") && !isArquivado(i.decisionSummary)).length;
-  const cpisArquivadas      = allPubItems.filter(i => i.recordType.startsWith("CPI") &&  isArquivado(i.decisionSummary)).length;
-  const elogiososPublicados = allPubItems.filter(i =>
-    (i.recordType === "Referência Elogiosa" || i.recordType === "Elogio publicado em BI") && !isArquivado(i.decisionSummary)
-  ).length;
-  const elogiososArquivados = allPubItems.filter(i =>
-    (i.recordType === "Referência Elogiosa" || i.recordType === "Elogio publicado em BI") &&  isArquivado(i.decisionSummary)
-  ).length;
 
   const pubPorAluno = new Map<string, typeof allPubItems>();
   for (const item of allPubItems) {
@@ -305,22 +336,31 @@ export default async function DashboardPage({
     new Map(data.zonaRisco.filter((s) => s.platoon).map((s) => [s.platoonId!, s.platoon!])).entries()
   ).sort((a, b) => a[1].name.localeCompare(b[1].name));
 
+  function commUrl(status?: string, nat?: string) {
+    const p = new URLSearchParams();
+    if (cursoId) p.set("cursoId", cursoId);
+    if (status)  p.set("status",  status);
+    if (nat)     p.set("nat",     nat);
+    const qs = p.toString();
+    return `/comunicacoes${qs ? `?${qs}` : ""}`;
+  }
+
   const cardsEmTramite = [
-    { label: "CPIs Registradas",              value: data.cards.totalCPIs,                 color: "bg-blue-600" },
-    { label: "Ag. Ciência/Defesa do Aluno",   value: data.cards.aguardandoCienciaDefesa,   color: "bg-yellow-500" },
-    { label: "Prazo Vencido",                 value: data.cards.prazoVencido,              color: "bg-red-600" },
-    { label: "Aguardando Parecer",            value: data.cards.aguardandoParecer,         color: "bg-purple-600" },
-    { label: "Aguardando Decisão",            value: data.cards.aguardandoDecisao,         color: "bg-indigo-600" },
-    { label: "CPIs decididas ag. publicação", value: data.cards.cpisDecididasAgPublicacao, color: "bg-green-600" },
-    { label: "Ref. elogiosa/Elogio",          value: data.cards.referencias,               color: "bg-teal-600" },
+    { label: "CPIs Registradas",              value: data.cards.totalCPIs,                 color: "bg-blue-600",   href: commUrl(undefined, "CPI") },
+    { label: "Ag. Ciência/Defesa do Aluno",   value: data.cards.aguardandoCienciaDefesa,   color: "bg-yellow-500", href: commUrl("AGUARDANDO_CIENCIA") },
+    { label: "Prazo Vencido",                 value: data.cards.prazoVencido,              color: "bg-red-600",    href: commUrl("PRAZO_EXPIRADO") },
+    { label: "Aguardando Parecer",            value: data.cards.aguardandoParecer,         color: "bg-purple-600", href: commUrl("AGUARDANDO_PARECER") },
+    { label: "Aguardando Decisão",            value: data.cards.aguardandoDecisao,         color: "bg-indigo-600", href: commUrl("AGUARDANDO_DECISAO") },
+    { label: "CPIs decididas ag. publicação", value: data.cards.cpisDecididasAgPublicacao, color: "bg-green-600",  href: commUrl("DECIDIDA_NAO_PUBLICADA", "CPI") },
+    { label: "Ref. elogiosa/Elogio",          value: data.cards.referencias,               color: "bg-teal-600",   href: commUrl(undefined, "FAVORAVEL") },
   ];
 
   const cardsTramitadas = [
-    { label: "CPIs c/ sanção publicadas",                       value: data.cards.cpisPublicadas,      color: "bg-slate-700" },
-    { label: "Ref. elogiosa/Elogio homologados publicados",      value: data.cards.elogiososPublicados, color: "bg-emerald-700" },
-    { label: "Cadernos publicados",                             value: data.cards.cadernosPublicados,  color: "bg-cyan-700" },
-    { label: "CPIs arquivadas (sem desconto)",                  value: data.cards.cpisArquivadas,      color: "bg-slate-500" },
-    { label: "Ref. elogiosa/Elogio arquivados (sem acréscimo)", value: data.cards.elogiososArquivados, color: "bg-emerald-500" },
+    { label: "CPIs c/ sanção publicadas",                       value: data.cards.cpisPublicadas,      color: "bg-slate-700",   href: commUrl("DECIDIDA_PUBLICADA",      "CPI") },
+    { label: "Ref. elogiosa/Elogio homologados publicados",      value: data.cards.elogiososPublicados, color: "bg-emerald-700", href: commUrl("DECIDIDA_PUBLICADA",      "FAVORAVEL") },
+    { label: "Cadernos publicados",                             value: data.cards.cadernosPublicados,  color: "bg-cyan-700",    href: "/caderno" },
+    { label: "CPIs arquivadas (sem desconto)",                  value: data.cards.cpisArquivadas,      color: "bg-slate-500",   href: commUrl("ARQUIVADA_PUBLICADA",     "CPI") },
+    { label: "Ref. elogiosa/Elogio arquivados (sem acréscimo)", value: data.cards.elogiososArquivados, color: "bg-emerald-500", href: commUrl("ARQUIVADA_PUBLICADA",     "FAVORAVEL") },
   ];
 
   const agora = new Date();
@@ -358,10 +398,10 @@ export default async function DashboardPage({
         <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Em trâmite</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
           {cardsEmTramite.map((card) => (
-            <div key={card.label} className={`${card.color} rounded-xl p-4 text-white`}>
+            <Link key={card.label} href={card.href} className={`${card.color} rounded-xl p-4 text-white hover:brightness-110 transition-[filter] cursor-pointer`}>
               <p className="text-3xl font-bold">{card.value}</p>
               <p className="text-xs mt-1 opacity-90 leading-tight">{card.label}</p>
-            </div>
+            </Link>
           ))}
         </div>
       </div>
@@ -371,10 +411,10 @@ export default async function DashboardPage({
         <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Tramitadas</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {cardsTramitadas.map((card) => (
-            <div key={card.label} className={`${card.color} rounded-xl p-4 text-white`}>
+            <Link key={card.label} href={card.href} className={`${card.color} rounded-xl p-4 text-white hover:brightness-110 transition-[filter] cursor-pointer`}>
               <p className="text-3xl font-bold">{card.value}</p>
               <p className="text-xs mt-1 opacity-90 leading-tight">{card.label}</p>
-            </div>
+            </Link>
           ))}
         </div>
       </div>

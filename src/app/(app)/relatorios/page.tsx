@@ -51,6 +51,8 @@ export default async function RelatoriosPage({
   const alinea     = sp.alinea     ?? "";
   const pagina     = Math.max(1, parseInt(sp.pagina ?? "1") || 1);
   const paginaArt  = Math.max(1, parseInt(sp.paginaArt ?? "1") || 1);
+  const col        = sp.col  ?? "";
+  const dir        = (sp.dir === "asc" ? "asc" : "desc") as "asc" | "desc";
 
   const school = getSchoolFilter(session.role, session.escola);
 
@@ -113,11 +115,26 @@ export default async function RelatoriosPage({
     Object.assign(whereFreq, statusWhere);
   }
 
+  const COLS: Record<string, object> = {
+    protocolNumber: { protocolNumber: dir },
+    tipo:           { type: { name: dir } },
+    dispositivo:    { article: dir },
+    aluno:          { student: { warName: dir } },
+    curso:          { student: { course: { name: dir } } },
+    data:           { factDate: dir },
+    status:         { status: dir },
+    pontuacao:      { finalScore: dir },
+  };
+
+  const orderBy = col && COLS[col]
+    ? [COLS[col], { createdAt: "desc" as const }]
+    : [{ createdAt: "desc" as const }];
+
   const [totalCount, comunicacoes, tipos, commsParaFreq] = await Promise.all([
     prisma.communication.count({ where }),
     prisma.communication.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy,
       include: {
         type: true,
         student: { include: { course: true } },
@@ -172,12 +189,24 @@ export default async function RelatoriosPage({
     if (artigo)     p.set("artigo",     artigo);
     if (inciso)     p.set("inciso",     inciso);
     if (alinea)     p.set("alinea",     alinea);
+    if (col)        p.set("col",        col);
+    if (dir)        p.set("dir",        dir);
     p.set("pagina",    String(paginaAtual));
     p.set("paginaArt", String(paginaArtAtual));
     for (const [k, v] of Object.entries(overrides)) {
       if (v !== "") p.set(k, String(v)); else p.delete(k);
     }
     return p.toString();
+  }
+
+  function sortHref(newCol: string) {
+    const newDir = col === newCol && dir === "asc" ? "desc" : "asc";
+    return `/relatorios?${buildQS({ col: newCol, dir: newDir, pagina: 1 })}`;
+  }
+
+  function sortIndicator(c: string) {
+    if (col !== c) return <span className="text-gray-300 group-hover:text-gray-500 ml-0.5">↕</span>;
+    return <span className="text-[#1e3a5f] ml-0.5">{dir === "asc" ? "↑" : "↓"}</span>;
   }
 
   function pillHref(id: string) {
@@ -402,14 +431,27 @@ export default async function RelatoriosPage({
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="text-left px-3 py-2.5 font-medium text-gray-700 text-xs whitespace-nowrap">Protocolo</th>
-              <th className="text-left px-3 py-2.5 font-medium text-gray-700 text-xs whitespace-nowrap">Tipo</th>
-              <th className="text-left px-3 py-2.5 font-medium text-gray-700 text-xs whitespace-nowrap">Dispositivo</th>
-              <th className="text-left px-3 py-2.5 font-medium text-gray-700 text-xs whitespace-nowrap">Aluno</th>
-              <th className="text-left px-3 py-2.5 font-medium text-gray-700 text-xs whitespace-nowrap">Curso</th>
-              <th className="text-left px-3 py-2.5 font-medium text-gray-700 text-xs whitespace-nowrap">Data</th>
-              <th className="text-left px-3 py-2.5 font-medium text-gray-700 text-xs whitespace-nowrap">Status</th>
-              <th className="text-left px-3 py-2.5 font-medium text-gray-700 text-xs whitespace-nowrap">Pont.</th>
+              {(
+                [
+                  ["protocolNumber", "Protocolo"],
+                  ["tipo",           "Tipo"],
+                  ["dispositivo",    "Dispositivo"],
+                  ["aluno",          "Aluno"],
+                  ["curso",          "Curso"],
+                  ["data",           "Data"],
+                  ["status",         "Status"],
+                  ["pontuacao",      "Pont."],
+                ] as const
+              ).map(([key, label]) => (
+                <th key={key} className="text-left px-3 py-2.5 font-medium text-gray-700 text-xs whitespace-nowrap">
+                  <Link
+                    href={sortHref(key)}
+                    className="inline-flex items-center gap-0.5 hover:text-[#1e3a5f] transition-colors cursor-pointer group select-none"
+                  >
+                    {label}{sortIndicator(key)}
+                  </Link>
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">

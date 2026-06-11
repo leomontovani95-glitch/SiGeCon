@@ -39,15 +39,17 @@ type CommItem = {
 };
 
 function derivedStatus(c: CommItem): { label: string; color: string } {
+  const arquivada = c.decisions.some((d) => d.decisionType.toLowerCase().includes("arquiv"));
+  const publicada = c.disciplinaryBookItems.some((i) => i.disciplinaryBook.status === "PUBLICADO");
   if (c.status === "PUBLICADA_CADERNO") {
+    if (arquivada) return { label: "Arquivada/Publicada", color: "bg-gray-200 text-gray-700" };
     return { label: "Decidida/Publicada", color: "bg-teal-100 text-teal-700" };
   }
   if (c.status === "DECIDIDA") {
-    const arquivada = c.decisions.some((d) => d.decisionType.toLowerCase().includes("arquiv"));
-    if (arquivada) return { label: "Arquivada", color: "bg-gray-100 text-gray-700" };
-    const publicada = c.disciplinaryBookItems.some((i) => i.disciplinaryBook.status === "PUBLICADO");
-    if (publicada) return { label: "Decidida/Publicada", color: "bg-teal-100 text-teal-700" };
-    return { label: "Decidida/Não publicada", color: "bg-green-100 text-green-700" };
+    if (arquivada && publicada)  return { label: "Arquivada/Publicada",     color: "bg-gray-200 text-gray-700" };
+    if (arquivada && !publicada) return { label: "Arquivada/Não publicada", color: "bg-gray-100 text-gray-500" };
+    if (publicada)               return { label: "Decidida/Publicada",      color: "bg-teal-100 text-teal-700" };
+    return                              { label: "Decidida/Não publicada",  color: "bg-green-100 text-green-700" };
   }
   return {
     label: STATUS_LABELS[c.status] ?? c.status,
