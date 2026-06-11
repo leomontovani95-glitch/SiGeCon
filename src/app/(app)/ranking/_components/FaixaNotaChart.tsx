@@ -34,8 +34,8 @@ export default function FaixaNotaChart({ data }: { data: FaixaNotaEntry[] }) {
             ))}
           </Pie>
           <Tooltip
-            formatter={(v: number, name: string) => [
-              `${v} aluno(s) — ${((v / total) * 100).toFixed(1)}%`,
+            formatter={(v, name) => [
+              `${v as number} aluno(s) — ${(((v as number) / total) * 100).toFixed(1)}%`,
               name,
             ]}
           />
