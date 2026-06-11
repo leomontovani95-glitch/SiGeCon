@@ -18,7 +18,13 @@ import {
 } from "recharts";
 
 export type DiaSemanaEntry   = { dia: string; total: number };
-export type EvolucaoEntry    = { mes: string; CPI: number; "Ref. Elogiosa": number };
+export type EvolucaoEntry    = {
+  mes: string;
+  CPI: number;
+  "Ref. Elogiosa": number;
+  "CPI (ano ant.)"?: number;
+  "Ref. Elogiosa (ano ant.)"?: number;
+};
 export type PelotaoEntry     = { pelotao: string; cpi0: number; cpi1: number; cpi2: number; cpi3: number; total: number };
 export type TipoEntry        = { name: string; value: number };
 export type ArtigoEntry      = { dispositivo: string; count: number };
@@ -77,6 +83,7 @@ export default function AnaliseCharts({
   topAlunos: AlunoEntry[];
 }) {
   const totalCPIs = pelotaoData.reduce((s, p) => s + p.total, 0);
+  const hasComparison = evolucaoMensalData.some((d) => d["CPI (ano ant.)"] !== undefined);
 
   return (
     <div className="space-y-6">
@@ -102,7 +109,9 @@ export default function AnaliseCharts({
         {/* 2 — Evolução mensal */}
         <Panel
           title="Evolução Mensal"
-          subtitle="Comunicações por mês: CPIs (desfavoráveis) e Referências Elogiosas (favoráveis)"
+          subtitle={hasComparison
+            ? "Período atual (linha cheia) vs. mesmo período do ano anterior (tracejado)"
+            : "Comunicações por mês: CPIs (desfavoráveis) e Referências Elogiosas (favoráveis)"}
           total={total}
         >
           {evolucaoMensalData.length > 0 ? (
@@ -121,6 +130,28 @@ export default function AnaliseCharts({
                   strokeWidth={2}
                   dot={{ r: 3 }}
                 />
+                {hasComparison && (
+                  <>
+                    <Line
+                      type="monotone"
+                      dataKey="CPI (ano ant.)"
+                      stroke="#ef4444"
+                      strokeWidth={1.5}
+                      strokeDasharray="5 5"
+                      dot={false}
+                      opacity={0.5}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="Ref. Elogiosa (ano ant.)"
+                      stroke="#22c55e"
+                      strokeWidth={1.5}
+                      strokeDasharray="5 5"
+                      dot={false}
+                      opacity={0.5}
+                    />
+                  </>
+                )}
               </LineChart>
             </ResponsiveContainer>
           ) : (

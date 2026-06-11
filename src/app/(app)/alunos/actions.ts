@@ -48,7 +48,14 @@ export async function salvarAluno(id: string | null, _prev: State, formData: For
         where: { id },
         data: { fullName, warName, courseId, courseNumber, platoonId, rg, functionalNumber, status },
       });
-      if (!existing?.userId && functionalNumber) {
+      if (existing?.userId) {
+        try {
+          await prisma.user.update({
+            where: { id: existing.userId },
+            data: { fullName, warName, rank, rg, ...(functionalNumber ? { functionalNumber } : {}) },
+          });
+        } catch { /* silently ignore unique constraint violations */ }
+      } else if (functionalNumber) {
         try {
           const passwordHash = await bcrypt.hash(senhaInicial(functionalNumber, rg), 10);
           const userAluno = await prisma.user.create({

@@ -12,24 +12,36 @@ export default async function AnalisePage({
   const session = await verifySession();
   if (session.role === "ALUNO") redirect("/acesso-negado");
 
-  const sp          = await searchParams;
-  const cursoId     = sp.cursoId    ?? "";
-  const dataInicio  = sp.dataInicio ?? "";
-  const dataFim     = sp.dataFim    ?? "";
+  const sp         = await searchParams;
+  const cursoId    = sp.cursoId    ?? "";
+  const platoonId  = sp.platoonId  ?? "";
+  const dataInicio = sp.dataInicio ?? "";
+  const dataFim    = sp.dataFim    ?? "";
 
   const school = getSchoolFilter(session.role, session.escola);
 
-  const cursosDisponiveis = await prisma.course.findMany({
-    where: { active: true, ...(school ? { school } : {}) },
-    orderBy: { name: "asc" },
-    select: { id: true, name: true },
-  });
+  const [cursosDisponiveis, platoesDisponiveis] = await Promise.all([
+    prisma.course.findMany({
+      where: { active: true, ...(school ? { school } : {}) },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    cursoId
+      ? prisma.platoon.findMany({
+          where: { courseId: cursoId, active: true },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([] as { id: string; name: string }[]),
+  ]);
 
   const courseFilter = cursoId
     ? { courseId: cursoId }
     : school
       ? { course: { school } }
       : {};
+
+  const platoonFilter = platoonId ? { platoonId } : {};
 
   const dateFilter =
     dataInicio || dataFim
@@ -41,7 +53,7 @@ export default async function AnalisePage({
         }
       : {};
 
-  const where = { ...courseFilter, ...dateFilter };
+  const where = { ...courseFilter, ...platoonFilter, ...dateFilter };
 
   const allComms = await prisma.communication.findMany({
     where,
@@ -68,7 +80,7 @@ export default async function AnalisePage({
 
   const total = allComms.length;
 
-  // ── 1. Frequência por dia da semana ────────────────────────────────────────
+  // ── 1. Frequência por dia da semana ──────────────────────────────────────
   const diasNomes = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
   const diasCount = new Array(7).fill(0) as number[];
   for (const c of allComms) {
@@ -76,7 +88,7 @@ export default async function AnalisePage({
   }
   const diaSemanaData = diasNomes.map((dia, i) => ({ dia, total: diasCount[i] }));
 
-  // ── 2. Evolução mensal ─────────────────────────────────────────────────────
+  // ── 2. Evolução mensal ────────────────────────────────────────────────────
   const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
   const monthlyMap = new Map<string, { CPI: number; refElogiosa: number }>();
   for (const c of allComms) {
@@ -87,18 +99,46 @@ export default async function AnalisePage({
     else prev.refElogiosa++;
     monthlyMap.set(key, prev);
   }
+
+  // Comparação com o mesmo período do ano anterior (requer ambas as datas)
+  let prevMonthlyMap: Map<string, { CPI: number; refElogiosa: number }> | null = null;
+  if (dataInicio && dataFim) {
+    const prevStart = new Date(dataInicio);
+    prevStart.setFullYear(prevStart.getFullYear() - 1);
+    const prevEnd = new Date(dataFim);
+    prevEnd.setFullYear(prevEnd.getFullYear() - 1);
+    const prevComms = await prisma.communication.findMany({
+      where: { ...courseFilter, ...platoonFilter, factDate: { gte: prevStart, lte: prevEnd } },
+      select: { factDate: true, type: { select: { scoreNature: true } } },
+    });
+    prevMonthlyMap = new Map();
+    for (const c of prevComms) {
+      const d   = new Date(c.factDate);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const prev = prevMonthlyMap.get(key) ?? { CPI: 0, refElogiosa: 0 };
+      if (c.type.scoreNature === "DESFAVORAVEL") prev.CPI++;
+      else prev.refElogiosa++;
+      prevMonthlyMap.set(key, prev);
+    }
+  }
+
   const evolucaoMensalData = Array.from(monthlyMap.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([key, val]) => {
       const [year, month] = key.split("-");
+      const prevKey = `${parseInt(year) - 1}-${month}`;
+      const prevVal = prevMonthlyMap?.get(prevKey);
       return {
         mes:             `${MESES[parseInt(month) - 1]}/${year.slice(2)}`,
         CPI:             val.CPI,
         "Ref. Elogiosa": val.refElogiosa,
+        ...(prevVal !== undefined
+          ? { "CPI (ano ant.)": prevVal.CPI, "Ref. Elogiosa (ano ant.)": prevVal.refElogiosa }
+          : {}),
       };
     });
 
-  // ── 3. Comparativo entre pelotões ──────────────────────────────────────────
+  // ── 3. Comparativo entre pelotões ─────────────────────────────────────────
   const pelotaoMap = new Map<string, { cpi0: number; cpi1: number; cpi2: number; cpi3: number }>();
   for (const c of allComms) {
     if (!c.type.name.toLowerCase().includes("cpi")) continue;
@@ -164,28 +204,55 @@ export default async function AnalisePage({
   const labelEscopo = school === "ESFAP" ? "Todos da EsFAP"
     : school === "ESFO"  ? "Todos da EsFO"
     : "Todos os cursos";
-  const cursoSelecionado = cursosDisponiveis.find((c) => c.id === cursoId);
+  const cursoSelecionado  = cursosDisponiveis.find((c) => c.id === cursoId);
+  const plataoSelecionado = platoesDisponiveis.find((p) => p.id === platoonId);
 
   function pillHref(id: string) {
     const p = new URLSearchParams();
-    if (id)          p.set("cursoId",    id);
-    if (dataInicio)  p.set("dataInicio", dataInicio);
-    if (dataFim)     p.set("dataFim",    dataFim);
+    if (id)         p.set("cursoId",    id);
+    if (dataInicio) p.set("dataInicio", dataInicio);
+    if (dataFim)    p.set("dataFim",    dataFim);
+    // platoonId é intencionalmente descartado ao trocar o curso
+    const qs = p.toString();
+    return `/analise${qs ? `?${qs}` : ""}`;
+  }
+
+  function platoonPillHref(pid: string) {
+    const p = new URLSearchParams();
+    if (cursoId)    p.set("cursoId",    cursoId);
+    if (pid)        p.set("platoonId",  pid);
+    if (dataInicio) p.set("dataInicio", dataInicio);
+    if (dataFim)    p.set("dataFim",    dataFim);
     const qs = p.toString();
     return `/analise${qs ? `?${qs}` : ""}`;
   }
 
   function clearDatesHref() {
-    return cursoId ? `/analise?cursoId=${cursoId}` : "/analise";
+    const p = new URLSearchParams();
+    if (cursoId)   p.set("cursoId",   cursoId);
+    if (platoonId) p.set("platoonId", platoonId);
+    const qs = p.toString();
+    return `/analise${qs ? `?${qs}` : ""}`;
   }
 
   function pdfHref() {
     const p = new URLSearchParams();
     if (cursoId)    p.set("cursoId",    cursoId);
+    if (platoonId)  p.set("platoonId",  platoonId);
     if (dataInicio) p.set("dataInicio", dataInicio);
     if (dataFim)    p.set("dataFim",    dataFim);
     const qs = p.toString();
     return `/analise/imprimir${qs ? `?${qs}` : ""}`;
+  }
+
+  function csvHref() {
+    const p = new URLSearchParams();
+    if (cursoId)    p.set("cursoId",    cursoId);
+    if (platoonId)  p.set("platoonId",  platoonId);
+    if (dataInicio) p.set("dataInicio", dataInicio);
+    if (dataFim)    p.set("dataFim",    dataFim);
+    const qs = p.toString();
+    return `/api/export/analise${qs ? `?${qs}` : ""}`;
   }
 
   return (
@@ -196,16 +263,25 @@ export default async function AnalisePage({
           <h1 className="text-2xl font-bold text-gray-900">Análise</h1>
           <p className="text-sm text-gray-500">
             {cursoSelecionado ? cursoSelecionado.name : labelEscopo}
+            {plataoSelecionado ? ` · ${plataoSelecionado.name}` : ""}
             {" · "}{total} comunicação(ões) considerada(s)
           </p>
         </div>
-        <Link
-          href={pdfHref()}
-          target="_blank"
-          className="bg-[#1e3a5f] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#16304f] transition-colors flex items-center gap-2"
-        >
-          <span>📄</span> Gerar PDF
-        </Link>
+        <div className="flex gap-2 flex-wrap">
+          <a
+            href={csvHref()}
+            className="border border-[#1e3a5f] text-[#1e3a5f] px-4 py-2 rounded-lg text-sm hover:bg-[#1e3a5f] hover:text-white transition-colors flex items-center gap-2"
+          >
+            <span>⬇</span> Exportar CSV
+          </a>
+          <Link
+            href={pdfHref()}
+            target="_blank"
+            className="bg-[#1e3a5f] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#16304f] transition-colors flex items-center gap-2"
+          >
+            <span>📄</span> Gerar PDF
+          </Link>
+        </div>
       </div>
 
       {/* Seletor de cursos */}
@@ -242,11 +318,51 @@ export default async function AnalisePage({
         </div>
       )}
 
+      {/* Seletor de pelotões */}
+      {cursoId && platoesDisponiveis.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-5">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Filtrar por pelotão
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={platoonPillHref("")}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                !platoonId
+                  ? "bg-[#1e3a5f] text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              Todos os pelotões
+            </Link>
+            {platoesDisponiveis.map((p) => (
+              <Link
+                key={p.id}
+                href={platoonPillHref(p.id)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  platoonId === p.id
+                    ? "bg-[#1e3a5f] text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                {p.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Filtro de período */}
       <form method="GET" className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
-        {cursoId && <input type="hidden" name="cursoId" value={cursoId} />}
+        {cursoId   && <input type="hidden" name="cursoId"   value={cursoId} />}
+        {platoonId && <input type="hidden" name="platoonId" value={platoonId} />}
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
           Filtrar por período
+          {dataInicio && dataFim && (
+            <span className="ml-2 text-xs font-normal text-blue-600 normal-case">
+              — gráfico mensal exibe comparação com o mesmo período do ano anterior
+            </span>
+          )}
         </p>
         <div className="flex flex-wrap gap-4 items-end">
           <div>

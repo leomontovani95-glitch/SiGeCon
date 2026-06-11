@@ -33,22 +33,30 @@ export default async function AnaliseImprimirPage({
 
   const sp         = await searchParams;
   const cursoId    = sp.cursoId    ?? "";
+  const platoonId  = sp.platoonId  ?? "";
   const dataInicio = sp.dataInicio ?? "";
   const dataFim    = sp.dataFim    ?? "";
 
   const school = getSchoolFilter(session.role, session.escola);
 
-  const cursosDisponiveis = await prisma.course.findMany({
-    where: { active: true, ...(school ? { school } : {}) },
-    orderBy: { name: "asc" },
-    select: { id: true, name: true },
-  });
+  const [cursosDisponiveis, plataoSelecionado] = await Promise.all([
+    prisma.course.findMany({
+      where: { active: true, ...(school ? { school } : {}) },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    platoonId
+      ? prisma.platoon.findUnique({ where: { id: platoonId }, select: { name: true } })
+      : Promise.resolve(null),
+  ]);
 
   const courseFilter = cursoId
     ? { courseId: cursoId }
     : school
       ? { course: { school } }
       : {};
+
+  const platoonFilter = platoonId ? { platoonId } : {};
 
   const dateFilter =
     dataInicio || dataFim
@@ -60,7 +68,7 @@ export default async function AnaliseImprimirPage({
         }
       : {};
 
-  const where = { ...courseFilter, ...dateFilter };
+  const where = { ...courseFilter, ...platoonFilter, ...dateFilter };
 
   const allComms = await prisma.communication.findMany({
     where,
@@ -165,7 +173,7 @@ export default async function AnaliseImprimirPage({
   // ── Metadados para o cabeçalho ────────────────────────────────────────────
   const cursoSelecionado = cursosDisponiveis.find((c) => c.id === cursoId);
   const labelEscopo = school === "ESFAP" ? "EsFAP" : school === "ESFO" ? "EsFO" : "Todos os cursos";
-  const escopo = cursoSelecionado?.name ?? labelEscopo;
+  const escopo = [cursoSelecionado?.name ?? labelEscopo, plataoSelecionado?.name].filter(Boolean).join(" · ");
 
   const periodoLabel =
     dataInicio && dataFim

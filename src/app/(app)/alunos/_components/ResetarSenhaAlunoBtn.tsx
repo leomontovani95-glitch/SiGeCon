@@ -1,10 +1,12 @@
 "use client";
+import { useState } from "react";
 import { useActionState } from "react";
 import { resetarSenhaAluno } from "../actions";
 
 export default function ResetarSenhaAlunoBtn({ studentId }: { studentId: string }) {
   const action = resetarSenhaAluno.bind(null, studentId);
   const [state, formAction, pending] = useActionState(action, undefined);
+  const [confirming, setConfirming] = useState(false);
 
   return (
     <div className="mt-6 border-t border-gray-200 pt-6">
@@ -23,15 +25,35 @@ export default function ResetarSenhaAlunoBtn({ studentId }: { studentId: string 
           {state.error}
         </div>
       )}
-      <form action={formAction}>
+      {!confirming ? (
         <button
-          type="submit"
-          disabled={pending}
-          className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          type="button"
+          onClick={() => setConfirming(true)}
+          className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
         >
-          {pending ? "Redefinindo..." : "Redefinir Senha para Nº Funcional"}
+          Redefinir Senha para Nº Funcional
         </button>
-      </form>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <span className="text-amber-800 text-sm font-medium">Confirma a redefinição de senha?</span>
+          <form action={formAction} className="flex items-center gap-2">
+            <button
+              type="submit"
+              disabled={pending}
+              className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-50"
+            >
+              {pending ? "Redefinindo..." : "Sim, redefinir"}
+            </button>
+          </form>
+          <button
+            type="button"
+            onClick={() => setConfirming(false)}
+            className="text-gray-600 hover:text-gray-800 text-xs px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
     </div>
   );
 }

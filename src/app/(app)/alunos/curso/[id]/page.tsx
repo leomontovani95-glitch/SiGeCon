@@ -46,7 +46,8 @@ export default async function CursoAlunosPage({
 
   const { id } = await params;
   const sp = await searchParams;
-  const busca   = sp.busca ?? "";
+  const busca        = sp.busca   ?? "";
+  const statusFiltro = sp.status  ?? "";
   const sortBy  = sp.sortBy ?? "courseNumber";
   const sortDir = (sp.sortDir === "desc" ? "desc" : "asc") as SortDir;
   const page    = Math.max(1, parseInt(sp.page ?? "1") || 1);
@@ -58,6 +59,7 @@ export default async function CursoAlunosPage({
 
   const where = {
     courseId: id,
+    ...(statusFiltro ? { status: statusFiltro } : {}),
     ...(busca ? {
       OR: [
         { fullName: { contains: busca } },
@@ -131,19 +133,27 @@ export default async function CursoAlunosPage({
       </div>
 
       {/* Busca — preserva sort e reseta página */}
-      <form method="GET" className="mb-5 flex gap-2">
+      <form method="GET" className="mb-5 flex flex-wrap gap-2">
         <input
           name="busca"
           defaultValue={busca}
           placeholder="Buscar por nome, nome de guerra, RG ou nº de curso..."
           className="w-full max-w-md input"
         />
+        <select name="status" defaultValue={statusFiltro} className="input text-sm">
+          <option value="">Todas as situações</option>
+          <option value="ATIVO">Ativo</option>
+          <option value="DESLIGADO">Desligado</option>
+          <option value="TRANSFERIDO">Transferido</option>
+          <option value="FORMADO">Formado</option>
+          <option value="ARQUIVADO">Arquivado</option>
+        </select>
         <input type="hidden" name="sortBy"  value={sortBy} />
         <input type="hidden" name="sortDir" value={sortDir} />
-        <button type="submit" className="btn-primary px-4">Buscar</button>
-        {busca && (
+        <button type="submit" className="btn-primary px-4">Filtrar</button>
+        {(busca || statusFiltro) && (
           <Link href={`/alunos/curso/${id}`} className="btn-secondary px-4 flex items-center">
-            Limpar
+            Limpar filtros
           </Link>
         )}
       </form>
