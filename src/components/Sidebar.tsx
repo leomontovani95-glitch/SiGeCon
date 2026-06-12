@@ -52,6 +52,7 @@ const nav: NavItem[] = [
   { href: "/comunicacoes",             label: "Comunicações",         icon: "📋", hasBadge: true },
   { href: "/comunicacoes/nova/cpi",       label: "Nova CPI",             icon: "📝", cfoOnly: true },
   { href: "/comunicacoes/nova/referencia", label: "Nova Ref. Elogiosa",  icon: "⭐", cfoOnly: true },
+  { href: "/comunicacoes/nova/lote",      label: "Registro em Lote",    icon: "📝", roles: [...COMANDANTES, ...PARECERISTAS, "PROTOCOLO"] },
   { href: "/despachos",    label: "Despachos",            icon: "📨", roles: DESPACHOS_ROLES, hasBadge: true },
   { href: "/alunos",       label: "Alunos",               icon: "👤", roles: STAFF },
   { href: "/caderno",      label: "Caderno Disciplinar",  icon: "📖", roles: STAFF },

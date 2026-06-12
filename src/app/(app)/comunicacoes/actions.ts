@@ -9,6 +9,7 @@ import { gerarProtocolo } from "@/lib/protocolo";
 import { calcularPrazoDefesa } from "@/lib/prazos";
 
 type State = { error: string } | undefined;
+export type LoteState = { error: string } | { success: true; count: number; protocols: string[] } | undefined;
 
 const TIPOS_PERMITIDOS = ["image/png", "image/jpeg", "application/pdf"];
 const LIMITE_TOTAL_BYTES = 5 * 1024 * 1024; // 5 MB total
@@ -125,6 +126,81 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
 
   try { await auditLog(session.userId, "CREATE", "Communication", commId, `Protocolo: ${protocolNumber}`); } catch {}
   redirect(`/comunicacoes/${commId}`);
+}
+
+// ── Registrar comunicação em lote (múltiplos alunos, mesmo fato) ─────────
+export async function registrarComunicacaoEmLote(_prev: LoteState, formData: FormData): Promise<LoteState> {
+  const session = await verifySession();
+  if (session.role === "ALUNO") return { error: "Sem permissão." };
+
+  const studentIds = (formData.getAll("studentId") as string[]).map(String).filter(Boolean);
+  if (studentIds.length < 2) return { error: "Selecione ao menos 2 alunos para registro em lote." };
+
+  const typeId          = String(formData.get("typeId") ?? "").trim();
+  const factDate        = String(formData.get("factDate") ?? "").trim();
+  const factTime        = String(formData.get("factTime") ?? "").trim() || null;
+  const factPlace       = String(formData.get("factPlace") ?? "").trim() || null;
+  const factDescription = String(formData.get("factDescription") ?? "").trim();
+  const manualRuleId    = String(formData.get("manualRuleId") ?? "").trim();
+  const suggestedScore  = formData.get("suggestedScore") ? Number(formData.get("suggestedScore")) : null;
+  const communicantRank = String(formData.get("communicantRank") ?? "").trim();
+  const communicantNameRaw = String(formData.get("communicantName") ?? "").trim();
+  const communicantName = communicantRank ? `${communicantRank} ${communicantNameRaw}`.trim() : communicantNameRaw || null;
+  const communicantUserId = String(formData.get("communicantUserId") ?? "").trim() || null;
+  const adaptationPeriod = formData.get("adaptationPeriod") === "true";
+
+  if (!manualRuleId)    return { error: "Selecione o dispositivo legal completo." };
+  if (!typeId)          return { error: "Selecione o tipo de comunicação." };
+  if (!factDate)        return { error: "Informe a data do fato." };
+  if (!factDescription) return { error: "Descreva o fato ocorrido." };
+  if (!communicantName) return { error: "Informe o comunicante." };
+
+  const regra = await prisma.manualRule.findUnique({ where: { id: manualRuleId } });
+  if (!regra) return { error: "Dispositivo legal inválido." };
+
+  const tipo = await prisma.communicationType.findUnique({ where: { id: typeId } });
+  if (!tipo) return { error: "Tipo de comunicação não encontrado." };
+
+  const witnessRanks = formData.getAll("witnessRank") as string[];
+  const witnessNames = formData.getAll("witnessName") as string[];
+  const testemunhas = witnessRanks
+    .map((rank, i) => ({ rank: rank.trim(), name: (witnessNames[i] ?? "").trim() }))
+    .filter((w) => w.name);
+
+  const protocols: string[] = [];
+  for (const studentId of studentIds) {
+    const aluno = await prisma.student.findUnique({ where: { id: studentId }, include: { course: true } });
+    if (!aluno) continue;
+
+    const protocolNumber = await gerarProtocolo(tipo.name, aluno.course.name);
+    try {
+      const comm = await prisma.communication.create({
+        data: {
+          protocolNumber, typeId, studentId,
+          courseId: aluno.courseId, courseNumber: aluno.courseNumber, platoonId: aluno.platoonId,
+          reporterId: session.userId, factDate: new Date(factDate + "T12:00:00"),
+          factTime, factPlace, factDescription,
+          manualRuleId, article: regra.article, item: regra.item, letter: regra.letter,
+          suggestedScore, communicantName, communicantUserId, adaptationPeriod,
+          status: "AGUARDANDO_CIENCIA",
+          defenseDeadline: calcularPrazoDefesa(new Date()),
+        },
+      });
+      if (testemunhas.length > 0) {
+        await prisma.witness.createMany({
+          data: testemunhas.map((w) => ({
+            communicationId: comm.id,
+            name: w.rank ? `${w.rank} ${w.name}` : w.name,
+          })),
+        }).catch(() => {});
+      }
+      await auditLog(session.userId, "CREATE", "Communication", comm.id, `Lote — Protocolo: ${protocolNumber}`).catch(() => {});
+      protocols.push(protocolNumber);
+    } catch { /* continua para próximo aluno */ }
+  }
+
+  if (protocols.length === 0) return { error: "Nenhuma comunicação pôde ser registrada. Verifique os dados." };
+  return { success: true, count: protocols.length, protocols };
 }
 
 // ── Tomar ciência e apresentar defesa (formulário único) ─────────────────

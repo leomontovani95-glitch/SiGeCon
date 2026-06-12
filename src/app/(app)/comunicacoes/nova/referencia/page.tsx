@@ -52,7 +52,14 @@ export default async function NovaReferenciaPage() {
 
   return (
     <div className="p-6 max-w-3xl">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Nova Referência Elogiosa</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Nova Referência Elogiosa</h1>
+        {!isAluno && (
+          <a href="/comunicacoes/nova/lote" className="text-sm text-[#1e3a5f] hover:underline font-medium">
+            Registrar para múltiplos alunos →
+          </a>
+        )}
+      </div>
       <ComunicacaoForm tipos={tipos} regras={regras} cursos={cursos} comunicanteFixo={comunicanteFixo} />
     </div>
   );

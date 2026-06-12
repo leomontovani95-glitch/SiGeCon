@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import NotaChart from "../_components/NotaChart";
 
 const STATUS_MAP: Record<string, string> = {
   REGISTRADA: "Registrada",
@@ -28,7 +29,7 @@ export default async function AlunoPage({
   const sp = await searchParams;
   const adaptacao = sp.adaptacao ?? "";
 
-  const [aluno, pubItems, provisItems] = await Promise.all([
+  const [aluno, pubItems, provisItems, livros] = await Promise.all([
     prisma.student.findUnique({
       where: { id },
       include: {
@@ -48,6 +49,16 @@ export default async function AlunoPage({
       where: { studentId: id, disciplinaryBook: { status: "RASCUNHO" } },
       include: { communication: { include: { type: { select: { scoreNature: true } } } } },
     }),
+    prisma.disciplinaryBook.findMany({
+      where: { status: "PUBLICADO", items: { some: { studentId: id } } },
+      include: {
+        items: {
+          where: { studentId: id },
+          include: { communication: { include: { type: { select: { scoreNature: true } } } } },
+        },
+      },
+      orderBy: { number: "asc" },
+    }),
   ]);
   if (!aluno) notFound();
 
@@ -66,6 +77,21 @@ export default async function AlunoPage({
   const totalFavoravel = pubItems
     .filter((i) => i.communication.type.scoreNature === "FAVORAVEL")
     .reduce((s, i) => s + Math.abs(i.score ?? 0), 0);
+
+  // Evolução da nota por caderno publicado
+  const evolucaoNota: { label: string; nota: number }[] = [];
+  let notaAcc = 10;
+  for (const livro of livros) {
+    for (const item of livro.items) {
+      const mag = Math.abs(item.score ?? 0);
+      if (item.communication.type.scoreNature === "DESFAVORAVEL") notaAcc -= mag;
+      else notaAcc += mag;
+    }
+    evolucaoNota.push({
+      label: `CD ${String(livro.number).padStart(2, "0")}`,
+      nota: Math.round(notaAcc * 100) / 100,
+    });
+  }
 
   // Contagens para os pills do filtro
   const totalAdaptacao = aluno.communications.filter((c) => c.adaptationPeriod).length;
@@ -168,6 +194,14 @@ export default async function AlunoPage({
           )}
         </div>
       </div>
+
+      {/* Gráfico de evolução da nota */}
+      {evolucaoNota.length >= 2 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Evolução da Nota — por Caderno Publicado</h2>
+          <NotaChart data={evolucaoNota} />
+        </div>
+      )}
 
       {/* Filtro de Período de Adaptação — acima do resumo */}
       <div className="bg-white rounded-xl border border-gray-200 px-5 py-3 mb-1 flex items-center gap-3 flex-wrap">
