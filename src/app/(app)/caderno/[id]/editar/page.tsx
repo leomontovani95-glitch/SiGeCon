@@ -8,6 +8,8 @@ import Link from "next/link";
 import PublicarBtn from "../../_components/PublicarBtn";
 import RemoverItemBtn from "../../_components/RemoverItemBtn";
 import AdicionarItemBtn from "../../_components/AdicionarItemBtn";
+import GerarAACPBtn from "../../_components/GerarAACPBtn";
+import AACPEditor from "../../_components/AACPEditor";
 
 export default async function EditarCadernoPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await verifyRole(
@@ -24,6 +26,14 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
       include: {
         createdBy: true,
         course: true,
+        aacp: {
+          include: {
+            dayGroups: { include: { actions: { orderBy: { order: "asc" } } }, orderBy: { order: "asc" } },
+            materiais: { orderBy: { order: "asc" } },
+            observacoes: { orderBy: { order: "asc" } },
+            dispositivosLegais: { orderBy: { order: "asc" } },
+          },
+        },
         items: {
           include: {
             student: { include: { course: true, platoon: true } },
@@ -213,6 +223,36 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
             <em> Publicada em Caderno</em> e as pontuações passarão a contar na nota dos alunos.
           </p>
           <PublicarBtn cadernoId={id} />
+        </div>
+      )}
+
+      {/* ── AACP — somente para rascunhos ──────────────────────────── */}
+      {caderno.status === "RASCUNHO" && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="font-semibold text-gray-900">AACP — Atividades de Ajuste de Conduta Profissional</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Anexo do caderno disciplinar, impresso na página seguinte do PDF.</p>
+            </div>
+            {!caderno.aacp && <GerarAACPBtn cadernoId={id} />}
+          </div>
+
+          {caderno.aacp ? (
+            <AACPEditor aacp={{
+              id: caderno.aacp.id,
+              saturdayDate: caderno.aacp.saturdayDate.toISOString().split("T")[0],
+              sundayDate:   caderno.aacp.sundayDate.toISOString().split("T")[0],
+              local:        caderno.aacp.local,
+              fiscalizacao: caderno.aacp.fiscalizacao,
+              versao:       caderno.aacp.versao,
+              dayGroups:    caderno.aacp.dayGroups,
+              materiais:    caderno.aacp.materiais,
+              observacoes:  caderno.aacp.observacoes,
+              dispositivosLegais: caderno.aacp.dispositivosLegais,
+            }} />
+          ) : (
+            <p className="text-sm text-gray-400 italic">Nenhuma AACP gerada ainda.</p>
+          )}
         </div>
       )}
     </div>

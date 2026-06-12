@@ -262,6 +262,73 @@ model DisciplinaryBook {
   publishedBy User?                  @relation("Publisher", fields: [publishedById], references: [id])
   course      Course?                @relation(fields: [courseId], references: [id])
   items       DisciplinaryBookItem[]
+  aacp        Aacp?
+}
+
+model Aacp {
+  id                 String   @id @default(cuid())
+  disciplinaryBookId String   @unique
+  local              String   @default("Academia de Polícia Militar – APMES")
+  fiscalizacao       String   @default("Oficial de Dia")
+  versao             Int      @default(1)
+  saturdayDate       DateTime
+  sundayDate         DateTime
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  disciplinaryBook   DisciplinaryBook       @relation(fields: [disciplinaryBookId], references: [id], onDelete: Cascade)
+  dayGroups          AacpDayGroup[]
+  materiais          AacpMaterial[]
+  observacoes        AacpObservacao[]
+  dispositivosLegais AacpDispositivoLegal[]
+}
+
+model AacpDayGroup {
+  id       String @id @default(cuid())
+  aacpId   String
+  day      String
+  cpiLabel String
+  order    Int
+
+  aacp    Aacp         @relation(fields: [aacpId], references: [id], onDelete: Cascade)
+  actions AacpAction[]
+}
+
+model AacpAction {
+  id      String @id @default(cuid())
+  groupId String
+  acao    String
+  periodo String
+  order   Int
+
+  group AacpDayGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+}
+
+model AacpMaterial {
+  id     String @id @default(cuid())
+  aacpId String
+  text   String
+  order  Int
+
+  aacp Aacp @relation(fields: [aacpId], references: [id], onDelete: Cascade)
+}
+
+model AacpObservacao {
+  id     String @id @default(cuid())
+  aacpId String
+  text   String
+  order  Int
+
+  aacp Aacp @relation(fields: [aacpId], references: [id], onDelete: Cascade)
+}
+
+model AacpDispositivoLegal {
+  id     String @id @default(cuid())
+  aacpId String
+  text   String
+  order  Int
+
+  aacp Aacp @relation(fields: [aacpId], references: [id], onDelete: Cascade)
 }
 
 model DisciplinaryBookItem {

@@ -21,6 +21,14 @@ async function fetchCaderno(id: string) {
           communication: { select: { protocolNumber: true, article: true, item: true, letter: true } },
         },
       },
+      aacp: {
+        include: {
+          dayGroups: { include: { actions: { orderBy: { order: "asc" } } }, orderBy: { order: "asc" } },
+          materiais: { orderBy: { order: "asc" } },
+          observacoes: { orderBy: { order: "asc" } },
+          dispositivosLegais: { orderBy: { order: "asc" } },
+        },
+      },
     },
   });
   if (!caderno) notFound();
@@ -137,6 +145,175 @@ function TabelaTipo({ items, label, note, isTdTac }: { items: Item[]; label: str
   );
 }
 
+type AacpData = NonNullable<Awaited<ReturnType<typeof fetchCaderno>>["aacp"]>;
+type CadernoMeta = { number: number; course?: { name: string; school?: string | null } | null; school?: string | null };
+type ChefeUser = { rank: string; fullName: string } | null;
+
+function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoMeta; chefe: ChefeUser }) {
+  const sat = new Date(aacp.saturdayDate);
+  const sun = new Date(aacp.sundayDate);
+  const numero = `${String(caderno.number).padStart(2, "0")}/${sat.getFullYear()}`;
+  const cursosNome = caderno.course?.name ?? "—";
+  const escola = (caderno.course?.school ?? caderno.school) as string | null | undefined;
+  const efetivoDicente = escola === "ESFAP" ? "Conforme Caderno Disciplinar EsFAP"
+    : escola === "ESFO" ? "Conforme Caderno Disciplinar EsFO"
+    : "Conforme Caderno Disciplinar";
+  const fmtDate = (d: Date) => format(d, "dd/MM/yyyy", { locale: ptBR });
+  const dateStr = sat.toDateString() === sun.toDateString()
+    ? fmtDate(sat)
+    : `${fmtDate(sat)} e ${fmtDate(sun)}`;
+
+  // Monta linhas da tabela com rowSpan para DIA e CPI
+  type Row = {
+    showDay: boolean; daySpan: number; dayLabel: string;
+    showCpi: boolean; cpiSpan: number; cpiLabel: string;
+    acao: string; periodo: string; key: string;
+  };
+  const rows: Row[] = [];
+  const DAY_ORDER = ["SABADO", "DOMINGO"];
+  const byDay = new Map<string, typeof aacp.dayGroups>();
+  for (const g of aacp.dayGroups) {
+    if (!byDay.has(g.day)) byDay.set(g.day, []);
+    byDay.get(g.day)!.push(g);
+  }
+  const orderedDays = [...DAY_ORDER.filter(d => byDay.has(d)), ...[...byDay.keys()].filter(d => !DAY_ORDER.includes(d))];
+  for (const day of orderedDays) {
+    const dGroups = byDay.get(day)!;
+    const dayTotal = dGroups.reduce((s, g) => s + g.actions.length, 0);
+    let dayShown = false;
+    for (const group of dGroups) {
+      let grpShown = false;
+      for (const action of group.actions) {
+        rows.push({
+          showDay: !dayShown, daySpan: dayTotal,
+          dayLabel: day === "SABADO" ? "SÁBADO" : day === "DOMINGO" ? "DOMINGO" : day,
+          showCpi: !grpShown, cpiSpan: group.actions.length, cpiLabel: group.cpiLabel,
+          acao: action.acao, periodo: action.periodo, key: action.id,
+        });
+        if (!grpShown) grpShown = true;
+        if (!dayShown) dayShown = true;
+      }
+    }
+  }
+
+  const cell: React.CSSProperties = { border: "1px solid #aaa", padding: "3px 7px" };
+  const hdr: React.CSSProperties = { fontWeight: "bold" };
+
+  return (
+    <div style={{ pageBreakBefore: "always", breakBefore: "page", fontFamily: "Arial, sans-serif", fontSize: "8pt", color: "#000" }}>
+
+      {/* Cabeçalho institucional */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "2px solid #1e3a5f", paddingBottom: 7, marginBottom: 8, gap: 8 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-pmes.png" alt="PMES" style={{ height: 48, width: 48, objectFit: "contain" }} />
+        <div style={{ flex: 1, textAlign: "center", lineHeight: 1.35 }}>
+          <p style={{ margin: 0, fontSize: "7pt", textTransform: "uppercase" }}>Governo do Estado do Espírito Santo</p>
+          <p style={{ margin: 0, fontSize: "10pt", fontWeight: "bold", color: "#1e3a5f", textTransform: "uppercase" }}>Polícia Militar</p>
+          <p style={{ margin: 0, fontSize: "8pt", fontWeight: "bold", textTransform: "uppercase" }}>Academia de Polícia Militar</p>
+          <p style={{ margin: 0, fontSize: "7pt", fontStyle: "italic", color: "#555" }}>"Policial Militar, herói protetor da sociedade"</p>
+        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brasao-apm.png" alt="APM/ES" style={{ height: 48, width: 48, objectFit: "contain" }} />
+      </div>
+
+      {/* Bloco de identificação */}
+      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 6, fontSize: "8pt" }}>
+        <tbody>
+          <tr>
+            <td style={{ ...cell, fontWeight: "bold", textAlign: "center", textTransform: "uppercase", letterSpacing: "0.3px", width: "75%" }}>
+              Atividades de Ajuste de Conduta Profissional
+            </td>
+            <td rowSpan={2} style={{ ...cell, fontWeight: "bold", textAlign: "center", verticalAlign: "middle", whiteSpace: "nowrap" }}>
+              Nº {numero}
+            </td>
+          </tr>
+          <tr>
+            <td style={{ ...cell, textAlign: "center", fontWeight: "bold" }}>{cursosNome}</td>
+          </tr>
+          <tr>
+            <td colSpan={2} style={cell}><span style={hdr}>LOCAL DE REALIZAÇÃO: </span>{aacp.local}</td>
+          </tr>
+          <tr>
+            <td colSpan={2} style={cell}><span style={hdr}>DATA: </span>{dateStr}</td>
+          </tr>
+          <tr>
+            <td colSpan={2} style={cell}><span style={hdr}>FISCALIZAÇÃO: </span>{aacp.fiscalizacao}</td>
+          </tr>
+          <tr>
+            <td colSpan={2} style={cell}><span style={hdr}>EFETIVO DISCENTE: </span>{efetivoDicente}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* Tabela de desenvolvimento */}
+      <table className="cd-table" style={{ marginBottom: 5 }}>
+        <thead>
+          <tr>
+            <th style={{ width: "8%", textAlign: "center", background: "#1e3a5f", color: "#fff" }}>DIA</th>
+            <th style={{ width: "8%", textAlign: "center", background: "#1e3a5f", color: "#fff" }}>CPI</th>
+            <th style={{ width: "70%", background: "#1e3a5f", color: "#fff" }}>AÇÕES</th>
+            <th style={{ width: "14%", textAlign: "center", background: "#1e3a5f", color: "#fff" }}>PERÍODO</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(row => (
+            <tr key={row.key}>
+              {row.showDay && (
+                <td rowSpan={row.daySpan}
+                  style={{ textAlign: "center", fontWeight: "bold", verticalAlign: "middle", borderBottom: "1px solid #e5e7eb", padding: "3px 5px" }}>
+                  {row.dayLabel}
+                </td>
+              )}
+              {row.showCpi && (
+                <td rowSpan={row.cpiSpan}
+                  style={{ textAlign: "center", verticalAlign: "middle", borderBottom: "1px solid #e5e7eb", padding: "3px 5px" }}>
+                  {row.cpiLabel}
+                </td>
+              )}
+              <td style={{ whiteSpace: "normal" }}>{row.acao}</td>
+              <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>{row.periodo}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* Seções inferiores */}
+      {[
+        { label: "Material Necessário", items: aacp.materiais },
+        { label: "Observações", items: aacp.observacoes },
+        { label: "Dispositivos Legais", items: aacp.dispositivosLegais },
+      ].map(sec => sec.items.length > 0 && (
+        <div key={sec.label} style={{ marginBottom: 5, border: "1px solid #aaa" }}>
+          <p style={{ margin: 0, fontWeight: "bold", textAlign: "center", textTransform: "uppercase", fontSize: "7pt", background: "#f3f4f6", padding: "2px 0", borderBottom: "1px solid #aaa" }}>
+            {sec.label}
+          </p>
+          <div style={{ padding: "3px 8px" }}>
+            {sec.items.map((item) => (
+              <p key={item.id} style={{ margin: "1px 0", fontSize: "7.5pt" }}>— {item.text}</p>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {/* Rodapé */}
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "7pt", marginTop: 6, marginBottom: 12 }}>
+        <span>VERSÃO: {String(aacp.versao).padStart(2, "0")}</span>
+        <span>LAVRADO EM: {format(new Date(), "dd/MM/yyyy", { locale: ptBR })}</span>
+      </div>
+
+      {/* Assinatura */}
+      {chefe && (
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
+          <div style={{ textAlign: "center", borderTop: "1px solid #000", paddingTop: 4, minWidth: 240 }}>
+            <p style={{ margin: 0, fontWeight: "bold", fontSize: "8pt" }}>{chefe.rank} {chefe.fullName}</p>
+            <p style={{ margin: 0, fontSize: "8pt" }}>Chefe da Divisão Acadêmica</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default async function ImprimirCadernoPage({ params }: { params: Promise<{ id: string }> }) {
   await verifySession();
   const { id } = await params;
@@ -148,17 +325,22 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
   const schoolRole = escolaEfetiva === "ESFAP" ? "COMANDANTE_ESFAP"
     : escolaEfetiva === "ESFO" ? "COMANDANTE_ESFO"
     : null;
-  const comandante = schoolRole
-    ? await prisma.user.findFirst({
-        where: {
-          active: true,
-          OR: [
-            { role: schoolRole },
-            { additionalRoles: { contains: schoolRole } },
-          ],
-        },
-      })
-    : caderno.publishedBy ?? null;
+  const [comandante, chefeDivisao] = await Promise.all([
+    schoolRole
+      ? prisma.user.findFirst({
+          where: {
+            active: true,
+            OR: [{ role: schoolRole }, { additionalRoles: { contains: schoolRole } }],
+          },
+        })
+      : Promise.resolve(caderno.publishedBy ?? null),
+    prisma.user.findFirst({
+      where: {
+        active: true,
+        OR: [{ role: "CHEFE_DIVISAO_ACADEMICA" }, { additionalRoles: { contains: "CHEFE_DIVISAO_ACADEMICA" } }],
+      },
+    }),
+  ]);
 
   const schoolLabel = escolaEfetiva === "ESFAP" ? "EsFAP"
     : escolaEfetiva === "ESFO" ? "EsFO"
@@ -235,6 +417,10 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
             <p>Comandante da {schoolLabel}</p>
           </div>
         </div>
+      )}
+
+      {caderno.aacp && (
+        <AACPAnexo aacp={caderno.aacp} caderno={caderno} chefe={chefeDivisao} />
       )}
     </PrintLayout>
   );
