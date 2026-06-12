@@ -4,10 +4,11 @@ import { useEffect } from "react";
 type Props = {
   title: string;
   children: React.ReactNode;
+  extraPages?: React.ReactNode[];
   extraStyles?: string;
 };
 
-export default function PrintLayout({ title, children, extraStyles }: Props) {
+export default function PrintLayout({ title, children, extraPages, extraStyles }: Props) {
   useEffect(() => {
     document.title = title;
   }, [title]);
@@ -18,6 +19,14 @@ export default function PrintLayout({ title, children, extraStyles }: Props) {
         @media screen {
           body { background: #e5e7eb; margin: 0; font-family: Arial, sans-serif; }
           .print-page {
+            background: white;
+            width: 210mm;
+            min-height: 297mm;
+            margin: 20px auto;
+            padding: 16mm 20mm 20mm 22mm;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+          }
+          .extra-page {
             background: white;
             width: 210mm;
             min-height: 297mm;
@@ -41,11 +50,20 @@ export default function PrintLayout({ title, children, extraStyles }: Props) {
         }
         @media print {
           .no-print-bar { display: none !important; }
-          /* Oculta todo o shell da aplicação (sidebar, header, etc.) */
           body * { visibility: hidden; }
-          .print-page, .print-page * { visibility: visible; }
+          .print-page, .print-page *, .extra-page, .extra-page * { visibility: visible; }
           body { background: white; margin: 0; padding: 0; }
           .print-page {
+            position: absolute !important;
+            top: 0 !important; left: 0 !important; right: 0 !important;
+            box-shadow: none !important;
+            margin: 0 !important;
+            padding: 12mm 15mm 15mm 18mm !important;
+            width: auto !important;
+          }
+          .extra-page {
+            break-before: page !important;
+            page-break-before: always !important;
             position: absolute !important;
             top: 0 !important; left: 0 !important; right: 0 !important;
             box-shadow: none !important;
@@ -155,6 +173,12 @@ export default function PrintLayout({ title, children, extraStyles }: Props) {
           <span>Documento de uso interno — APM/ES</span>
         </div>
       </div>
+
+      {extraPages?.map((page, i) => (
+        <div key={i} className="extra-page">
+          {page}
+        </div>
+      ))}
     </>
   );
 }

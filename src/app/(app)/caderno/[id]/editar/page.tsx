@@ -109,14 +109,12 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
                 <thead className="bg-[#1e3a5f] text-white sticky top-0 z-10">
                   <tr>
                     <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Protocolo</th>
-                    <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Enquadramento</th>
+                    <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Enquad.</th>
                     <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Curso</th>
-                    <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Pelotão</th>
+                    <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Pel</th>
                     <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Nº</th>
-                    <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Nome de Guerra</th>
-                    <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Tipo</th>
+                    <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Nome</th>
                     <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Data Fato</th>
-                    <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Decisão</th>
                     <th className="text-right px-3 py-3 font-medium whitespace-nowrap">Pont.</th>
                     {canPublish && <th className="px-3 py-3"></th>}
                   </tr>
@@ -136,11 +134,9 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
                       <td className="px-3 py-2.5 text-xs text-gray-600 whitespace-nowrap">{abreviarPelotao(item.student.platoon?.name)}</td>
                       <td className="px-3 py-2.5 font-mono text-xs">{item.studentCourseNumber}</td>
                       <td className="px-3 py-2.5 font-semibold">{item.studentWarName}</td>
-                      <td className="px-3 py-2.5 text-xs text-gray-700">{item.recordType}</td>
                       <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">
                         {format(new Date(item.factDate), "dd/MM/yyyy", { locale: ptBR })}
                       </td>
-                      <td className="px-3 py-2.5 text-xs">{item.decisionSummary}</td>
                       <td className="px-3 py-2.5 text-right font-bold text-xs">
                         {item.score != null ? (
                           <span className={item.score > 0 ? "text-red-600" : item.score < 0 ? "text-green-600" : "text-gray-500"}>
@@ -157,7 +153,7 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
                   ))}
                   {caderno.items.length === 0 && (
                     <tr>
-                      <td colSpan={canPublish ? 11 : 10} className="px-4 py-6 text-center text-gray-400">
+                      <td colSpan={canPublish ? 9 : 8} className="px-4 py-6 text-center text-gray-400">
                         Nenhum registro compilado.
                       </td>
                     </tr>

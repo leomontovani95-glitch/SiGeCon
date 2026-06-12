@@ -6,8 +6,7 @@ const dbPath = path.resolve(process.cwd(), "dev.db").replace(/\\/g, "/");
 const prisma = new PrismaClient({ adapter: new PrismaLibSql({ url: `file:///${dbPath}` }) });
 
 async function gerarProtocolo(typeName: string, courseName: string): Promise<string> {
-  const ano = new Date().getFullYear();
-  const base = `CPI - ${ano} - `;
+  const base = `CPI - `;
   const sufixo = ` - ${courseName}`;
   const ultimo = await prisma.communication.findFirst({
     where: { protocolNumber: { startsWith: base, endsWith: sufixo } },
@@ -15,7 +14,9 @@ async function gerarProtocolo(typeName: string, courseName: string): Promise<str
   });
   let seq = 1;
   if (ultimo) {
-    const n = parseInt(ultimo.protocolNumber.split(" - ")[2], 10);
+    const partes = ultimo.protocolNumber.split(" - ");
+    const seqIndex = partes.length >= 4 ? 2 : 1;
+    const n = parseInt(partes[seqIndex], 10);
     if (!isNaN(n)) seq = n + 1;
   }
   return `${base}${String(seq).padStart(4, "0")}${sufixo}`;

@@ -16,10 +16,9 @@ const prefixos: Record<string, string> = {
 };
 
 export async function gerarProtocolo(typeName: string, courseName: string): Promise<string> {
-  const ano = new Date().getFullYear();
   const prefixo = prefixos[typeName] ?? "COM";
-  // Formato: "CPI - 2026 - 0001 - CFO 1"
-  const base = `${prefixo} - ${ano} - `;
+  // Formato: "CPI - 0001 - CFO 1"
+  const base = `${prefixo} - `;
   const sufixo = ` - ${courseName}`;
 
   const ultimo = await prisma.communication.findFirst({
@@ -30,8 +29,10 @@ export async function gerarProtocolo(typeName: string, courseName: string): Prom
   let seq = 1;
   if (ultimo) {
     const partes = ultimo.protocolNumber.split(" - ");
-    // partes: ["CPI", "2026", "0001", "CFO 1"]
-    const n = parseInt(partes[2], 10);
+    // Novo formato: ["CPI", "0001", "CFO 1"] — seq em partes[1]
+    // Formato legado (pré-migração): ["CPI", "2026", "0001", "CFO 1"] — seq em partes[2]
+    const seqIndex = partes.length >= 4 ? 2 : 1;
+    const n = parseInt(partes[seqIndex], 10);
     if (!isNaN(n)) seq = n + 1;
   }
 

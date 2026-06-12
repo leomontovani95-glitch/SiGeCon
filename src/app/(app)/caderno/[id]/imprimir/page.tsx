@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
-import { platoonOrder } from "@/lib/utils";
+import { platoonOrder, abreviarPelotao } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -44,8 +44,8 @@ async function fetchCaderno(id: string) {
 function fmtEnq(art: string | null, inc: string | null, al: string | null) {
   if (!art) return "—";
   let s = `Art. ${art}`;
-  if (inc) s += `, Inc. ${inc}`;
-  if (al)  s += `, Al. ${al}`;
+  if (inc) s += `, ${inc}`;
+  if (al)  s += `, ${al})`;
   return s;
 }
 
@@ -94,19 +94,17 @@ function TabelaTipo({ items, label, note, isTdTac }: { items: Item[]; label: str
           <col className="cd-col-num" />
           <col className="cd-col-nome" />
           <col className="cd-col-data" />
-          <col className="cd-col-dec" />
           <col className="cd-col-obs" />
           <col className="cd-col-pont" />
         </colgroup>
         <thead>
           <tr>
             <th className="cd-col-proto">Protocolo</th>
-            <th className="cd-col-enq">Enquadramento</th>
-            <th className="cd-col-pel">Pelotão</th>
+            <th className="cd-col-enq">Enquad.</th>
+            <th className="cd-col-pel">Pel</th>
             <th className="cd-col-num">Nº</th>
-            <th className="cd-col-nome">Nome de Guerra</th>
+            <th className="cd-col-nome">Nome</th>
             <th className="cd-col-data">Data</th>
-            <th className="cd-col-dec">Decisão</th>
             <th className="cd-col-obs">Obs.</th>
             <th className="cd-col-pont" style={{ textAlign: "right" }}>Pont.</th>
           </tr>
@@ -114,22 +112,21 @@ function TabelaTipo({ items, label, note, isTdTac }: { items: Item[]; label: str
         <tbody>
           {items.map((item) => (
             <tr key={item.id}>
-              <td className="cd-col-proto" style={{ fontFamily: "monospace", fontSize: "7pt" }}>
+              <td className="cd-col-proto" style={{ fontFamily: "monospace", fontSize: "6pt" }}>
                 {item.communication.protocolNumber}
               </td>
-              <td className="cd-col-enq" style={{ color: "#1e3a8a", fontSize: "7pt" }}>
+              <td className="cd-col-enq" style={{ color: "#1e3a8a" }}>
                 {isTdTac
-                  ? item.decisionSummary
+                  ? item.recordType
                   : fmtEnq(item.communication.article, item.communication.item, item.communication.letter)}
               </td>
-              <td className="cd-col-pel">{item.student.platoon?.name ?? "—"}</td>
+              <td className="cd-col-pel">{abreviarPelotao(item.student.platoon?.name)}</td>
               <td className="cd-col-num" style={{ fontFamily: "monospace", textAlign: "center" }}>
                 {item.studentCourseNumber}
               </td>
               <td className="cd-col-nome" style={{ fontWeight: "bold" }}>{item.studentWarName}</td>
               <td className="cd-col-data">{format(new Date(item.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
-              <td className="cd-col-dec">{isTdTac ? "Sanção" : item.decisionSummary}</td>
-              <td className="cd-col-obs" style={{ fontSize: "7pt", color: "#666" }}>{item.shortObservation ?? "—"}</td>
+              <td className="cd-col-obs" style={{ color: "#666" }}>{item.shortObservation ?? "—"}</td>
               <td className="cd-col-pont" style={{ textAlign: "right", fontWeight: "bold" }}>
                 {item.score != null
                   ? (["Referência Elogiosa", "Elogio publicado em BI"].includes(item.recordType)
@@ -196,11 +193,11 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
     }
   }
 
-  const cell: React.CSSProperties = { border: "1px solid #aaa", padding: "3px 7px" };
+  const cell: React.CSSProperties = { border: "1px solid #000", padding: "3px 7px" };
   const hdr: React.CSSProperties = { fontWeight: "bold" };
 
   return (
-    <div style={{ pageBreakBefore: "always", breakBefore: "page", fontFamily: "Arial, sans-serif", fontSize: "8pt", color: "#000" }}>
+    <div style={{ fontFamily: "Arial, sans-serif", fontSize: "8pt", color: "#000" }}>
 
       {/* Cabeçalho institucional */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "2px solid #1e3a5f", paddingBottom: 7, marginBottom: 8, gap: 8 }}>
@@ -246,13 +243,13 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
       </table>
 
       {/* Tabela de desenvolvimento */}
-      <table className="cd-table" style={{ marginBottom: 5 }}>
+      <table className="aacp-table" style={{ marginBottom: 5 }}>
         <thead>
           <tr>
-            <th style={{ width: "8%", textAlign: "center", background: "#1e3a5f", color: "#fff" }}>DIA</th>
-            <th style={{ width: "8%", textAlign: "center", background: "#1e3a5f", color: "#fff" }}>CPI</th>
-            <th style={{ width: "70%", background: "#1e3a5f", color: "#fff" }}>AÇÕES</th>
-            <th style={{ width: "14%", textAlign: "center", background: "#1e3a5f", color: "#fff" }}>PERÍODO</th>
+            <th style={{ width: "8%", textAlign: "center" }}>DIA</th>
+            <th style={{ width: "8%", textAlign: "center" }}>CPI</th>
+            <th style={{ width: "70%" }}>AÇÕES</th>
+            <th style={{ width: "14%", textAlign: "center" }}>PERÍODO</th>
           </tr>
         </thead>
         <tbody>
@@ -260,13 +257,13 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
             <tr key={row.key}>
               {row.showDay && (
                 <td rowSpan={row.daySpan}
-                  style={{ textAlign: "center", fontWeight: "bold", verticalAlign: "middle", borderBottom: "1px solid #e5e7eb", padding: "3px 5px" }}>
+                  style={{ textAlign: "center", fontWeight: "bold", verticalAlign: "middle", padding: "3px 5px" }}>
                   {row.dayLabel}
                 </td>
               )}
               {row.showCpi && (
                 <td rowSpan={row.cpiSpan}
-                  style={{ textAlign: "center", verticalAlign: "middle", borderBottom: "1px solid #e5e7eb", padding: "3px 5px" }}>
+                  style={{ textAlign: "center", verticalAlign: "middle", padding: "3px 5px" }}>
                   {row.cpiLabel}
                 </td>
               )}
@@ -283,8 +280,8 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
         { label: "Observações", items: aacp.observacoes },
         { label: "Dispositivos Legais", items: aacp.dispositivosLegais },
       ].map(sec => sec.items.length > 0 && (
-        <div key={sec.label} style={{ marginBottom: 5, border: "1px solid #aaa" }}>
-          <p style={{ margin: 0, fontWeight: "bold", textAlign: "center", textTransform: "uppercase", fontSize: "7pt", background: "#f3f4f6", padding: "2px 0", borderBottom: "1px solid #aaa" }}>
+        <div key={sec.label} style={{ marginBottom: 5, border: "1px solid #000" }}>
+          <p style={{ margin: 0, fontWeight: "bold", textAlign: "center", textTransform: "uppercase", fontSize: "7pt", background: "#f3f4f6", padding: "2px 0", borderBottom: "1px solid #000" }}>
             {sec.label}
           </p>
           <div style={{ padding: "3px 8px" }}>
@@ -358,27 +355,34 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
 
   const extraStyles = `
     @media print {
-      @page { size: A4 landscape; margin: 12mm 12mm 12mm 15mm; }
-      .print-page { padding: 0 !important; box-shadow: none !important; width: auto !important; }
+      @page { size: A4 portrait; margin: 8mm 5mm 12mm 5mm; }
+      .print-page, .extra-page { padding: 2mm 3mm 12mm 3mm !important; }
     }
-    @media screen { .print-page { width: 270mm !important; } }
-    .cd-table { width: 100%; border-collapse: collapse; font-size: 7.5pt; table-layout: fixed; }
-    .cd-table th { background: #1e3a5f; color: white; padding: 4px 5px; font-size: 7pt; text-align: left; overflow: hidden; white-space: nowrap; }
-    .cd-table td { padding: 3.5px 5px; border-bottom: 1px solid #e5e7eb; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+    .cd-table { width: 100%; border-collapse: collapse; font-size: 7pt; table-layout: fixed; }
+    .cd-table th { background: #1e3a5f; color: white; padding: 4px 5px; font-size: 6.5pt; text-align: left; overflow: hidden; white-space: nowrap; }
+    .cd-table td { padding: 3px 4px; border-bottom: 1px solid #e5e7eb; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
     .cd-table tr:nth-child(even) td { background: #f9fafb; }
-    .cd-col-proto { width: 16%; }
+    .cd-col-proto { width: 19%; }
     .cd-col-enq   { width: 11%; }
-    .cd-col-pel   { width: 9%; }
-    .cd-col-num   { width: 4%; }
-    .cd-col-nome  { width: 10%; }
-    .cd-col-data  { width: 9%; }
-    .cd-col-dec   { width: 26%; white-space: normal !important; }
-    .cd-col-obs   { width: 8%; }
+    .cd-col-pel   { width: 7%; }
+    .cd-col-num   { width: 5%; }
+    .cd-col-nome  { width: 18%; }
+    .cd-col-data  { width: 15%; }
+    .cd-col-obs   { width: 20%; white-space: normal !important; }
     .cd-col-pont  { width: 5%; text-align: right; }
+    .aacp-table { width: 100%; border-collapse: collapse; font-size: 7.5pt; table-layout: fixed; }
+    .aacp-table th { background: #1e3a5f; color: white; padding: 4px 5px; font-size: 7pt; text-align: left; border: 1px solid #000; }
+    .aacp-table td { padding: 3.5px 5px; border: 1px solid #000; vertical-align: middle; }
   `;
 
   return (
-    <PrintLayout title={`Caderno Disciplinar ${numero}`} extraStyles={extraStyles}>
+    <PrintLayout
+      title={`Caderno Disciplinar ${numero}`}
+      extraStyles={extraStyles}
+      extraPages={caderno.aacp ? [
+        <AACPAnexo key="aacp" aacp={caderno.aacp} caderno={caderno} chefe={chefeDivisao} />
+      ] : undefined}
+    >
 
       {/* Cabeçalho */}
       <div className="print-section">
@@ -417,10 +421,6 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
             <p>Comandante da {schoolLabel}</p>
           </div>
         </div>
-      )}
-
-      {caderno.aacp && (
-        <AACPAnexo aacp={caderno.aacp} caderno={caderno} chefe={chefeDivisao} />
       )}
     </PrintLayout>
   );
