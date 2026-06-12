@@ -42,6 +42,23 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
   const desfavoravel = pubItems.filter((i) => i.communication.type.scoreNature === "DESFAVORAVEL").reduce((s, i) => s + Math.abs(i.score ?? 0), 0);
   const favoravel    = pubItems.filter((i) => i.communication.type.scoreNature === "FAVORAVEL").reduce((s, i) => s + Math.abs(i.score ?? 0), 0);
 
+  // Contagens por tipo
+  const ct = aluno.communications.reduce((acc, c) => { acc[c.type.name] = (acc[c.type.name] ?? 0) + 1; return acc; }, {} as Record<string, number>);
+  const resumo = [
+    { label: "Total",        value: aluno.communications.length,                              color: "#1e3a5f" },
+    { label: "Publicados",   value: pubItems.length,                                           color: "#374151" },
+    { label: "CPI 0/1",      value: (ct["CPI 0"] ?? 0) + (ct["CPI 1"] ?? 0),                color: "#b45309" },
+    { label: "CPI 2",        value: ct["CPI 2"] ?? 0,                                         color: "#b91c1c" },
+    { label: "CPI 3",        value: ct["CPI 3"] ?? 0,                                         color: "#7f1d1d" },
+    { label: "TD Leve",      value: ct["TD Leve"] ?? 0,                                       color: "#b45309" },
+    { label: "TD Média",     value: ct["TD Média"] ?? 0,                                      color: "#b91c1c" },
+    { label: "TD Grave",     value: ct["TD Grave"] ?? 0,                                      color: "#7f1d1d" },
+    { label: "TAC",          value: ct["TAC"] ?? 0,                                            color: "#7f1d1d" },
+    { label: "Arq.",         value: ct["Arquivamento"] ?? 0,                                   color: "#6b7280" },
+    { label: "Ref. Elogiosa",value: ct["Referência Elogiosa"] ?? 0,                           color: "#15803d" },
+    { label: "Elogio BI",    value: ct["Elogio publicado em BI"] ?? 0,                        color: "#15803d" },
+  ];
+
   // Evolução da nota por caderno publicado
   const cadernosOrdenados = Array.from(
     new Map(
@@ -87,6 +104,28 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
           <div className="print-field"><label>Situação</label><span>{aluno.status}</span></div>
           <div className="print-field"><label>Gerado em</label><span>{format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span></div>
         </div>
+      </div>
+
+      <div className="print-section">
+        <h2>Resumo de Registros</h2>
+        <table className="print-table" style={{ fontSize: "8pt" }}>
+          <thead>
+            <tr>
+              {resumo.map(({ label }) => (
+                <th key={label} style={{ textAlign: "center", whiteSpace: "nowrap", padding: "4px 6px" }}>{label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              {resumo.map(({ label, value, color }) => (
+                <td key={label} style={{ textAlign: "center", fontWeight: "bold", fontSize: "11pt", padding: "5px 6px", color: value > 0 ? color : "#9ca3af" }}>
+                  {value}
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <div className="print-section">

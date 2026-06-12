@@ -240,7 +240,6 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
               sundayDate:   caderno.aacp.sundayDate.toISOString().split("T")[0],
               local:        caderno.aacp.local,
               fiscalizacao: caderno.aacp.fiscalizacao,
-              versao:       caderno.aacp.versao,
               dayGroups:    caderno.aacp.dayGroups,
               materiais:    caderno.aacp.materiais,
               observacoes:  caderno.aacp.observacoes,

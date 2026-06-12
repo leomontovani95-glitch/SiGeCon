@@ -1,5 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { salvarAACP, type AACPSaveData } from "../aacp-actions";
 
 // ── PeriodoInput ────────────────────────────────────────────────────────────
@@ -57,10 +59,19 @@ function PeriodoInput({ value, onChange }: { value: string; onChange: (v: string
   );
 }
 
+function getDayName(dateStr: string): string {
+  if (!dateStr) return "Dia";
+  try {
+    const d = new Date(dateStr + "T12:00:00");
+    const name = format(d, "EEEE", { locale: ptBR }); // "sábado", "segunda-feira"…
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  } catch { return "Dia"; }
+}
+
 // ── Tipos ──────────────────────────────────────────────────────────────────
 
 type ActionRow = { _key: string; acao: string; periodo: string };
-type DayGroup  = { _key: string; day: "SABADO" | "DOMINGO"; cpiLabel: string; order: number; actions: ActionRow[] };
+type DayGroup  = { _key: string; day: string; cpiLabel: string; order: number; actions: ActionRow[] };
 type ListItem  = { _key: string; text: string };
 
 type FormState = {
@@ -68,7 +79,6 @@ type FormState = {
   sundayDate:   string;
   local:        string;
   fiscalizacao: string;
-  versao:       number;
   dayGroups:    DayGroup[];
   materiais:    ListItem[];
   observacoes:  ListItem[];
@@ -81,7 +91,6 @@ export type AACPProps = {
   sundayDate:   string;
   local:        string;
   fiscalizacao: string;
-  versao:       number;
   dayGroups: {
     id: string; day: string; cpiLabel: string; order: number;
     actions: { id: string; acao: string; periodo: string; order: number }[];
@@ -102,7 +111,6 @@ function initState(a: AACPProps): FormState {
     sundayDate:   a.sundayDate,
     local:        a.local,
     fiscalizacao: a.fiscalizacao,
-    versao:       a.versao,
     dayGroups: [...a.dayGroups]
       .sort((x, y) => x.order - y.order)
       .map(g => ({
@@ -119,7 +127,7 @@ function initState(a: AACPProps): FormState {
 
 function toSaveData(s: FormState): AACPSaveData {
   return {
-    local: s.local, fiscalizacao: s.fiscalizacao, versao: s.versao,
+    local: s.local, fiscalizacao: s.fiscalizacao,
     saturdayDate: s.saturdayDate, sundayDate: s.sundayDate,
     dayGroups: s.dayGroups.map((g, gi) => ({
       day: g.day, cpiLabel: g.cpiLabel, order: gi,
@@ -236,7 +244,7 @@ export default function AACPEditor({ aacp }: { aacp: AACPProps }) {
 
   // ── helpers de mutação de estado ──────────────────────────────────────
 
-  const updateMeta = (patch: Partial<Pick<FormState, "saturdayDate" | "sundayDate" | "local" | "fiscalizacao" | "versao">>) =>
+  const updateMeta = (patch: Partial<Pick<FormState, "saturdayDate" | "sundayDate" | "local" | "fiscalizacao">>) =>
     setState(s => ({ ...s, ...patch }));
 
   const updateGroupCpi = (key: string, cpiLabel: string) =>
@@ -308,33 +316,33 @@ export default function AACPEditor({ aacp }: { aacp: AACPProps }) {
     <div className="space-y-6">
 
       {/* Metadados */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Data (sábado)</label>
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Data 1 {state.saturdayDate && <span className="font-normal text-[#1e3a5f]">— {getDayName(state.saturdayDate)}</span>}
+          </label>
           <input type="date" value={state.saturdayDate} onChange={e => updateMeta({ saturdayDate: e.target.value })} className={inputBase} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Data (domingo)</label>
+          <label className="block text-xs font-medium text-gray-600 mb-1">
+            Data 2 {state.sundayDate && <span className="font-normal text-[#1e3a5f]">— {getDayName(state.sundayDate)}</span>}
+          </label>
           <input type="date" value={state.sundayDate} onChange={e => updateMeta({ sundayDate: e.target.value })} className={inputBase} />
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Fiscalização</label>
           <input type="text" value={state.fiscalizacao} onChange={e => updateMeta({ fiscalizacao: e.target.value })} className={`${inputBase} w-full`} />
         </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">Versão</label>
-          <input type="number" min={1} value={state.versao} onChange={e => updateMeta({ versao: parseInt(e.target.value) || 1 })} className={`${inputBase} w-20`} />
-        </div>
-        <div className="col-span-2 sm:col-span-4">
+        <div className="col-span-1 sm:col-span-3">
           <label className="block text-xs font-medium text-gray-600 mb-1">Local de realização</label>
           <input type="text" value={state.local} onChange={e => updateMeta({ local: e.target.value })} className={`${inputBase} w-full`} />
         </div>
       </div>
 
-      {/* Sábado */}
+      {/* Dia 1 */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-bold text-[#1e3a5f] uppercase tracking-wide">Sábado</h3>
+          <h3 className="text-sm font-bold text-[#1e3a5f] uppercase tracking-wide">{getDayName(state.saturdayDate)}</h3>
           <button type="button" onClick={() => addGroup("SABADO")}
             className="text-xs text-[#1e3a5f] hover:underline font-medium">+ Adicionar grupo</button>
         </div>
@@ -355,10 +363,10 @@ export default function AACPEditor({ aacp }: { aacp: AACPProps }) {
         </div>
       </div>
 
-      {/* Domingo */}
+      {/* Dia 2 */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-bold text-[#1e3a5f] uppercase tracking-wide">Domingo</h3>
+          <h3 className="text-sm font-bold text-[#1e3a5f] uppercase tracking-wide">{getDayName(state.sundayDate)}</h3>
           <button type="button" onClick={() => addGroup("DOMINGO")}
             className="text-xs text-[#1e3a5f] hover:underline font-medium">+ Adicionar grupo</button>
         </div>

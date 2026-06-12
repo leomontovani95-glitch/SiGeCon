@@ -216,7 +216,11 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
       for (const action of group.actions) {
         rows.push({
           showDay: !dayShown, daySpan: dayTotal,
-          dayLabel: day === "SABADO" ? "SÁBADO" : day === "DOMINGO" ? "DOMINGO" : day,
+          dayLabel: day === "SABADO"
+            ? format(sat, "EEEE", { locale: ptBR }).toUpperCase()
+            : day === "DOMINGO"
+              ? format(sun, "EEEE", { locale: ptBR }).toUpperCase()
+              : day.toUpperCase(),
           showCpi: !grpShown, cpiSpan: group.actions.length, cpiLabel: group.cpiLabel,
           acao: action.acao, periodo: action.periodo, key: action.id,
         });
@@ -325,8 +329,7 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
       ))}
 
       {/* Rodapé */}
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "7pt", marginTop: 6, marginBottom: 12 }}>
-        <span>VERSÃO: {String(aacp.versao).padStart(2, "0")}</span>
+      <div style={{ fontSize: "7pt", marginTop: 6, marginBottom: 12, textAlign: "right" }}>
         <span>LAVRADO EM: {format(new Date(), "dd/MM/yyyy", { locale: ptBR })}</span>
       </div>
 

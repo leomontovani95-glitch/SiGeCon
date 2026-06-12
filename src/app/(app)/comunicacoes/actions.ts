@@ -93,7 +93,7 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
       data: {
         protocolNumber, typeId, studentId,
         courseId: aluno.courseId, courseNumber: aluno.courseNumber, platoonId: aluno.platoonId,
-        reporterId: session.userId, factDate: new Date(factDate),
+        reporterId: session.userId, factDate: new Date(factDate + "T12:00:00"),
         factTime, factPlace, factDescription,
         manualRuleId,
         article: regra.article,

@@ -50,26 +50,19 @@ export default function PrintLayout({ title, children, extraPages, extraStyles }
         }
         @media print {
           .no-print-bar { display: none !important; }
+          body { background: white; margin: 0; padding: 0; }
           body * { visibility: hidden; }
           .print-page, .print-page *, .extra-page, .extra-page * { visibility: visible; }
-          body { background: white; margin: 0; padding: 0; }
-          .print-page {
-            position: absolute !important;
-            top: 0 !important; left: 0 !important; right: 0 !important;
+          .print-page, .extra-page {
             box-shadow: none !important;
             margin: 0 !important;
             padding: 12mm 15mm 15mm 18mm !important;
-            width: auto !important;
+            width: 100% !important;
+            min-height: unset !important;
           }
           .extra-page {
             break-before: page !important;
             page-break-before: always !important;
-            position: absolute !important;
-            top: 0 !important; left: 0 !important; right: 0 !important;
-            box-shadow: none !important;
-            margin: 0 !important;
-            padding: 12mm 15mm 15mm 18mm !important;
-            width: auto !important;
           }
           * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }

@@ -98,7 +98,6 @@ export async function criarAACP(disciplinaryBookId: string) {
 export type AACPSaveData = {
   local: string;
   fiscalizacao: string;
-  versao: number;
   saturdayDate: string;
   sundayDate: string;
   dayGroups: {
@@ -130,9 +129,8 @@ export async function salvarAACP(aacpId: string, data: AACPSaveData) {
       data: {
         local: data.local,
         fiscalizacao: data.fiscalizacao,
-        versao: data.versao,
-        saturdayDate: new Date(data.saturdayDate),
-        sundayDate: new Date(data.sundayDate),
+        saturdayDate: new Date(data.saturdayDate + "T12:00:00"),
+        sundayDate: new Date(data.sundayDate + "T12:00:00"),
         dayGroups: {
           create: data.dayGroups.map(g => ({
             day: g.day,
