@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
+import { platoonOrder } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -15,7 +16,6 @@ async function fetchCaderno(id: string) {
       createdBy: true,
       course: true,
       items: {
-        orderBy: [{ studentCourseNumber: "asc" }],
         include: {
           student: { include: { course: true, platoon: true } },
           communication: { select: { protocolNumber: true, article: true, item: true, letter: true } },
@@ -24,6 +24,12 @@ async function fetchCaderno(id: string) {
     },
   });
   if (!caderno) notFound();
+  caderno.items.sort((a, b) => {
+    const pa = platoonOrder(a.student.platoon?.name);
+    const pb = platoonOrder(b.student.platoon?.name);
+    if (pa !== pb) return pa - pb;
+    return (parseInt(a.studentCourseNumber, 10) || 0) - (parseInt(b.studentCourseNumber, 10) || 0);
+  });
   return caderno;
 }
 

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { abreviarPelotao } from "@/lib/utils";
+import { abreviarPelotao, platoonOrder } from "@/lib/utils";
 import { verifySession } from "@/lib/dal";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
@@ -41,10 +41,13 @@ function decisaoLabel(decisionSummary: string, recordType: string): string {
   return "Sanção";
 }
 
-function sortByNum<T extends { studentCourseNumber: string }>(items: T[]): T[] {
-  return [...items].sort((a, b) =>
-    (parseInt(a.studentCourseNumber, 10) || 0) - (parseInt(b.studentCourseNumber, 10) || 0)
-  );
+function sortByPlatoonThenNum<T extends { studentCourseNumber: string; student: { platoon: { name: string } | null } }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const pa = platoonOrder(a.student.platoon?.name);
+    const pb = platoonOrder(b.student.platoon?.name);
+    if (pa !== pb) return pa - pb;
+    return (parseInt(a.studentCourseNumber, 10) || 0) - (parseInt(b.studentCourseNumber, 10) || 0);
+  });
 }
 
 type GrupoItem = {
@@ -131,9 +134,9 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
     (i.decisionSummary ?? "").toLowerCase().includes("arquiv");
 
   // Separa: reenquadramentos, arquivamentos, TD/TAC e demais
-  const reenquadrados = sortByNum(caderno.items.filter(i => i.decisionSummary === "Reenquadrar artigo"));
-  const arquivados    = sortByNum(caderno.items.filter(i => i.decisionSummary !== "Reenquadrar artigo" && isArquivado(i)));
-  const tdTacItems    = sortByNum(caderno.items.filter(i =>
+  const reenquadrados = sortByPlatoonThenNum(caderno.items.filter(i => i.decisionSummary === "Reenquadrar artigo"));
+  const arquivados    = sortByPlatoonThenNum(caderno.items.filter(i => i.decisionSummary !== "Reenquadrar artigo" && isArquivado(i)));
+  const tdTacItems    = sortByPlatoonThenNum(caderno.items.filter(i =>
     i.decisionSummary !== "Reenquadrar artigo" && !isArquivado(i) && TD_TAC_TIPOS.has(i.recordType)
   ));
   const demais        = caderno.items.filter(i =>
@@ -145,9 +148,12 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
     if (!grupos.has(item.recordType)) grupos.set(item.recordType, []);
     grupos.get(item.recordType)!.push(item);
   }
-  for (const [, arr] of grupos) arr.sort((a, b) =>
-    (parseInt(a.studentCourseNumber, 10) || 0) - (parseInt(b.studentCourseNumber, 10) || 0)
-  );
+  for (const [, arr] of grupos) arr.sort((a, b) => {
+    const pa = platoonOrder(a.student.platoon?.name);
+    const pb = platoonOrder(b.student.platoon?.name);
+    if (pa !== pb) return pa - pb;
+    return (parseInt(a.studentCourseNumber, 10) || 0) - (parseInt(b.studentCourseNumber, 10) || 0);
+  });
 
   const mkGrupo = (order: string[]) => [
     ...order.filter(t => grupos.has(t)).map(t => ({ tipo: t, items: grupos.get(t)! })),

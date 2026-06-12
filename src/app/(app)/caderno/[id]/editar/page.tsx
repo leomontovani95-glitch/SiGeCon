@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { abreviarPelotao } from "@/lib/utils";
+import { abreviarPelotao, platoonOrder } from "@/lib/utils";
 import { verifyRole, getSchoolFilter } from "@/lib/dal";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
@@ -25,7 +25,6 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
         createdBy: true,
         course: true,
         items: {
-          orderBy: [{ studentWarName: "asc" }],
           include: {
             student: { include: { course: true, platoon: true } },
             communication: { select: { protocolNumber: true, article: true, item: true, letter: true } },
@@ -46,6 +45,13 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
   ]);
 
   if (!caderno) notFound();
+
+  caderno.items.sort((a, b) => {
+    const pa = platoonOrder(a.student.platoon?.name);
+    const pb = platoonOrder(b.student.platoon?.name);
+    if (pa !== pb) return pa - pb;
+    return (parseInt(a.studentCourseNumber, 10) || 0) - (parseInt(b.studentCourseNumber, 10) || 0);
+  });
 
   // Filtra pendentes: não deve incluir itens que já estão neste caderno
   const itemIds = new Set(caderno.items.map((i) => i.communicationId));
