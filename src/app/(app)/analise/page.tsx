@@ -17,6 +17,7 @@ export default async function AnalisePage({
   const platoonId  = sp.platoonId  ?? "";
   const dataInicio = sp.dataInicio ?? "";
   const dataFim    = sp.dataFim    ?? "";
+  const adaptacao  = sp.adaptacao  ?? "";
 
   const school = getSchoolFilter(session.role, session.escola);
 
@@ -53,7 +54,8 @@ export default async function AnalisePage({
         }
       : {};
 
-  const where = { ...courseFilter, ...platoonFilter, ...dateFilter };
+  const adaptationFilter = adaptacao === "sim" ? { adaptationPeriod: true } : adaptacao === "nao" ? { adaptationPeriod: false } : {};
+  const where = { ...courseFilter, ...platoonFilter, ...dateFilter, ...adaptationFilter };
 
   const allComms = await prisma.communication.findMany({
     where,
@@ -212,6 +214,7 @@ export default async function AnalisePage({
     if (id)         p.set("cursoId",    id);
     if (dataInicio) p.set("dataInicio", dataInicio);
     if (dataFim)    p.set("dataFim",    dataFim);
+    if (adaptacao)  p.set("adaptacao",  adaptacao);
     // platoonId é intencionalmente descartado ao trocar o curso
     const qs = p.toString();
     return `/analise${qs ? `?${qs}` : ""}`;
@@ -223,6 +226,7 @@ export default async function AnalisePage({
     if (pid)        p.set("platoonId",  pid);
     if (dataInicio) p.set("dataInicio", dataInicio);
     if (dataFim)    p.set("dataFim",    dataFim);
+    if (adaptacao)  p.set("adaptacao",  adaptacao);
     const qs = p.toString();
     return `/analise${qs ? `?${qs}` : ""}`;
   }
@@ -231,6 +235,7 @@ export default async function AnalisePage({
     const p = new URLSearchParams();
     if (cursoId)   p.set("cursoId",   cursoId);
     if (platoonId) p.set("platoonId", platoonId);
+    if (adaptacao) p.set("adaptacao", adaptacao);
     const qs = p.toString();
     return `/analise${qs ? `?${qs}` : ""}`;
   }
@@ -241,6 +246,7 @@ export default async function AnalisePage({
     if (platoonId)  p.set("platoonId",  platoonId);
     if (dataInicio) p.set("dataInicio", dataInicio);
     if (dataFim)    p.set("dataFim",    dataFim);
+    if (adaptacao)  p.set("adaptacao",  adaptacao);
     const qs = p.toString();
     return `/analise/imprimir${qs ? `?${qs}` : ""}`;
   }
@@ -251,6 +257,7 @@ export default async function AnalisePage({
     if (platoonId)  p.set("platoonId",  platoonId);
     if (dataInicio) p.set("dataInicio", dataInicio);
     if (dataFim)    p.set("dataFim",    dataFim);
+    if (adaptacao)  p.set("adaptacao",  adaptacao);
     const qs = p.toString();
     return `/api/export/analise${qs ? `?${qs}` : ""}`;
   }
@@ -382,6 +389,14 @@ export default async function AnalisePage({
               defaultValue={dataFim}
               className="input text-sm"
             />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Período de Adaptação</label>
+            <select name="adaptacao" defaultValue={adaptacao} className="input text-sm">
+              <option value="">Todos</option>
+              <option value="sim">Sim</option>
+              <option value="nao">Não</option>
+            </select>
           </div>
           <button type="submit" className="btn-primary">
             Aplicar

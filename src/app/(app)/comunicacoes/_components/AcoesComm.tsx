@@ -3,6 +3,7 @@ import { useActionState, useState, useRef } from "react";
 import {
   tomarCienciaComDefesa,
   tomarCienciaSemDefesa,
+  tomarCienciaAdaptacao,
   proferirDecisao,
   corrigirPontuacao,
 } from "../actions";
@@ -84,6 +85,7 @@ type CommInfo = {
   studentId: string;
   finalScore: number | null;
   suggestedScore: number | null;
+  adaptationPeriod: boolean;
   opinions: { id: string }[];
   decisions: { id: string; finalScore: number | null; decisionType: string }[];
   typeName: string;
@@ -118,6 +120,7 @@ export default function AcoesComm({
 
   const [defState, defAction, defPending] = useActionState(tomarCienciaComDefesa, undefined);
   const [semDefState, semDefAction, semDefPending] = useActionState(tomarCienciaSemDefesa, undefined);
+  const [adaptacaoState, adaptacaoAction, adaptacaoPending] = useActionState(tomarCienciaAdaptacao, undefined);
   const [decisaoState, decisaoAction, decisaoPending] = useActionState(proferirDecisao, undefined);
   const [correcaoState, correcaoAction, correcaoPending] = useActionState(corrigirPontuacao, undefined);
 
@@ -181,7 +184,32 @@ export default function AcoesComm({
     <div className="space-y-4 mt-6">
 
       {/* ── OPÇÕES DE CIÊNCIA (antes de tomar ciência) ────────────── */}
-      {canTakeAck && !mostraFormDefesa && (
+      {canTakeAck && !mostraFormDefesa && comm.adaptationPeriod && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-5">
+          <h3 className="font-semibold text-orange-900 mb-2">Ciência da Comunicação — Período de Adaptação</h3>
+          <p className="text-sm text-orange-800 mb-3">
+            Esta comunicação foi registrada durante o <strong>Período de Adaptação</strong>. A publicação não incidirá sobre a sua nota de conduta, independente do seu conteúdo.
+          </p>
+          <p className="text-sm text-gray-600 mb-4">
+            Não há possibilidade de apresentar justificativa neste caso, pois não haverá desconto ou acréscimo de pontuação. Tome ciência para registrar o seu conhecimento da comunicação.
+          </p>
+          <form action={adaptacaoAction}>
+            <input type="hidden" name="communicationId" value={comm.id} />
+            <button
+              type="submit"
+              disabled={adaptacaoPending}
+              className="btn-secondary text-sm"
+            >
+              {adaptacaoPending ? "Registrando..." : "Tomar Ciência"}
+            </button>
+          </form>
+          {adaptacaoState?.error && (
+            <p className="text-sm text-red-600 mt-2">{adaptacaoState.error}</p>
+          )}
+        </div>
+      )}
+
+      {canTakeAck && !mostraFormDefesa && !comm.adaptationPeriod && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
           <h3 className="font-semibold text-yellow-900 mb-2">Ciência da Comunicação</h3>
           <p className="text-sm text-gray-600 mb-4">
@@ -215,7 +243,7 @@ export default function AcoesComm({
       )}
 
       {/* ── FORMULÁRIO DE DEFESA ─────────────────────────────── */}
-      {canTakeAck && mostraFormDefesa && (
+      {canTakeAck && mostraFormDefesa && !comm.adaptationPeriod && (
         <div className="bg-orange-50 border border-orange-200 rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold text-orange-900">Justificativa / Defesa</h3>

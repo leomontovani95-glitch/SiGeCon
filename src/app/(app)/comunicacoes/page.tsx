@@ -139,6 +139,7 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
   const cursoId = sp.cursoId ?? "";
   const nat     = sp.nat     ?? "";   // CPI | REFERENCIA | ELOGIO | TD_TAC | FAVORAVEL
   const subtipo = sp.subtipo ?? "";   // CPI 0 | CPI 1 | CPI 2 | CPI 3 (só quando nat=CPI)
+  const adaptacao = sp.adaptacao ?? "";  // "" | "sim" | "nao"
   const col     = sp.col in COLS ? sp.col : "";
   const dir: Dir = sp.dir === "asc" ? "asc" : "desc";
   const pageRaw  = parseInt(sp.page ?? "1", 10);
@@ -168,6 +169,9 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
   else if (nat === "ELOGIO")     where.type = { name: "Elogio publicado em BI" };
   else if (nat === "FAVORAVEL")  where.type = { name: { in: [...FAV_TYPES] } };
   else if (nat === "TD_TAC")     where.type = { name: { notIn: OTHER_TYPES } };
+
+  if (adaptacao === "sim") where.adaptationPeriod = true;
+  else if (adaptacao === "nao") where.adaptationPeriod = false;
 
   if (busca) {
     where.OR = [
@@ -232,13 +236,14 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
   // Constrói URL preservando todos os filtros
   function buildUrl(overrides: Record<string, string>) {
     const p = new URLSearchParams();
-    if (cursoId) p.set("cursoId", cursoId);
-    if (busca)   p.set("busca",   busca);
-    if (status)  p.set("status",  status);
-    if (nat)     p.set("nat",     nat);
-    if (subtipo) p.set("subtipo", subtipo);
-    if (col)     p.set("col",     col);
-    if (dir)     p.set("dir",     dir);
+    if (cursoId)   p.set("cursoId",   cursoId);
+    if (busca)     p.set("busca",     busca);
+    if (status)    p.set("status",    status);
+    if (nat)       p.set("nat",       nat);
+    if (subtipo)   p.set("subtipo",   subtipo);
+    if (adaptacao) p.set("adaptacao", adaptacao);
+    if (col)       p.set("col",       col);
+    if (dir)       p.set("dir",       dir);
     for (const [k, v] of Object.entries(overrides)) {
       if (v) p.set(k, v); else p.delete(k);
     }
@@ -355,7 +360,7 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
         )}
       </div>
 
-      {/* Filtros de busca e status */}
+      {/* Filtros de busca, status e período de adaptação */}
       <form method="GET" className="bg-white rounded-xl border border-gray-200 p-4 mb-5 flex flex-wrap gap-3 items-end">
         {cursoId && <input type="hidden" name="cursoId" value={cursoId} />}
         {nat     && <input type="hidden" name="nat"     value={nat} />}
@@ -374,10 +379,18 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
             ))}
           </select>
         </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Período de Adaptação</label>
+          <select name="adaptacao" defaultValue={adaptacao} className="input text-sm">
+            <option value="">Todos</option>
+            <option value="sim">Sim</option>
+            <option value="nao">Não</option>
+          </select>
+        </div>
         <div className="flex gap-2">
           <button type="submit" className="btn-primary">Filtrar</button>
-          {(busca || status) && (
-            <Link href={buildUrl({ busca: "", status: "", page: "1" })} className="btn-secondary text-sm">Limpar</Link>
+          {(busca || status || adaptacao) && (
+            <Link href={buildUrl({ busca: "", status: "", adaptacao: "", page: "1" })} className="btn-secondary text-sm">Limpar</Link>
           )}
         </div>
       </form>
@@ -438,6 +451,9 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
                         <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">{format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
                         <td className="px-3 py-2.5 whitespace-nowrap">
                           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ds.color}`}>{ds.label}</span>
+                          {c.adaptationPeriod && (
+                            <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700">PA</span>
+                          )}
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap">
                           <Link href={`/comunicacoes/${c.id}`} className="text-xs text-[#1e3a5f] hover:underline font-medium">Ver</Link>

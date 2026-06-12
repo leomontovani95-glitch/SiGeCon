@@ -92,14 +92,16 @@ export default async function MeusRegistrosPage({
 }) {
   const session = await verifySession();
   const sp = await searchParams;
-  const busca   = sp.busca  ?? "";
-  const tipo    = sp.tipo   ?? "";
+  const busca     = sp.busca     ?? "";
+  const tipo      = sp.tipo      ?? "";
+  const adaptacao = sp.adaptacao ?? "";
   const pageRaw = parseInt(sp.page ?? "1", 10);
   const page    = isNaN(pageRaw) || pageRaw < 1 ? 1 : pageRaw;
 
   const baseWhere = {
     communicantUserId: session.userId,
     ...(tipo  ? { type: { name: tipo } }  : {}),
+    ...(adaptacao === "sim" ? { adaptationPeriod: true } : adaptacao === "nao" ? { adaptationPeriod: false } : {}),
     ...(busca ? {
       OR: [
         { protocolNumber: { contains: busca } },
@@ -150,8 +152,9 @@ export default async function MeusRegistrosPage({
 
   function buildUrl(overrides: Record<string, string>) {
     const p = new URLSearchParams();
-    if (busca) p.set("busca", busca);
-    if (tipo)  p.set("tipo",  tipo);
+    if (busca)     p.set("busca",     busca);
+    if (tipo)      p.set("tipo",      tipo);
+    if (adaptacao) p.set("adaptacao", adaptacao);
     for (const [k, v] of Object.entries(overrides)) {
       if (v) p.set(k, v); else p.delete(k);
     }
@@ -206,9 +209,17 @@ export default async function MeusRegistrosPage({
             ))}
           </select>
         </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-600 mb-1">Período de Adaptação</label>
+          <select name="adaptacao" defaultValue={adaptacao} className="input text-sm">
+            <option value="">Todos</option>
+            <option value="sim">Sim</option>
+            <option value="nao">Não</option>
+          </select>
+        </div>
         <div className="flex gap-2">
           <button type="submit" className="btn-primary">Filtrar</button>
-          {(busca || tipo) && (
+          {(busca || tipo || adaptacao) && (
             <Link href="/meus-registros" className="btn-secondary text-sm">Limpar</Link>
           )}
         </div>
@@ -261,7 +272,12 @@ export default async function MeusRegistrosPage({
                         {format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}
                       </td>
                       <td className="px-3 py-2.5 whitespace-nowrap">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ds.color}`}>{ds.label}</span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ds.color}`}>{ds.label}</span>
+                          {c.adaptationPeriod && (
+                            <span className="text-xs px-1.5 py-0.5 rounded font-semibold bg-orange-100 text-orange-700">PA</span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

@@ -5,6 +5,10 @@ const NOTA_AUTO =
   "Prazo de 2 dias úteis encerrado sem que o aluno tomasse ciência ou apresentasse defesa. " +
   "Comunicação encaminhada automaticamente ao Subcomandante/Oficial da Escola para emissão de parecer.";
 
+const NOTA_AUTO_ADAPTACAO =
+  "Prazo de 2 dias úteis encerrado sem que o aluno tomasse ciência. " +
+  "Comunicação em Período de Adaptação encaminhada automaticamente ao caderno disciplinar, sem impacto na nota de conduta.";
+
 export async function processarPrazosExpirados(): Promise<number> {
   const agora = new Date();
 
@@ -13,34 +17,100 @@ export async function processarPrazosExpirados(): Promise<number> {
       status: "AGUARDANDO_CIENCIA",
       defenseDeadline: { lt: agora, not: null },
     },
-    select: { id: true, studentId: true },
+    include: { student: true, type: true },
   });
 
   if (expiradas.length === 0) return 0;
 
-  // Usa o primeiro ADMINISTRADOR ativo como ator do log de sistema
   const admin = await prisma.user.findFirst({
     where: { role: "ADMINISTRADOR", active: true },
     select: { id: true },
   });
 
   for (const comm of expiradas) {
-    await prisma.$transaction([
-      // Registra ciência automática por prazo expirado
-      prisma.studentAcknowledgement.create({
-        data: {
-          communicationId: comm.id,
-          studentId: comm.studentId,
-          method: "PRAZO_EXPIRADO",
-          notes: NOTA_AUTO,
-        },
-      }),
-      // Encaminha para parecer do Subcomandante/Oficial
-      prisma.communication.update({
-        where: { id: comm.id },
-        data: { status: "AGUARDANDO_PARECER" },
-      }),
-    ]);
+    if (comm.adaptationPeriod) {
+      // Período de Adaptação: decisão automática + caderno + sem parecer
+      const authorityId = admin?.id ?? comm.reporterId;
+
+      await prisma.$transaction(async (tx) => {
+        await tx.studentAcknowledgement.create({
+          data: {
+            communicationId: comm.id,
+            studentId: comm.studentId,
+            method: "PRAZO_EXPIRADO",
+            notes: NOTA_AUTO_ADAPTACAO,
+          },
+        });
+
+        await tx.decision.create({
+          data: {
+            communicationId: comm.id,
+            authorityId,
+            decisionType: "Período de Adaptação",
+            text: NOTA_AUTO_ADAPTACAO,
+            finalScore: 0,
+          },
+        });
+
+        await tx.communication.update({
+          where: { id: comm.id },
+          data: { status: "DECIDIDA", finalScore: 0 },
+        });
+
+        // Adiciona ao caderno rascunho
+        const courseId = comm.courseId;
+        let caderno = await tx.disciplinaryBook.findFirst({
+          where: { status: "RASCUNHO", courseId },
+          orderBy: { number: "desc" },
+        });
+        if (!caderno) {
+          const ultimoDoCurso = await tx.disciplinaryBook.findFirst({
+            where: { courseId },
+            orderBy: { number: "desc" },
+          });
+          caderno = await tx.disciplinaryBook.create({
+            data: { number: (ultimoDoCurso?.number ?? 0) + 1, courseId, createdById: authorityId },
+          });
+        }
+        const jaExiste = await tx.disciplinaryBookItem.findFirst({
+          where: { disciplinaryBookId: caderno.id, communicationId: comm.id },
+        });
+        if (!jaExiste) {
+          await tx.disciplinaryBookItem.create({
+            data: {
+              disciplinaryBookId: caderno.id,
+              communicationId: comm.id,
+              studentId: comm.studentId,
+              courseId: comm.courseId,
+              platoonId: comm.platoonId,
+              studentCourseNumber: comm.courseNumber,
+              studentWarName: comm.student.warName,
+              recordType: comm.type.name,
+              factDate: comm.factDate,
+              decisionSummary: "Período de Adaptação",
+              shortObservation: "Período de Adaptação",
+              score: 0,
+            },
+          });
+        }
+      });
+    } else {
+      // Fluxo normal: encaminha para parecer
+      await prisma.$transaction([
+        prisma.studentAcknowledgement.create({
+          data: {
+            communicationId: comm.id,
+            studentId: comm.studentId,
+            method: "PRAZO_EXPIRADO",
+            notes: NOTA_AUTO,
+          },
+        }),
+        prisma.communication.update({
+          where: { id: comm.id },
+          data: { status: "AGUARDANDO_PARECER" },
+        }),
+      ]);
+    }
 
     if (admin) {
       await prisma.auditLog.create({
@@ -49,7 +119,7 @@ export async function processarPrazosExpirados(): Promise<number> {
           action: "PRAZO_EXPIRADO_AUTO",
           entity: "Communication",
           entityId: comm.id,
-          details: NOTA_AUTO,
+          details: comm.adaptationPeriod ? NOTA_AUTO_ADAPTACAO : NOTA_AUTO,
         },
       });
     }
@@ -58,7 +128,7 @@ export async function processarPrazosExpirados(): Promise<number> {
   if (expiradas.length > 0) {
     console.log(
       `[SiGeCon] ${new Date().toLocaleString("pt-BR")} — ` +
-      `${expiradas.length} comunicação(ões) encaminhada(s) automaticamente por prazo expirado.`
+      `${expiradas.length} comunicação(ões) processada(s) automaticamente por prazo expirado.`
     );
   }
 

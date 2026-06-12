@@ -53,6 +53,7 @@ export default async function RelatoriosPage({
   const paginaArt  = Math.max(1, parseInt(sp.paginaArt ?? "1") || 1);
   const col        = sp.col  ?? "";
   const dir        = (sp.dir === "asc" ? "asc" : "desc") as "asc" | "desc";
+  const adaptacao  = sp.adaptacao ?? "";
 
   const school = getSchoolFilter(session.role, session.escola);
 
@@ -73,6 +74,8 @@ export default async function RelatoriosPage({
   if (artigo) where.article = artigo;
   if (inciso) where.item = inciso;
   if (alinea) where.letter = alinea;
+  if (adaptacao === "sim") where.adaptationPeriod = true;
+  else if (adaptacao === "nao") where.adaptationPeriod = false;
 
   if (status) {
     switch (status) {
@@ -109,6 +112,8 @@ export default async function RelatoriosPage({
   const whereFreq: Record<string, unknown> = { ...cursoFilter };
   if (tipo) whereFreq.type = { name: tipo };
   if (dataInicio || dataFim) whereFreq.factDate = where.factDate;
+  if (adaptacao === "sim") whereFreq.adaptationPeriod = true;
+  else if (adaptacao === "nao") whereFreq.adaptationPeriod = false;
   if (status) {
     const statusWhere: Record<string, unknown> = {};
     Object.assign(statusWhere, where.status ? { status: where.status } : {});
@@ -189,6 +194,7 @@ export default async function RelatoriosPage({
     if (artigo)     p.set("artigo",     artigo);
     if (inciso)     p.set("inciso",     inciso);
     if (alinea)     p.set("alinea",     alinea);
+    if (adaptacao)  p.set("adaptacao",  adaptacao);
     if (col)        p.set("col",        col);
     if (dir)        p.set("dir",        dir);
     p.set("pagina",    String(paginaAtual));
@@ -312,6 +318,14 @@ export default async function RelatoriosPage({
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Data fim</label>
             <input name="dataFim" type="date" defaultValue={dataFim} className="input text-sm" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Período de Adaptação</label>
+            <select name="adaptacao" defaultValue={adaptacao} className="input text-sm">
+              <option value="">Todos</option>
+              <option value="sim">Sim</option>
+              <option value="nao">Não</option>
+            </select>
           </div>
         </div>
 
@@ -475,7 +489,12 @@ export default async function RelatoriosPage({
                   <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">
                     {format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}
                   </td>
-                  <td className="px-3 py-2.5 text-xs whitespace-nowrap">{resolveStatusLabel(c)}</td>
+                  <td className="px-3 py-2.5 text-xs whitespace-nowrap">
+                    {resolveStatusLabel(c)}
+                    {c.adaptationPeriod && (
+                      <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full font-medium bg-orange-100 text-orange-700">PA</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2.5 text-xs font-bold whitespace-nowrap">
                     {c.finalScore != null ? c.finalScore.toFixed(1) : "—"}
                   </td>

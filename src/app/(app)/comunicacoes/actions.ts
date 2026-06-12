@@ -32,6 +32,7 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
     ? `${communicantRank} ${communicantNameRaw}`.trim()
     : communicantNameRaw || null;
   const communicantUserId = String(formData.get("communicantUserId") ?? "").trim() || null;
+  const adaptationPeriod = formData.get("adaptationPeriod") === "true";
 
   // Validações obrigatórias
   if (!studentId)       return { error: "Localize e selecione o aluno pelo número de curso." };
@@ -100,6 +101,7 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
         item: regra.item,
         letter: regra.letter,
         suggestedScore, communicantName, communicantUserId,
+        adaptationPeriod,
         status: "AGUARDANDO_CIENCIA",
         defenseDeadline: calcularPrazoDefesa(new Date()),
       },
@@ -142,6 +144,8 @@ export async function tomarCienciaComDefesa(_prev: State, formData: FormData): P
     return { error: "Sem permissão." };
   if (comm.status !== "AGUARDANDO_CIENCIA")
     return { error: "Esta comunicação não aguarda ciência." };
+  if (comm.adaptationPeriod)
+    return { error: "Comunicações em Período de Adaptação não permitem apresentação de defesa." };
 
   // Processar anexos (opcionais — múltiplos, total ≤ 5 MB)
   const arquivos = (formData.getAll("file") as File[]).filter((f) => f && f.size > 0);
@@ -225,6 +229,94 @@ export async function tomarCienciaSemDefesa(_prev: State, formData: FormData): P
     });
     await auditLog(session.userId, "CIENCIA_SEM_DEFESA", "Communication", communicationId,
       "Sem defesa — encaminhado ao Subcomandante/Oficial para parecer");
+  } catch {
+    return { error: "Erro ao registrar ciência. Tente novamente." };
+  }
+  redirect(`/comunicacoes/${communicationId}`);
+}
+
+// ── Tomar ciência durante Período de Adaptação → decisão automática ─────────
+export async function tomarCienciaAdaptacao(_prev: State, formData: FormData): Promise<State> {
+  const session = await verifySession();
+  const communicationId = String(formData.get("communicationId") ?? "");
+
+  const comm = await prisma.communication.findUnique({
+    where: { id: communicationId },
+    include: { student: true, type: true },
+  });
+  if (!comm) return { error: "Comunicação não encontrada." };
+  if (session.role === "ALUNO" && comm.student.userId !== session.userId)
+    return { error: "Sem permissão." };
+  if (comm.status !== "AGUARDANDO_CIENCIA")
+    return { error: "Esta comunicação não aguarda ciência." };
+  if (!comm.adaptationPeriod)
+    return { error: "Ação exclusiva para comunicações em Período de Adaptação." };
+
+  const admin = await prisma.user.findFirst({
+    where: { role: "ADMINISTRADOR", active: true },
+    select: { id: true },
+  });
+  const authorityId = admin?.id ?? comm.reporterId;
+
+  try {
+    await prisma.studentAcknowledgement.create({
+      data: { communicationId, studentId: comm.studentId, method: "SEM_DEFESA" },
+    });
+
+    await prisma.decision.create({
+      data: {
+        communicationId,
+        authorityId,
+        decisionType: "Período de Adaptação",
+        text: "Comunicação registrada em Período de Adaptação. Não haverá impacto na nota de conduta.",
+        finalScore: 0,
+      },
+    });
+
+    await prisma.communication.update({
+      where: { id: communicationId },
+      data: { status: "DECIDIDA", finalScore: 0 },
+    });
+
+    await auditLog(session.userId, "CIENCIA_ADAPTACAO", "Communication", communicationId,
+      "Período de Adaptação — decisão automática, sem impacto na nota");
+
+    // Adiciona ao caderno rascunho do mesmo curso
+    const courseId = comm.courseId;
+    let caderno = await prisma.disciplinaryBook.findFirst({
+      where: { status: "RASCUNHO", courseId },
+      orderBy: { number: "desc" },
+    });
+    if (!caderno) {
+      const ultimoDoCurso = await prisma.disciplinaryBook.findFirst({
+        where: { courseId },
+        orderBy: { number: "desc" },
+      });
+      caderno = await prisma.disciplinaryBook.create({
+        data: { number: (ultimoDoCurso?.number ?? 0) + 1, courseId, createdById: authorityId },
+      });
+    }
+    const jaExiste = await prisma.disciplinaryBookItem.findFirst({
+      where: { disciplinaryBookId: caderno.id, communicationId },
+    });
+    if (!jaExiste) {
+      await prisma.disciplinaryBookItem.create({
+        data: {
+          disciplinaryBookId: caderno.id,
+          communicationId,
+          studentId: comm.studentId,
+          courseId: comm.courseId,
+          platoonId: comm.platoonId,
+          studentCourseNumber: comm.courseNumber,
+          studentWarName: comm.student.warName,
+          recordType: comm.type.name,
+          factDate: comm.factDate,
+          decisionSummary: "Período de Adaptação",
+          shortObservation: "Período de Adaptação",
+          score: 0,
+        },
+      });
+    }
   } catch {
     return { error: "Erro ao registrar ciência. Tente novamente." };
   }

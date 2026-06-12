@@ -141,6 +141,7 @@ model Communication {
   defenseDeadline  DateTime?
   communicantName   String?
   communicantUserId String?
+  adaptationPeriod  Boolean  @default(false)
   bgpmNumber     String?
   bgpmYear       String?
   tacEquivalent  String?

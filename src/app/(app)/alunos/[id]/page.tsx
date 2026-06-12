@@ -62,6 +62,7 @@ export default async function AlunoPage({ params }: { params: Promise<{ id: stri
   const resumo = [
     { label: "Total",         value: aluno.communications.length,                              desfav: false, fav: false },
     { label: "Publicados",    value: pubItems.length,                                           desfav: false, fav: false },
+    { label: "P. Adapt.",     value: aluno.communications.filter((c) => c.adaptationPeriod).length, desfav: false, fav: false },
     { label: "CPI 0/1",       value: (ct["CPI 0"] ?? 0) + (ct["CPI 1"] ?? 0),                desfav: true,  fav: false },
     { label: "CPI 2",         value: ct["CPI 2"] ?? 0,                                         desfav: true,  fav: false },
     { label: "CPI 3",         value: ct["CPI 3"] ?? 0,                                         desfav: true,  fav: false },
@@ -196,9 +197,14 @@ export default async function AlunoPage({ params }: { params: Promise<{ id: stri
                   {format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}
                 </td>
                 <td className="px-4 py-3">
-                  <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
-                    {STATUS_MAP[c.status] ?? c.status}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                      {STATUS_MAP[c.status] ?? c.status}
+                    </span>
+                    {c.adaptationPeriod && (
+                      <span className="text-xs px-1.5 py-0.5 rounded font-semibold bg-orange-100 text-orange-700">PA</span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-4 py-3">
                   {c.finalScore != null ? (

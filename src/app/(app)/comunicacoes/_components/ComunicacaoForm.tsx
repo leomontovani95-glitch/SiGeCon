@@ -97,6 +97,9 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
   const [typeId, setTypeId] = useState("");
   const [score, setScore] = useState("");
 
+  // Período de Adaptação
+  const [adaptationPeriod, setAdaptationPeriod] = useState(false);
+
   // Testemunhas
   const [testemunhas, setTestemunhas] = useState<{ rank: string; name: string }[]>([]);
   function addTestemunha() { setTestemunhas((t) => [...t, { rank: "", name: "" }]); }
@@ -264,6 +267,37 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
         </div>
         {aluno && <input type="hidden" name="studentId" value={aluno.id} />}
         {!aluno && <input type="hidden" name="studentId" value="" />}
+      </fieldset>
+
+      {/* ── PERÍODO DE ADAPTAÇÃO ──────────────────────────────────── */}
+      <fieldset className={`border rounded-lg p-4 ${adaptationPeriod ? "border-orange-300 bg-orange-50" : "border-gray-200 bg-gray-50"}`}>
+        <legend className="text-sm font-semibold px-2 text-gray-700">Período de Adaptação?</legend>
+        <input type="hidden" name="adaptationPeriod" value={adaptationPeriod ? "true" : "false"} />
+        <div className="flex gap-6 mt-2">
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="radio"
+              checked={!adaptationPeriod}
+              onChange={() => setAdaptationPeriod(false)}
+              className="w-4 h-4 accent-[#1e3a5f]"
+            />
+            Não
+          </label>
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="radio"
+              checked={adaptationPeriod}
+              onChange={() => setAdaptationPeriod(true)}
+              className="w-4 h-4 accent-orange-600"
+            />
+            Sim
+          </label>
+        </div>
+        {adaptationPeriod && (
+          <p className="text-sm text-orange-800 mt-3 bg-orange-100 rounded-lg px-3 py-2 border border-orange-200">
+            A publicação da presente comunicação não incidirá sobre a nota de conduta, independente da decisão.
+          </p>
+        )}
       </fieldset>
 
       {/* ── DISPOSITIVO LEGAL (obrigatório, cascata) ──────────────── */}

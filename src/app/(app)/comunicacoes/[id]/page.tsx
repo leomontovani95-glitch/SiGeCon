@@ -123,6 +123,11 @@ export default async function ComunicacaoPage({
             <span className="inline-block text-xs px-3 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
               {STATUS_LABELS[comm.status] ?? comm.status}
             </span>
+            {comm.adaptationPeriod && (
+              <span className="inline-block text-xs px-3 py-1 rounded-full bg-orange-100 text-orange-700 font-medium">
+                Período de Adaptação
+              </span>
+            )}
             {cadernoPublicado && (
               <span className="inline-block text-xs px-3 py-1 rounded-full bg-teal-100 text-teal-700 font-medium font-mono">
                 {cadernoPublicado.course
@@ -397,6 +402,7 @@ export default async function ComunicacaoPage({
           studentId: comm.studentId,
           finalScore: comm.finalScore,
           suggestedScore: comm.suggestedScore,
+          adaptationPeriod: comm.adaptationPeriod,
           opinions: comm.opinions.map((o) => ({ id: o.id })),
           decisions: comm.decisions.map((d) => ({ id: d.id, finalScore: d.finalScore, decisionType: d.decisionType })),
           typeName: comm.type.name,
