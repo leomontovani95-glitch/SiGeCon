@@ -93,7 +93,7 @@ export default function Sidebar({
   );
 
   return (
-    <div className="flex flex-col w-64 bg-[#1e3a5f] min-h-screen">
+    <div className="flex flex-col w-64 bg-[#1e3a5f] min-h-screen h-full">
       <div className="flex items-center justify-center h-16 border-b border-[#16304f] px-3">
         <div className="flex items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
