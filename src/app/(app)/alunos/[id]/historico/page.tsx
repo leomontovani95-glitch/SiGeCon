@@ -47,7 +47,6 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
   const resumo = [
     { label: "Total",        value: aluno.communications.length,                              color: "#1e3a5f" },
     { label: "Publicados",   value: pubItems.length,                                           color: "#374151" },
-    { label: "P. Adapt.",    value: aluno.communications.filter((c) => c.adaptationPeriod).length, color: "#c2410c" },
     { label: "CPI 0/1",      value: (ct["CPI 0"] ?? 0) + (ct["CPI 1"] ?? 0),                color: "#b45309" },
     { label: "CPI 2",        value: ct["CPI 2"] ?? 0,                                         color: "#b91c1c" },
     { label: "CPI 3",        value: ct["CPI 3"] ?? 0,                                         color: "#7f1d1d" },

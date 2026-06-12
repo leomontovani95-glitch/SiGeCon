@@ -16,9 +16,17 @@ const STATUS_MAP: Record<string, string> = {
   PUBLICADA_CADERNO: "Publicada em Caderno", FINALIZADA: "Finalizada",
 };
 
-export default async function AlunoPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AlunoPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string>>;
+}) {
   const session = await verifySession();
   const { id } = await params;
+  const sp = await searchParams;
+  const adaptacao = sp.adaptacao ?? "";
 
   const [aluno, pubItems, provisItems] = await Promise.all([
     prisma.student.findUnique({
@@ -43,6 +51,7 @@ export default async function AlunoPage({ params }: { params: Promise<{ id: stri
   ]);
   if (!aluno) notFound();
 
+  // Nota sempre calculada sobre todos os itens publicados (não é afetada pelo filtro)
   const nota  = calcularNotaPublicada(pubItems);
   const faixa = faixaNota(nota);
   const risco = zonaDeRisco(nota);
@@ -58,11 +67,27 @@ export default async function AlunoPage({ params }: { params: Promise<{ id: stri
     .filter((i) => i.communication.type.scoreNature === "FAVORAVEL")
     .reduce((s, i) => s + Math.abs(i.score ?? 0), 0);
 
-  const ct = aluno.communications.reduce((acc, c) => { acc[c.type.name] = (acc[c.type.name] ?? 0) + 1; return acc; }, {} as Record<string, number>);
+  // Contagens para os pills do filtro
+  const totalAdaptacao = aluno.communications.filter((c) => c.adaptationPeriod).length;
+
+  // Dados filtrados — afetam resumo e tabela
+  const commsVisiveis = adaptacao === "sim"
+    ? aluno.communications.filter((c) => c.adaptationPeriod)
+    : adaptacao === "nao"
+      ? aluno.communications.filter((c) => !c.adaptationPeriod)
+      : aluno.communications;
+
+  const pubItemsVisiveis = adaptacao === "sim"
+    ? pubItems.filter((i) => i.communication.adaptationPeriod)
+    : adaptacao === "nao"
+      ? pubItems.filter((i) => !i.communication.adaptationPeriod)
+      : pubItems;
+
+  // Resumo baseado nos dados filtrados
+  const ct = commsVisiveis.reduce((acc, c) => { acc[c.type.name] = (acc[c.type.name] ?? 0) + 1; return acc; }, {} as Record<string, number>);
   const resumo = [
-    { label: "Total",         value: aluno.communications.length,                              desfav: false, fav: false },
-    { label: "Publicados",    value: pubItems.length,                                           desfav: false, fav: false },
-    { label: "P. Adapt.",     value: aluno.communications.filter((c) => c.adaptationPeriod).length, desfav: false, fav: false },
+    { label: "Total",         value: commsVisiveis.length,                                     desfav: false, fav: false },
+    { label: "Publicados",    value: pubItemsVisiveis.length,                                   desfav: false, fav: false },
     { label: "CPI 0/1",       value: (ct["CPI 0"] ?? 0) + (ct["CPI 1"] ?? 0),                desfav: true,  fav: false },
     { label: "CPI 2",         value: ct["CPI 2"] ?? 0,                                         desfav: true,  fav: false },
     { label: "CPI 3",         value: ct["CPI 3"] ?? 0,                                         desfav: true,  fav: false },
@@ -144,6 +169,36 @@ export default async function AlunoPage({ params }: { params: Promise<{ id: stri
         </div>
       </div>
 
+      {/* Filtro de Período de Adaptação — acima do resumo */}
+      <div className="bg-white rounded-xl border border-gray-200 px-5 py-3 mb-1 flex items-center gap-3 flex-wrap">
+        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Período de Adaptação</span>
+        <div className="flex gap-1.5">
+          {[
+            { v: "",    label: `Todos (${aluno.communications.length})` },
+            { v: "sim", label: `Sim (${totalAdaptacao})` },
+            { v: "nao", label: `Não (${aluno.communications.length - totalAdaptacao})` },
+          ].map(({ v, label }) => (
+            <Link
+              key={v}
+              href={`/alunos/${aluno.id}${v ? `?adaptacao=${v}` : ""}`}
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                adaptacao === v
+                  ? "bg-orange-500 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {label}
+            </Link>
+          ))}
+        </div>
+        {adaptacao && (
+          <span className="text-xs text-orange-700 bg-orange-50 border border-orange-200 rounded px-2 py-0.5">
+            Resumo e histórico filtrados por P. Adaptação = {adaptacao === "sim" ? "Sim" : "Não"}
+          </span>
+        )}
+      </div>
+
+      {/* Resumo de Registros */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
         <div className="px-5 py-3 border-b border-gray-100">
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Resumo de Registros</h2>
@@ -170,9 +225,13 @@ export default async function AlunoPage({ params }: { params: Promise<{ id: stri
         </div>
       </div>
 
+      {/* Histórico de Comunicações */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">Histórico de Comunicações</h2>
+          <h2 className="font-semibold text-gray-900">
+            Histórico de Comunicações
+            <span className="ml-2 text-sm font-normal text-gray-400">({commsVisiveis.length})</span>
+          </h2>
         </div>
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
@@ -185,7 +244,7 @@ export default async function AlunoPage({ params }: { params: Promise<{ id: stri
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {aluno.communications.map((c) => (
+            {commsVisiveis.map((c) => (
               <tr key={c.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3">
                   <Link href={`/comunicacoes/${c.id}`} className="font-mono text-xs text-[#1e3a5f] hover:underline">
@@ -215,8 +274,10 @@ export default async function AlunoPage({ params }: { params: Promise<{ id: stri
                 </td>
               </tr>
             ))}
-            {aluno.communications.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400">Nenhuma comunicação registrada.</td></tr>
+            {commsVisiveis.length === 0 && (
+              <tr><td colSpan={5} className="px-4 py-6 text-center text-gray-400">
+                {aluno.communications.length === 0 ? "Nenhuma comunicação registrada." : "Nenhuma comunicação encontrada com este filtro."}
+              </td></tr>
             )}
           </tbody>
         </table>
