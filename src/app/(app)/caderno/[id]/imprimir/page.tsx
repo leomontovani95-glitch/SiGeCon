@@ -18,7 +18,7 @@ async function fetchCaderno(id: string) {
       items: {
         include: {
           student: { include: { course: true, platoon: true } },
-          communication: { select: { protocolNumber: true, article: true, item: true, letter: true } },
+          communication: { select: { protocolNumber: true, article: true, item: true, letter: true, bgpmNumber: true, bgpmYear: true } },
         },
       },
       aacp: {
@@ -47,6 +47,39 @@ function fmtEnq(art: string | null, inc: string | null, al: string | null) {
   if (inc) s += `, ${inc}`;
   if (al)  s += `, ${al})`;
   return s;
+}
+
+function fmtOrigEnq(art: string | null, inc: string | null, al: string | null): string {
+  if (!art) return "—";
+  let s = `Enquad. orig. ${art}`;
+  if (inc) s += `, ${inc}`;
+  if (al)  s += `, ${al})`;
+  return s;
+}
+
+function fmtBGPM(num: string | null | undefined, year: string | null | undefined): string | null {
+  if (!num || !year) return null;
+  return `BGPM Nº ${num.padStart(3, "0")}/${year}`;
+}
+
+function normalizarPeriodo(p: string): string {
+  // Substitui cada token de hora individualmente
+  return p.replace(/\d+h\d*(?:min)?/gi, (token) => {
+    let t = token.replace(/(?:min)$/i, ""); // remove sufixo "min"
+    t = t.replace(/h00$/, "h");             // 08h00 → 08h
+    return t;
+  });
+}
+
+function obsCell(item: Item): string {
+  if (item.decisionSummary === "Reenquadrar artigo") {
+    return fmtOrigEnq(item.originalArticle ?? null, item.originalItem ?? null, item.originalLetter ?? null);
+  }
+  const TD_TAC = new Set(["TD Leve", "TD Média", "TD Grave", "TAC", "Elogio publicado em BI"]);
+  if (TD_TAC.has(item.recordType)) {
+    return fmtBGPM(item.communication.bgpmNumber, item.communication.bgpmYear) ?? item.shortObservation ?? "—";
+  }
+  return item.shortObservation ?? "—";
 }
 
 // Definição dos grupos na ordem de exibição
@@ -126,7 +159,7 @@ function TabelaTipo({ items, label, note, isTdTac }: { items: Item[]; label: str
               </td>
               <td className="cd-col-nome" style={{ fontWeight: "bold" }}>{item.studentWarName}</td>
               <td className="cd-col-data">{format(new Date(item.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
-              <td className="cd-col-obs" style={{ color: "#666" }}>{item.shortObservation ?? "—"}</td>
+              <td className="cd-col-obs" style={{ color: "#666" }}>{obsCell(item)}</td>
               <td className="cd-col-pont" style={{ textAlign: "right", fontWeight: "bold" }}>
                 {item.score != null
                   ? (["Referência Elogiosa", "Elogio publicado em BI"].includes(item.recordType)
@@ -199,18 +232,17 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
   return (
     <div style={{ fontFamily: "Arial, sans-serif", fontSize: "8pt", color: "#000" }}>
 
-      {/* Cabeçalho institucional */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "2px solid #1e3a5f", paddingBottom: 7, marginBottom: 8, gap: 8 }}>
+      {/* Cabeçalho institucional — mesmo padrão do PrintLayout */}
+      <div className="print-header">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-pmes.png" alt="PMES" style={{ height: 48, width: 48, objectFit: "contain" }} />
-        <div style={{ flex: 1, textAlign: "center", lineHeight: 1.35 }}>
-          <p style={{ margin: 0, fontSize: "7pt", textTransform: "uppercase" }}>Governo do Estado do Espírito Santo</p>
-          <p style={{ margin: 0, fontSize: "10pt", fontWeight: "bold", color: "#1e3a5f", textTransform: "uppercase" }}>Polícia Militar</p>
-          <p style={{ margin: 0, fontSize: "8pt", fontWeight: "bold", textTransform: "uppercase" }}>Academia de Polícia Militar</p>
-          <p style={{ margin: 0, fontSize: "7pt", fontStyle: "italic", color: "#555" }}>"Policial Militar, herói protetor da sociedade"</p>
+        <img src="/logo-pmes.png" alt="PMES" className="print-header-logo" width={68} height={68} />
+        <div className="print-header-text">
+          <p className="linha1">Governo do Estado do Espírito Santo</p>
+          <p className="linha2">Polícia Militar</p>
+          <p className="linha3">Academia de Polícia Militar</p>
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brasao-apm.png" alt="APM/ES" style={{ height: 48, width: 48, objectFit: "contain" }} />
+        <img src="/brasao-apm.png" alt="APM/ES" className="print-header-logo" width={68} height={68} />
       </div>
 
       {/* Bloco de identificação */}
@@ -246,10 +278,10 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
       <table className="aacp-table" style={{ marginBottom: 5 }}>
         <thead>
           <tr>
-            <th style={{ width: "8%", textAlign: "center" }}>DIA</th>
+            <th style={{ width: "10%", textAlign: "center" }}>DIA</th>
             <th style={{ width: "8%", textAlign: "center" }}>CPI</th>
-            <th style={{ width: "70%" }}>AÇÕES</th>
-            <th style={{ width: "14%", textAlign: "center" }}>PERÍODO</th>
+            <th style={{ width: "67%" }}>AÇÕES</th>
+            <th style={{ width: "15%", textAlign: "center" }}>PERÍODO</th>
           </tr>
         </thead>
         <tbody>
@@ -257,18 +289,18 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
             <tr key={row.key}>
               {row.showDay && (
                 <td rowSpan={row.daySpan}
-                  style={{ textAlign: "center", fontWeight: "bold", verticalAlign: "middle", padding: "3px 5px" }}>
+                  style={{ textAlign: "center", fontWeight: "bold", verticalAlign: "middle", padding: "3px 8px" }}>
                   {row.dayLabel}
                 </td>
               )}
               {row.showCpi && (
                 <td rowSpan={row.cpiSpan}
-                  style={{ textAlign: "center", verticalAlign: "middle", padding: "3px 5px" }}>
+                  style={{ textAlign: "center", verticalAlign: "middle", padding: "3px 6px" }}>
                   {row.cpiLabel}
                 </td>
               )}
               <td style={{ whiteSpace: "normal" }}>{row.acao}</td>
-              <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>{row.periodo}</td>
+              <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>{normalizarPeriodo(row.periodo)}</td>
             </tr>
           ))}
         </tbody>
@@ -300,10 +332,10 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
 
       {/* Assinatura */}
       {chefe && (
-        <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
-          <div style={{ textAlign: "center", borderTop: "1px solid #000", paddingTop: 4, minWidth: 240 }}>
-            <p style={{ margin: 0, fontWeight: "bold", fontSize: "8pt" }}>{chefe.rank} {chefe.fullName}</p>
-            <p style={{ margin: 0, fontSize: "8pt" }}>Chefe da Divisão Acadêmica</p>
+        <div className="print-signatures" style={{ marginTop: 48 }}>
+          <div className="print-sig-line" style={{ gridColumn: "1 / -1", maxWidth: 400, margin: "0 auto" }}>
+            <p style={{ fontWeight: "bold" }}>{chefe.rank} {chefe.fullName}</p>
+            <p>Chefe da Divisão Acadêmica</p>
           </div>
         </div>
       )}
