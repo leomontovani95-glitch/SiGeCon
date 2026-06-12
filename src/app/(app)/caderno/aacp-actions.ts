@@ -76,6 +76,7 @@ export async function criarAACP(disciplinaryBookId: string) {
   await prisma.aacp.create({
     data: {
       disciplinaryBookId,
+      local: "Academia de Polícia Militar do Espírito Santo - APM/ES",
       saturdayDate: sat,
       sundayDate: sun,
       dayGroups: {
@@ -110,6 +111,14 @@ export type AACPSaveData = {
   observacoes: { text: string; order: number }[];
   dispositivosLegais: { text: string; order: number }[];
 };
+
+export async function removerAACP(aacpId: string) {
+  await verifyRole(...ROLES);
+  const aacp = await prisma.aacp.findUnique({ where: { id: aacpId }, select: { disciplinaryBookId: true } });
+  if (!aacp) return;
+  await prisma.aacp.delete({ where: { id: aacpId } });
+  revalidatePath(`/caderno/${aacp.disciplinaryBookId}/editar`);
+}
 
 export async function salvarAACP(aacpId: string, data: AACPSaveData) {
   await verifyRole(...ROLES);

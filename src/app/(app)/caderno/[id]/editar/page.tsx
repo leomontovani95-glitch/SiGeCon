@@ -9,6 +9,7 @@ import PublicarBtn from "../../_components/PublicarBtn";
 import RemoverItemBtn from "../../_components/RemoverItemBtn";
 import AdicionarItemBtn from "../../_components/AdicionarItemBtn";
 import GerarAACPBtn from "../../_components/GerarAACPBtn";
+import RemoverAACPBtn from "../../_components/RemoverAACPBtn";
 import AACPEditor from "../../_components/AACPEditor";
 
 export default async function EditarCadernoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -230,7 +231,10 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
               <h2 className="font-semibold text-gray-900">AACP — Atividades de Ajuste de Conduta Profissional</h2>
               <p className="text-xs text-gray-500 mt-0.5">Anexo do caderno disciplinar, impresso na página seguinte do PDF.</p>
             </div>
-            {!caderno.aacp && <GerarAACPBtn cadernoId={id} />}
+            {caderno.aacp
+              ? <RemoverAACPBtn aacpId={caderno.aacp.id} />
+              : <GerarAACPBtn cadernoId={id} />
+            }
           </div>
 
           {caderno.aacp ? (

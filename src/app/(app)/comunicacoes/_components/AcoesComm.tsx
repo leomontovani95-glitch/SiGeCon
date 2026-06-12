@@ -209,7 +209,29 @@ export default function AcoesComm({
         </div>
       )}
 
-      {canTakeAck && !mostraFormDefesa && !comm.adaptationPeriod && (
+      {canTakeAck && !mostraFormDefesa && !comm.adaptationPeriod && (comm.typeName.toLowerCase().includes("elogiosa")) && (
+        <div className="bg-green-50 border border-green-200 rounded-xl p-5">
+          <h3 className="font-semibold text-green-900 mb-2">Ciência da Referência Elogiosa</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Esta é uma Referência Elogiosa. Tome ciência para registrar o seu conhecimento e encaminhar ao Oficial da Escola.
+          </p>
+          <form action={semDefAction}>
+            <input type="hidden" name="communicationId" value={comm.id} />
+            <button
+              type="submit"
+              disabled={semDefPending}
+              className="btn-primary text-sm"
+            >
+              {semDefPending ? "Registrando..." : "Tomar Ciência"}
+            </button>
+            {semDefState?.error && (
+              <p className="text-sm text-red-600 mt-1">{semDefState.error}</p>
+            )}
+          </form>
+        </div>
+      )}
+
+      {canTakeAck && !mostraFormDefesa && !comm.adaptationPeriod && (!comm.typeName.toLowerCase().includes("elogiosa")) && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
           <h3 className="font-semibold text-yellow-900 mb-2">Ciência da Comunicação</h3>
           <p className="text-sm text-gray-600 mb-4">

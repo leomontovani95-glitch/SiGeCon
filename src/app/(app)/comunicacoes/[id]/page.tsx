@@ -307,7 +307,11 @@ export default async function ComunicacaoPage({
             ))
           ) : (
             <p className="text-sm text-gray-600 italic">
-              O aluno tomou ciência da comunicação e optou por não apresentar justificativa/defesa.
+              {comm.type.name.toLowerCase().includes("elogiosa")
+                ? "O aluno tomou ciência da Referência Elogiosa."
+                : comm.adaptationPeriod
+                ? "O aluno tomou ciência da comunicação e não há apresentação de defesa por se tratar de comunicação em Período de Adaptação."
+                : "O aluno tomou ciência da comunicação e optou por não apresentar justificativa/defesa."}
             </p>
           )}
         </div>

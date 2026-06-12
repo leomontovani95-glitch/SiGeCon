@@ -269,7 +269,7 @@ model DisciplinaryBook {
 model Aacp {
   id                 String   @id @default(cuid())
   disciplinaryBookId String   @unique
-  local              String   @default("Academia de Polícia Militar – APMES")
+  local              String   @default("Academia de Polícia Militar do Espírito Santo - APM/ES")
   fiscalizacao       String   @default("Oficial de Dia")
   versao             Int      @default(1)
   saturdayDate       DateTime

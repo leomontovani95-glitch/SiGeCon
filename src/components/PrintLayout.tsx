@@ -140,7 +140,6 @@ export default function PrintLayout({ title, children, extraPages, extraStyles }
       <div className="no-print-bar">
         <span style={{ fontWeight: "bold" }}>SiGeCon — Documento</span>
         <button onClick={() => window.print()}>Baixar PDF</button>
-        <button onClick={() => window.history.back()}>Voltar</button>
       </div>
 
       {extraStyles && <style>{extraStyles}</style>}
