@@ -49,6 +49,8 @@ model Course {
   students          Student[]
   communications    Communication[]
   disciplinaryBooks DisciplinaryBook[]
+
+  @@index([school])
 }
 
 model Platoon {
@@ -62,6 +64,8 @@ model Platoon {
   course         Course          @relation(fields: [courseId], references: [id])
   students       Student[]
   communications Communication[]
+
+  @@index([courseId])
 }
 
 model Student {
@@ -87,6 +91,9 @@ model Student {
   acknowledgements          StudentAcknowledgement[]
   defenses                  Defense[]
   disciplinaryBookItems     DisciplinaryBookItem[]
+
+  @@index([courseId])
+  @@index([platoonId])
 }
 
 model ManualRule {
@@ -162,6 +169,12 @@ model Communication {
   opinions              Opinion[]
   decisions             Decision[]
   disciplinaryBookItems DisciplinaryBookItem[]
+
+  @@index([studentId])
+  @@index([courseId])
+  @@index([status])
+  @@index([reporterId])
+  @@index([communicantUserId])
 }
 
 model Witness {
@@ -174,6 +187,8 @@ model Witness {
   notes           String?
 
   communication Communication @relation(fields: [communicationId], references: [id])
+
+  @@index([communicationId])
 }
 
 model Attachment {
@@ -192,6 +207,8 @@ model Attachment {
   defense       Defense?      @relation(fields: [defenseId], references: [id])
   opinion       Opinion?      @relation(fields: [opinionId], references: [id])
   decision      Decision?     @relation(fields: [decisionId], references: [id])
+
+  @@index([communicationId])
 }
 
 model StudentAcknowledgement {
@@ -204,6 +221,9 @@ model StudentAcknowledgement {
 
   communication Communication @relation(fields: [communicationId], references: [id])
   student       Student       @relation(fields: [studentId], references: [id])
+
+  @@index([communicationId])
+  @@index([studentId])
 }
 
 model Defense {
@@ -217,6 +237,8 @@ model Defense {
   communication Communication  @relation(fields: [communicationId], references: [id])
   student       Student        @relation(fields: [studentId], references: [id])
   attachments   Attachment[]
+
+  @@index([communicationId])
 }
 
 model Opinion {
@@ -231,6 +253,8 @@ model Opinion {
   communication Communication @relation(fields: [communicationId], references: [id])
   author        User          @relation(fields: [authorId], references: [id])
   attachments   Attachment[]
+
+  @@index([communicationId])
 }
 
 model Decision {
@@ -245,6 +269,8 @@ model Decision {
   communication Communication @relation(fields: [communicationId], references: [id])
   authority     User          @relation(fields: [authorityId], references: [id])
   attachments   Attachment[]
+
+  @@index([communicationId])
 }
 
 model DisciplinaryBook {
@@ -267,6 +293,7 @@ model DisciplinaryBook {
 
   // Numeração do caderno é única por curso (não mais global).
   @@unique([courseId, number])
+  @@index([status])
 }
 
 model Aacp {
@@ -359,6 +386,8 @@ model DisciplinaryBookItem {
 
   // Uma comunicação não pode ser lançada duas vezes no mesmo caderno.
   @@unique([disciplinaryBookId, communicationId])
+  @@index([studentId])
+  @@index([communicationId])
 }
 
 model AuditLog {
@@ -371,4 +400,7 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entity, entityId])
 }
