@@ -5,6 +5,7 @@ import { abreviarPelotao } from "@/lib/utils";
 import Link from "next/link";
 import { format, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import NotificacoesAluno from "./_components/NotificacoesAluno";
 
 // ── Dashboard do ALUNO ────────────────────────────────────────────────────
 async function getDashboardAluno(userId: string) {
@@ -37,6 +38,18 @@ async function getDashboardAluno(userId: string) {
   const nota = calcularNotaPublicada(pubItems);
   const notaProvisoria = provisItems.length > 0 ? calcularNotaPublicada([...pubItems, ...provisItems]) : nota;
 
+  const trintaDiasAtras = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const STATUSES_NOTIF = ["AGUARDANDO_PARECER", "AGUARDANDO_DECISAO", "DECIDIDA", "PUBLICADA_CADERNO"];
+  const notificacoes = comms
+    .filter((c) => STATUSES_NOTIF.includes(c.status) && new Date(c.updatedAt) > trintaDiasAtras)
+    .map((c) => ({
+      id: c.id,
+      protocolNumber: c.protocolNumber,
+      status: c.status,
+      typeName: c.type.name,
+      updatedAt: c.updatedAt.toISOString(),
+    }));
+
   return {
     aluno,
     nota,
@@ -44,13 +57,15 @@ async function getDashboardAluno(userId: string) {
     temProvisorio: provisItems.length > 0,
     pendenteCiencia: comms.filter((c) => c.status === "AGUARDANDO_CIENCIA" || c.status === "AGUARDANDO_DEFESA").length,
     prazoVencido: comms.filter((c) => c.status === "PRAZO_EXPIRADO").length,
-    decididas: pubItems.length,
+    aguardandoParecer: comms.filter((c) => c.status === "AGUARDANDO_PARECER").length,
+    decididas: comms.filter((c) => ["DECIDIDA", "PUBLICADA_CADERNO"].includes(c.status)).length,
     favoraveis: favoraveisPublicados,
     publicadas: pubItems.length,
     totalCPIs: comms.filter((c) => c.type.name.startsWith("CPI")).length,
     pendentes: comms.filter((c) =>
       ["AGUARDANDO_CIENCIA", "AGUARDANDO_DEFESA", "PRAZO_EXPIRADO"].includes(c.status)
     ),
+    notificacoes,
   };
 }
 
@@ -197,7 +212,7 @@ export default async function DashboardPage({
       );
     }
 
-    const { aluno, nota, notaProvisoria, temProvisorio, pendenteCiencia, prazoVencido, decididas, favoraveis, publicadas, totalCPIs, pendentes } = dados;
+    const { aluno, nota, notaProvisoria, temProvisorio, pendenteCiencia, prazoVencido, aguardandoParecer, decididas, favoraveis, publicadas, totalCPIs, pendentes, notificacoes } = dados;
     const faixa = faixaNota(nota);
     const emRisco = zonaDeRisco(nota);
 
@@ -254,11 +269,12 @@ export default async function DashboardPage({
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
           {[
-            { label: "Aguardando minha ciência/defesa", value: pendenteCiencia, color: "bg-yellow-500", urgent: pendenteCiencia > 0 },
-            { label: "Prazo de defesa vencido",         value: prazoVencido,    color: "bg-red-600",    urgent: prazoVencido > 0 },
-            { label: "Registros decididos",             value: decididas,       color: "bg-green-600",  urgent: false },
-            { label: "Registros favoráveis",            value: favoraveis,      color: "bg-teal-600",   urgent: false },
-            { label: "Publicados em Caderno",           value: publicadas,      color: "bg-gray-600",   urgent: false },
+            { label: "Aguardando minha ciência/defesa", value: pendenteCiencia,    color: "bg-yellow-500",  urgent: pendenteCiencia > 0 },
+            { label: "Prazo de defesa vencido",         value: prazoVencido,       color: "bg-red-600",     urgent: prazoVencido > 0 },
+            { label: "Registro ag. parecer",            value: aguardandoParecer,  color: "bg-purple-600",  urgent: false },
+            { label: "Registros decididos",             value: decididas,          color: "bg-green-600",   urgent: false },
+            { label: "Registros favoráveis",            value: favoraveis,         color: "bg-teal-600",    urgent: false },
+            { label: "Publicados em Caderno",           value: publicadas,         color: "bg-gray-600",    urgent: false },
           ].map((card) => (
             <div key={card.label} className={`${card.color} rounded-xl p-4 text-white ${card.urgent ? "ring-2 ring-white ring-offset-2" : ""}`}>
               <p className="text-3xl font-bold">{card.value}</p>
@@ -266,6 +282,8 @@ export default async function DashboardPage({
             </div>
           ))}
         </div>
+
+        <NotificacoesAluno notificacoes={notificacoes} />
 
         {pendentes.length > 0 && (
           <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">

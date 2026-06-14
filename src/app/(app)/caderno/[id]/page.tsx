@@ -19,6 +19,13 @@ const ELOGIO_ORDER = ["Referência Elogiosa", "Elogio publicado em BI"];
 const TD_TAC_TIPOS = new Set(["TD Leve", "TD Média", "TD Grave", "TAC"]);
 const TIPO_ORDER   = [...CPI_ORDER, ...ELOGIO_ORDER, "Arquivamento", "TD Leve", "TD Média", "TD Grave", "TAC"];
 
+function cpiDoReenquadramento(article: string | null, inciso: string | null, fallback: string): string {
+  if (!inciso) return fallback;
+  if (article === "146" && inciso === "I") return "CPI 0";
+  const map: Record<string, string> = { I: "CPI 1", II: "CPI 2", III: "CPI 3" };
+  return map[inciso] ?? fallback;
+}
+
 const CPI0_NOTE = "CPI de Grau 0 — sanção equivalente à metade da CPI 1 (−0,1 pt)";
 
 const TIPO_NOTE: Record<string, string> = {
@@ -54,7 +61,7 @@ type GrupoItem = {
   id: string; communicationId: string; score: number | null; recordType: string;
   decisionSummary: string; studentCourseNumber: string; studentWarName: string;
   factDate: Date; student: { platoon: { name: string } | null };
-  communication: { protocolNumber: string; article: string | null; item: string | null; letter: string | null };
+  communication: { protocolNumber: string; article: string | null; item: string | null; letter: string | null; adaptationPeriod: boolean };
 };
 
 function TabelaGrupo({ items, thBase, tdBase }: { items: GrupoItem[]; thBase: string; tdBase: string }) {
@@ -90,7 +97,12 @@ function TabelaGrupo({ items, thBase, tdBase }: { items: GrupoItem[]; thBase: st
               <td className={`${tdBase} text-gray-500 whitespace-nowrap`}>{new Date(item.factDate).toLocaleDateString("pt-BR")}</td>
               <td className={`${tdBase} text-gray-700 whitespace-nowrap font-medium`}>{decisaoLabel(item.decisionSummary, item.recordType)}</td>
               <td className={`${tdBase} text-right font-bold`}>
-                {(() => { const sd = scoreDisplay(item.score, item.recordType); return sd ? <span className={sd.fav ? "text-green-600" : "text-red-600"}>{sd.text}</span> : <span className="text-gray-400">—</span>; })()}
+                {(() => {
+                  const sd = scoreDisplay(item.score, item.recordType);
+                  if (sd) return <span className={sd.fav ? "text-green-600" : "text-red-600"}>{sd.text}</span>;
+                  if (item.communication.adaptationPeriod) return <span className="text-orange-600 font-normal text-xs">P. adapt.</span>;
+                  return <span className="text-gray-400">—</span>;
+                })()}
               </td>
             </tr>
           ))}
@@ -112,7 +124,7 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
       items: {
         include: {
           student: { include: { course: true, platoon: true } },
-          communication: { select: { protocolNumber: true, article: true, item: true, letter: true } },
+          communication: { select: { protocolNumber: true, article: true, item: true, letter: true, adaptationPeriod: true } },
         },
       },
     },
@@ -196,7 +208,7 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
           <p className="text-xs opacity-90 mt-1">Total de registros</p>
         </div>
         <div className="bg-red-600 rounded-xl p-4 text-white">
-          <p className="text-3xl font-bold">{caderno.items.filter(i => i.recordType.startsWith("CPI")).length}</p>
+          <p className="text-3xl font-bold">{gruposCPI.reduce((s, g) => s + g.items.length, 0) + reenquadrados.length}</p>
           <p className="text-xs opacity-90 mt-1">Punições (CPI)</p>
         </div>
         <div className="bg-orange-600 rounded-xl p-4 text-white">
@@ -204,7 +216,7 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
           <p className="text-xs opacity-90 mt-1">TD / TAC</p>
         </div>
         <div className="bg-green-600 rounded-xl p-4 text-white">
-          <p className="text-3xl font-bold">{caderno.items.filter(i => TIPOS_FAVORAVEIS.has(i.recordType)).length}</p>
+          <p className="text-3xl font-bold">{gruposElogio.reduce((s, g) => s + g.items.length, 0)}</p>
           <p className="text-xs opacity-90 mt-1">Favoráveis</p>
         </div>
         <div className="bg-gray-500 rounded-xl p-4 text-white">
@@ -274,7 +286,9 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
                       <td className={`${tdBase} text-right font-bold`}>
                         {item.score != null && item.score > 0
                           ? <span className="text-red-600">−{item.score.toFixed(1)}</span>
-                          : <span className="text-gray-400">—</span>
+                          : item.communication.adaptationPeriod
+                            ? <span className="text-orange-600 font-normal text-xs">P. adapt.</span>
+                            : <span className="text-gray-400">—</span>
                         }
                       </td>
                     </tr>
@@ -321,10 +335,17 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
                       <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{abreviarPelotao(item.student.platoon?.name)}</td>
                       <td className={`${tdBase} font-mono text-gray-700 whitespace-nowrap`}>{item.studentCourseNumber}</td>
                       <td className={`${tdBase} font-semibold text-gray-900 whitespace-nowrap`}>{item.studentWarName}</td>
-                      <td className={`${tdBase} text-gray-700 whitespace-nowrap`}>{item.recordType}</td>
+                      <td className={`${tdBase} text-gray-700 whitespace-nowrap`}>
+                        {cpiDoReenquadramento(item.communication.article, item.communication.item, item.recordType)}
+                      </td>
                       <td className={`${tdBase} text-gray-500 whitespace-nowrap`}>{format(new Date(item.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
                       <td className={`${tdBase} text-right font-bold`}>
-                        {(() => { const sd = scoreDisplay(item.score, item.recordType); return sd ? <span className={sd.fav ? "text-green-600" : "text-red-600"}>{sd.text}</span> : <span className="text-gray-400">—</span>; })()}
+                        {(() => {
+                          const sd = scoreDisplay(item.score, item.recordType);
+                          if (sd) return <span className={sd.fav ? "text-green-600" : "text-red-600"}>{sd.text}</span>;
+                          if (item.communication.adaptationPeriod) return <span className="text-orange-600 font-normal text-xs">P. adapt.</span>;
+                          return <span className="text-gray-400">—</span>;
+                        })()}
                       </td>
                     </tr>
                   ))}
@@ -382,7 +403,12 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
                       <td className={`${tdBase} font-semibold text-gray-900 whitespace-nowrap`}>{item.studentWarName}</td>
                       <td className={`${tdBase} text-gray-500 whitespace-nowrap`}>{item.recordType}</td>
                       <td className={`${tdBase} text-gray-500 whitespace-nowrap`}>{format(new Date(item.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
-                      <td className={`${tdBase} text-gray-500 whitespace-nowrap font-medium`}>Arquivar</td>
+                      <td className={`${tdBase} text-gray-500 font-medium`}>
+                        Arquivar
+                        {item.communication.adaptationPeriod && (
+                          <span className="block text-orange-600 font-normal text-xs leading-tight">P. adapt.</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

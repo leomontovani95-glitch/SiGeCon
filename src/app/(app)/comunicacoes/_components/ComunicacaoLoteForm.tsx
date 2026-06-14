@@ -46,8 +46,13 @@ function alineas(regras: Regra[], article: string, item: string) {
     .sort((a, b) => (a.letter ?? "").localeCompare(b.letter ?? ""));
 }
 
+type Modo = "CPI" | "REF";
+
 export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: Tipo[]; regras: Regra[]; cursos: Curso[] }) {
   const [state, formAction, pending] = useActionState<LoteState, FormData>(registrarComunicacaoEmLote, undefined);
+
+  // Modo: CPI ou Referência Elogiosa
+  const [modo, setModo] = useState<Modo>("CPI");
 
   // Curso
   const [cursoId, setCursoId] = useState("");
@@ -85,19 +90,33 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
   const [testemunhas, setTestemunhas] = useState<{ rank: string; name: string }[]>([]);
 
   const tipoByName = useMemo(() => Object.fromEntries(tipos.map((t) => [t.name, t.id])), [tipos]);
+  const tiposCPI   = useMemo(() => tipos.filter((t) => t.name.startsWith("CPI")), [tipos]);
+  const tipoRef    = useMemo(() => tipos.find((t) => t.name === "Referência Elogiosa") ?? null, [tipos]);
   const listaArtigos = useMemo(() => artigos(regras), [regras]);
   const listaIncisos = useMemo(() => incisos(regras, artigo), [regras, artigo]);
   const listaAlineas = useMemo(() => alineas(regras, artigo, inciso), [regras, artigo, inciso]);
   const regraAtual   = useMemo(() => regras.find((r) => r.id === ruleId) ?? null, [regras, ruleId]);
 
+  function trocarModo(m: Modo) {
+    setModo(m);
+    setArtigo(""); setInciso(""); setRuleId(""); setScore("");
+    if (m === "REF") {
+      setTypeId(tipoRef?.id ?? "");
+    } else {
+      setTypeId("");
+    }
+  }
+
   function selecionarRegra(r: Regra) {
     setRuleId(r.id);
-    if (r.defaultCommunicationType) { const tid = tipoByName[r.defaultCommunicationType]; if (tid) setTypeId(tid); }
-    if (r.defaultScore != null) setScore(String(r.defaultScore));
+    if (modo === "CPI") {
+      if (r.defaultCommunicationType) { const tid = tipoByName[r.defaultCommunicationType]; if (tid) setTypeId(tid); }
+      if (r.defaultScore != null) setScore(String(r.defaultScore));
+    }
   }
-  function handleArtigoChange(val: string) { setArtigo(val); setInciso(""); setRuleId(""); setTypeId(""); setScore(""); }
+  function handleArtigoChange(val: string) { setArtigo(val); setInciso(""); setRuleId(""); if (modo === "CPI") { setTypeId(""); setScore(""); } }
   function handleIncisoChange(val: string) {
-    setInciso(val); setRuleId(""); setTypeId(""); setScore("");
+    setInciso(val); setRuleId(""); if (modo === "CPI") { setTypeId(""); setScore(""); }
     const lista = alineas(regras, artigo, val);
     if (lista.length === 1) selecionarRegra(lista[0]);
   }
@@ -154,13 +173,19 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
   const canSubmit = cursoId && alunos.length >= 2 && !!ruleId && !!typeId && !!commName.trim();
   const success = state && "success" in state && state.success;
 
+  const isRef = modo === "REF";
+  const accentBorder = isRef ? "border-teal-200"    : "border-blue-200";
+  const accentBg     = isRef ? "bg-teal-50"         : "bg-blue-50";
+  const accentText   = isRef ? "text-teal-800"      : "text-blue-800";
+  const accentBadge  = isRef ? "text-teal-600"      : "text-blue-600";
+
   if (success && "protocols" in state) {
     return (
-      <div className="bg-green-50 border border-green-200 rounded-xl p-6">
-        <h2 className="font-semibold text-green-900 mb-2">
-          {state.count} comunicação(ões) registrada(s) com sucesso
+      <div className={`border rounded-xl p-6 ${isRef ? "bg-teal-50 border-teal-200" : "bg-green-50 border-green-200"}`}>
+        <h2 className={`font-semibold mb-2 ${isRef ? "text-teal-900" : "text-green-900"}`}>
+          {state.count} {isRef ? "referência(s) elogiosa(s)" : "comunicação(ões)"} registrada(s) com sucesso
         </h2>
-        <ul className="text-sm text-green-800 space-y-1 mb-4">
+        <ul className={`text-sm space-y-1 mb-4 ${isRef ? "text-teal-800" : "text-green-800"}`}>
           {state.protocols.map((p) => (
             <li key={p} className="font-mono">{p}</li>
           ))}
@@ -177,6 +202,50 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
 
   return (
     <form action={formAction} className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+
+      {/* ── MODO: CPI ou REFERÊNCIA ELOGIOSA ──────────────────────── */}
+      <div className={`rounded-xl border-2 p-4 ${isRef ? "border-teal-300 bg-teal-50" : "border-[#1e3a5f]/20 bg-slate-50"}`}>
+        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Tipo de registro em lote</p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => trocarModo("CPI")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              !isRef
+                ? "bg-[#1e3a5f] text-white shadow-sm"
+                : "bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            <span className={`w-2.5 h-2.5 rounded-full ${!isRef ? "bg-red-400" : "bg-gray-300"}`} />
+            CPI
+            <span className={`text-xs font-normal ${!isRef ? "opacity-75" : "text-gray-400"}`}>
+              (desconta pontos)
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => trocarModo("REF")}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              isRef
+                ? "bg-teal-600 text-white shadow-sm"
+                : "bg-white border border-gray-300 text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            <span className={`w-2.5 h-2.5 rounded-full ${isRef ? "bg-yellow-300" : "bg-gray-300"}`} />
+            Referência Elogiosa
+            <span className={`text-xs font-normal ${isRef ? "opacity-75" : "text-gray-400"}`}>
+              (acrescenta pontos)
+            </span>
+          </button>
+        </div>
+        {isRef && (
+          <p className="text-xs text-teal-700 mt-3 flex items-center gap-1.5">
+            <span className="text-base leading-none">⭐</span>
+            Cada aluno selecionado receberá uma Referência Elogiosa individual com protocolo próprio.
+            {tipoRef && <span className="ml-1 font-semibold">Pontuação: +{tipoRef.score.toFixed(1)} pt por aluno.</span>}
+          </p>
+        )}
+      </div>
 
       {/* ── CURSO ─────────────────────────────────────────────────── */}
       <fieldset className="border border-indigo-200 rounded-lg p-4 bg-indigo-50">
@@ -195,10 +264,10 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
       </fieldset>
 
       {/* ── SELEÇÃO DE ALUNOS ─────────────────────────────────────── */}
-      <fieldset className={`border rounded-lg p-4 ${cursoId ? "border-blue-200 bg-blue-50" : "border-gray-200 bg-gray-50 opacity-60"}`}>
-        <legend className="text-sm font-semibold text-blue-800 px-2">
-          Alunos envolvidos <span className="text-red-500">*</span>
-          {alunos.length > 0 && <span className="ml-2 font-normal text-blue-600">({alunos.length} selecionado{alunos.length > 1 ? "s" : ""})</span>}
+      <fieldset className={`border rounded-lg p-4 ${cursoId ? `${accentBorder} ${accentBg}` : "border-gray-200 bg-gray-50 opacity-60"}`}>
+        <legend className={`text-sm font-semibold px-2 ${accentText}`}>
+          {isRef ? "Alunos a elogiar" : "Alunos envolvidos"} <span className="text-red-500">*</span>
+          {alunos.length > 0 && <span className={`ml-2 font-normal ${accentBadge}`}>({alunos.length} selecionado{alunos.length > 1 ? "s" : ""})</span>}
         </legend>
 
         {/* Hidden inputs — um por aluno */}
@@ -226,7 +295,9 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
               <button
                 type="button"
                 onClick={() => adicionarAluno(searchResult)}
-                className="text-xs font-medium bg-[#1e3a5f] text-white px-3 py-1.5 rounded-lg hover:bg-[#16304f] whitespace-nowrap"
+                className={`text-xs font-medium text-white px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
+                  isRef ? "bg-teal-600 hover:bg-teal-700" : "bg-[#1e3a5f] hover:bg-[#16304f]"
+                }`}
               >
                 + Adicionar
               </button>
@@ -248,7 +319,7 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
           </div>
         )}
         {alunos.length < 2 && (
-          <p className="text-xs text-blue-700 mt-2">Adicione ao menos 2 alunos para registro em lote.</p>
+          <p className={`text-xs mt-2 ${accentText}`}>Adicione ao menos 2 alunos para registro em lote.</p>
         )}
       </fieldset>
 
@@ -323,35 +394,63 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
       </fieldset>
 
       {/* ── DADOS DA COMUNICAÇÃO ──────────────────────────────────── */}
+      {/* hidden typeId sempre enviado */}
+      <input type="hidden" name="typeId" value={typeId} />
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {isRef ? (
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Comunicação</label>
+            <div className="flex items-center gap-3 px-4 py-2.5 bg-teal-50 border border-teal-200 rounded-lg">
+              <span className="text-base">⭐</span>
+              <div>
+                <p className="text-sm font-semibold text-teal-800">Referência Elogiosa</p>
+                {tipoRef && <p className="text-xs text-teal-600">+{tipoRef.score.toFixed(1)} ponto(s) por aluno na nota de conduta</p>}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Comunicação *</label>
+              <select value={typeId} onChange={(e) => setTypeId(e.target.value)} className="input">
+                <option value="">{ruleId ? "Selecione" : "Selecione o dispositivo legal primeiro"}</option>
+                {tiposCPI.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.score.toFixed(1)} pt)</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Pontuação sugerida</label>
+              <input name="suggestedScore" type="number" step="0.1" min="0" value={score} onChange={(e) => setScore(e.target.value)} className="input" />
+            </div>
+          </>
+        )}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Comunicação *</label>
-          <select name="typeId" required value={typeId} onChange={(e) => setTypeId(e.target.value)} className="input">
-            <option value="">{ruleId ? "Selecione" : "Selecione o dispositivo legal primeiro"}</option>
-            {tipos.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.score.toFixed(1)} pt)</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Pontuação sugerida</label>
-          <input name="suggestedScore" type="number" step="0.1" min="0" value={score} onChange={(e) => setScore(e.target.value)} className="input" />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Data do Fato *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">{isRef ? "Data do Elogio *" : "Data do Fato *"}</label>
           <input name="factDate" type="date" required className="input" defaultValue={new Date().toISOString().split("T")[0]} />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Hora do Fato</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">{isRef ? "Hora" : "Hora do Fato"}</label>
           <input name="factTime" type="time" className="input" />
         </div>
         <div className="sm:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Local do Fato</label>
-          <input name="factPlace" className="input" placeholder="Ex: Pátio de instrução" />
+          <label className="block text-sm font-medium text-gray-700 mb-1">{isRef ? "Local" : "Local do Fato"}</label>
+          <input name="factPlace" className="input" placeholder={isRef ? "Ex: Sala de aula, pátio..." : "Ex: Pátio de instrução"} />
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Descrição / Observações do Fato *</label>
-        <textarea name="factDescription" required rows={4} className="input" placeholder="Descreva o fato ocorrido..." />
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {isRef ? "Motivação / Descrição do Elogio *" : "Descrição / Observações do Fato *"}
+        </label>
+        <textarea
+          name="factDescription"
+          required
+          rows={4}
+          className="input"
+          placeholder={isRef
+            ? "Descreva a conduta exemplar que motivou o elogio..."
+            : "Descreva o fato ocorrido..."}
+        />
       </div>
 
       {/* ── TESTEMUNHAS ───────────────────────────────────────────── */}
@@ -454,8 +553,21 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
       )}
 
       <div className="flex gap-3 pt-2">
-        <button type="submit" disabled={pending || !canSubmit} className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
-          {pending ? "Registrando..." : `Registrar para ${alunos.length} aluno${alunos.length !== 1 ? "s" : ""}`}
+        <button
+          type="submit"
+          disabled={pending || !canSubmit}
+          className={`disabled:opacity-50 disabled:cursor-not-allowed px-5 py-2.5 rounded-lg text-sm font-medium text-white transition-colors ${
+            isRef
+              ? "bg-teal-600 hover:bg-teal-700 focus:ring-teal-600"
+              : "bg-[#1e3a5f] hover:bg-[#16304f] focus:ring-[#1e3a5f]"
+          } focus:outline-none focus:ring-2 focus:ring-offset-2`}
+        >
+          {pending
+            ? "Registrando..."
+            : isRef
+              ? `⭐ Registrar elogios para ${alunos.length} aluno${alunos.length !== 1 ? "s" : ""}`
+              : `Registrar para ${alunos.length} aluno${alunos.length !== 1 ? "s" : ""}`
+          }
         </button>
         <a href="/comunicacoes" className="btn-secondary">Cancelar</a>
       </div>
@@ -464,7 +576,7 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
           {!cursoId ? "Selecione o curso. " : ""}
           {cursoId && alunos.length < 2 ? "Adicione ao menos 2 alunos. " : ""}
           {!ruleId ? "Selecione o dispositivo legal. " : ""}
-          {ruleId && !typeId ? "Selecione o tipo de comunicação. " : ""}
+          {!isRef && ruleId && !typeId ? "Selecione o tipo de comunicação. " : ""}
           {!commName.trim() ? "Informe o comunicante." : ""}
         </p>
       )}

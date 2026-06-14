@@ -22,7 +22,8 @@ export default function ElogioBiForm({ cursos, regras }: { cursos: Curso[]; regr
   const [erroAluno, setErroAluno] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [ruleId, setRuleId]       = useState("");
+  const regraAutoFill = regras.length === 1 ? regras[0] : null;
+  const [ruleId, setRuleId]       = useState(() => regraAutoFill?.id ?? "");
   const [bgpmNum, setBgpmNum]     = useState("");
   const [bgpmAno, setBgpmAno]     = useState(String(new Date().getFullYear()));
 
@@ -111,30 +112,47 @@ export default function ElogioBiForm({ cursos, regras }: { cursos: Curso[]; regr
       </fieldset>
 
       {/* Dispositivo Legal */}
+      <input type="hidden" name="manualRuleId" value={ruleId} />
       <fieldset className="border border-green-200 rounded-lg p-4 bg-green-50">
         <legend className="text-sm font-semibold text-green-800 px-2">Dispositivo Legal</legend>
         <div className="mt-2">
-          <label className="block text-xs font-medium text-gray-600 mb-1">
-            Artigo / Inciso <span className="text-red-500">*</span>
-          </label>
-          {regras.length > 0 ? (
-            <select
-              name="manualRuleId"
-              value={ruleId}
-              onChange={(e) => setRuleId(e.target.value)}
-              className="input"
-              required
-            >
-              <option value="">— Selecione —</option>
-              {regras.map((r) => (
-                <option key={r.id} value={r.id}>
-                  Art. {r.article}{r.item ? ` — Inc. ${r.item}` : ""}{r.letter ? ` — Al. ${r.letter}` : ""}{r.description ? ` — ${r.description}` : ""}
-                </option>
-              ))}
-            </select>
+          {regraAutoFill ? (
+            <div className="flex items-start gap-3">
+              <span className="text-green-600 mt-0.5">✓</span>
+              <div>
+                <p className="text-sm font-medium text-green-900">
+                  Art. {regraAutoFill.article}
+                  {regraAutoFill.item && `, Inc. ${regraAutoFill.item}`}
+                  {regraAutoFill.letter && `, Al. ${regraAutoFill.letter}`}
+                </p>
+                {regraAutoFill.description && (
+                  <p className="text-xs text-green-700 mt-0.5">{regraAutoFill.description}</p>
+                )}
+              </div>
+            </div>
+          ) : regras.length > 0 ? (
+            <>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Artigo / Inciso <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="manualRuleId"
+                value={ruleId}
+                onChange={(e) => setRuleId(e.target.value)}
+                className="input"
+                required
+              >
+                <option value="">— Selecione —</option>
+                {regras.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    Art. {r.article}{r.item ? ` — Inc. ${r.item}` : ""}{r.letter ? ` — Al. ${r.letter}` : ""}{r.description ? ` — ${r.description}` : ""}
+                  </option>
+                ))}
+              </select>
+            </>
           ) : (
             <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              Nenhum dispositivo legal cadastrado para "Elogio publicado em BI". Cadastre em{" "}
+              Nenhum dispositivo legal cadastrado para &quot;Elogio publicado em BI&quot;. Cadastre em{" "}
               <a href="/manual" className="underline">Manual do Aluno</a>.
             </p>
           )}

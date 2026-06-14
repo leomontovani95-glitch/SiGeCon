@@ -208,6 +208,28 @@ export default async function ComunicacaoPage({
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
         <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Descrição do Fato</h2>
         <p className="text-sm text-gray-700 whitespace-pre-wrap">{comm.factDescription}</p>
+        {(() => {
+          const provas = comm.attachments.filter((a) => !a.defenseId && !a.opinionId && !a.decisionId);
+          if (provas.length === 0) return null;
+          return (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Meios de Prova Anexados</p>
+              <div className="flex flex-wrap gap-2">
+                {provas.map((a) => (
+                  <a
+                    key={a.id}
+                    href={a.filePath}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-[#1e3a5f] bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-100 transition-colors"
+                  >
+                    {a.fileType === "application/pdf" ? "📄" : "🖼️"} {a.fileName}
+                  </a>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {!ehComunicante && (comm.bgpmNumber || comm.tacEquivalent) && (
@@ -388,6 +410,7 @@ export default async function ComunicacaoPage({
         comm.opinions.length === 0 && (
           <ParecerForm
             communicationId={comm.id}
+            typeName={comm.type.name}
             manualRules={manualRules.map((r) => ({
               id: r.id,
               article: r.article,

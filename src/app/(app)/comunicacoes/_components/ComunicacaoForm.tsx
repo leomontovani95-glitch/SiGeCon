@@ -63,6 +63,151 @@ function alineas(regras: Regra[], article: string, item: string) {
     .sort((a, b) => (a.letter ?? "").localeCompare(b.letter ?? ""));
 }
 
+// ── sub-componente de testemunha ──────────────────────────────────────────
+function TestemunhaRow({ idx, onRemove }: { idx: number; onRemove: () => void }) {
+  const [mode, setMode] = useState<"buscar" | "manual">("buscar");
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<CommResult[]>([]);
+  const [buscando, setBuscando] = useState(false);
+  const [selected, setSelected] = useState<CommResult | null>(null);
+  const [rank, setRank] = useState("");
+  const [name, setName] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function buscar(q: string) {
+    if (q.length < 2) { setResults([]); return; }
+    setBuscando(true);
+    try {
+      const res = await fetch(`/api/comunicante/buscar?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      setResults(data.results ?? []);
+    } catch { setResults([]); }
+    finally { setBuscando(false); }
+  }
+
+  function handleQueryChange(val: string) {
+    setQuery(val); setSelected(null); setResults([]);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => buscar(val), 400);
+  }
+
+  function selecionar(r: CommResult) {
+    setSelected(r); setRank(r.rank); setName(r.name);
+    setResults([]); setQuery("");
+  }
+
+  function limpar() { setSelected(null); setRank(""); setName(""); }
+
+  function trocarModo(m: "buscar" | "manual") { setMode(m); limpar(); }
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-3 bg-white space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-gray-600">Testemunha {idx + 1}</span>
+        <button type="button" onClick={onRemove} className="text-red-400 hover:text-red-600 text-xs font-medium">
+          Remover
+        </button>
+      </div>
+
+      <div className="flex gap-1">
+        {(["buscar", "manual"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => trocarModo(m)}
+            className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors ${
+              mode === m ? "bg-[#1e3a5f] text-white" : "bg-white border border-gray-300 text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            {m === "buscar" ? "Buscar cadastrado" : "Preencher manualmente"}
+          </button>
+        ))}
+      </div>
+
+      {mode === "buscar" && (
+        <>
+          <input type="hidden" name="witnessRank" value={rank} />
+          <input type="hidden" name="witnessName" value={name} />
+          {!selected ? (
+            <div className="space-y-1">
+              <input
+                value={query}
+                onChange={(e) => handleQueryChange(e.target.value)}
+                placeholder="Pesquise por nome, RG ou NF..."
+                className="input text-sm"
+                autoComplete="off"
+              />
+              {buscando && <p className="text-xs text-blue-600">Buscando...</p>}
+              {!buscando && query.length >= 2 && results.length === 0 && (
+                <p className="text-xs text-gray-400">Nenhum resultado. Use &quot;Preencher manualmente&quot;.</p>
+              )}
+              {results.length > 0 && (
+                <ul className="border border-gray-200 rounded-lg bg-white divide-y divide-gray-100 max-h-40 overflow-y-auto">
+                  {results.map((r) => (
+                    <li
+                      key={r.key}
+                      onClick={() => selecionar(r)}
+                      className="px-3 py-2 hover:bg-blue-50 cursor-pointer flex items-center gap-2"
+                    >
+                      <span className="bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded font-mono whitespace-nowrap">
+                        {r.rank || "—"}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-900 truncate">{r.name}</p>
+                        <p className="text-xs text-gray-500 truncate">{r.fullName} · {r.detail}</p>
+                      </div>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap ${
+                        r.tipo === "Usuário" ? "bg-indigo-100 text-indigo-700" : "bg-blue-100 text-blue-700"
+                      }`}>{r.tipo}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 bg-white border border-green-200 rounded-lg px-3 py-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900">
+                  {rank && <span className="font-mono text-xs bg-gray-100 px-1 mr-1.5 rounded">{rank}</span>}
+                  {name}
+                </p>
+                <p className="text-xs text-gray-500 truncate">{selected.fullName} · {selected.detail}</p>
+              </div>
+              <span className={`text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap ${
+                selected.tipo === "Usuário" ? "bg-indigo-100 text-indigo-700" : "bg-blue-100 text-blue-700"
+              }`}>{selected.tipo}</span>
+              <button type="button" onClick={limpar} className="text-xs text-red-500 hover:text-red-700 font-medium whitespace-nowrap">
+                Alterar
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {mode === "manual" && (
+        <div className="grid grid-cols-1 sm:grid-cols-[180px_1fr] gap-2">
+          <select
+            name="witnessRank"
+            value={rank}
+            onChange={(e) => setRank(e.target.value)}
+            className="input text-sm"
+          >
+            <option value="">Posto/Graduação</option>
+            {POSTOS.map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <input
+            name="witnessName"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Nome completo ou de guerra"
+            className="input text-sm"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── componente ────────────────────────────────────────────────────────────
 export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo }: Props) {
   const [state, formAction, pending] = useActionState(registrarComunicacao, undefined);
@@ -88,24 +233,46 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
   const [commName, setCommName] = useState(comunicanteFixo?.name ?? "");
   const [commUserId, setCommUserId] = useState(comunicanteFixo?.userId ?? "");
 
-  // Cascata dispositivo legal
-  const [artigo, setArtigo] = useState("");
-  const [inciso, setInciso] = useState("");
-  const [ruleId, setRuleId] = useState("");
+  // Dispositivo legal — auto-preenchido quando há uma única regra possível
+  const regraAutoFill = regras.length === 1 ? regras[0] : null;
+  const [artigo, setArtigo] = useState(() => {
+    const arts = [...new Set(regras.map((r) => r.article))];
+    return arts.length === 1 ? arts[0] : "";
+  });
+  const [inciso, setInciso] = useState(() => {
+    const arts = [...new Set(regras.map((r) => r.article))];
+    if (arts.length !== 1) return "";
+    const items = [...new Set(regras.filter((r) => r.article === arts[0]).map((r) => r.item).filter(Boolean))];
+    return items.length === 1 ? (items[0] as string) : "";
+  });
+  const [ruleId, setRuleId] = useState(() => (regras.length === 1 ? regras[0].id : ""));
 
   // Tipo e pontuação (controlados para auto-fill)
-  const [typeId, setTypeId] = useState("");
-  const [score, setScore] = useState("");
+  const [typeId, setTypeId] = useState(() => {
+    if (!regraAutoFill?.defaultCommunicationType) return "";
+    return tipos.find((t) => t.name === regraAutoFill.defaultCommunicationType)?.id ?? "";
+  });
+  const [score, setScore] = useState(() =>
+    regraAutoFill?.defaultScore != null ? String(regraAutoFill.defaultScore) : ""
+  );
 
   // Período de Adaptação
   const [adaptationPeriod, setAdaptationPeriod] = useState(false);
 
   // Testemunhas
-  const [testemunhas, setTestemunhas] = useState<{ rank: string; name: string }[]>([]);
-  function addTestemunha() { setTestemunhas((t) => [...t, { rank: "", name: "" }]); }
-  function removeTestemunha(i: number) { setTestemunhas((t) => t.filter((_, idx) => idx !== i)); }
-  function updateTestemunha(i: number, field: "rank" | "name", val: string) {
-    setTestemunhas((t) => t.map((w, idx) => idx === i ? { ...w, [field]: val } : w));
+  const [testemunhaKeys, setTestemunhaKeys] = useState<number[]>([]);
+  const keyCountRef = useRef(0);
+  function addTestemunha() { setTestemunhaKeys((k) => [...k, keyCountRef.current++]); }
+  function removeTestemunha(key: number) { setTestemunhaKeys((k) => k.filter((x) => x !== key)); }
+
+  // Anexos (meios de prova)
+  const [arquivos, setArquivos] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  function removerArquivo(idx: number) {
+    const dt = new DataTransfer();
+    arquivos.forEach((f, i) => { if (i !== idx) dt.items.add(f); });
+    if (fileInputRef.current) fileInputRef.current.files = dt.files;
+    setArquivos(Array.from(dt.files));
   }
 
   // Lookup: nome do tipo → id
@@ -300,99 +467,113 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
         )}
       </fieldset>
 
-      {/* ── DISPOSITIVO LEGAL (obrigatório, cascata) ──────────────── */}
-      <fieldset className={`border rounded-lg p-4 ${dispositivoCompleto ? "border-green-300 bg-green-50" : "border-orange-200 bg-orange-50"}`}>
-        <legend className="text-sm font-semibold px-2 text-gray-800">
-          Dispositivo Legal <span className="text-red-500">*</span>
-          {dispositivoCompleto && <span className="ml-2 text-green-700 font-normal text-xs">✓ selecionado</span>}
-        </legend>
-
-        {/* hidden inputs que serão enviados ao servidor */}
-        <input type="hidden" name="manualRuleId" value={ruleId} />
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-3">
-          {/* 1) ARTIGO */}
+      {/* ── DISPOSITIVO LEGAL ─────────────────────────────────────── */}
+      <input type="hidden" name="manualRuleId" value={ruleId} />
+      {regraAutoFill ? (
+        <div className="flex items-start gap-3 border border-green-300 bg-green-50 rounded-lg px-4 py-3">
+          <span className="text-green-600 mt-0.5">✓</span>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Artigo *</label>
-            <select
-              value={artigo}
-              onChange={(e) => handleArtigoChange(e.target.value)}
-              className="input"
-              required
-            >
-              <option value="">Selecione o artigo</option>
-              {listaArtigos.map((a) => (
-                <option key={a.article} value={a.article}>
-                  Art. {a.article}{a.theme ? ` — ${a.theme}` : ""}
-                </option>
-              ))}
-            </select>
+            <p className="text-xs font-semibold text-green-800 uppercase tracking-wide mb-0.5">Dispositivo Legal</p>
+            <p className="text-sm font-medium text-green-900">
+              Art. {regraAutoFill.article}
+              {regraAutoFill.item && `, Inc. ${regraAutoFill.item}`}
+              {regraAutoFill.letter && `, Al. ${regraAutoFill.letter}`}
+            </p>
+            {regraAutoFill.description && (
+              <p className="text-xs text-green-700 mt-0.5">{regraAutoFill.description}</p>
+            )}
           </div>
+        </div>
+      ) : (
+        <fieldset className={`border rounded-lg p-4 ${dispositivoCompleto ? "border-green-300 bg-green-50" : "border-orange-200 bg-orange-50"}`}>
+          <legend className="text-sm font-semibold px-2 text-gray-800">
+            Dispositivo Legal <span className="text-red-500">*</span>
+            {dispositivoCompleto && <span className="ml-2 text-green-700 font-normal text-xs">✓ selecionado</span>}
+          </legend>
 
-          {/* 2) INCISO — aparece após escolher artigo */}
-          {artigo && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-3">
+            {/* 1) ARTIGO */}
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Inciso *</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Artigo *</label>
               <select
-                value={inciso}
-                onChange={(e) => handleIncisoChange(e.target.value)}
+                value={artigo}
+                onChange={(e) => handleArtigoChange(e.target.value)}
                 className="input"
                 required
               >
-                <option value="">Selecione o inciso</option>
-                {listaIncisos.map((i) => (
-                  <option key={i} value={i}>Inciso {i}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* 3) ALÍNEA / CONDUTA — aparece após escolher inciso, apenas quando há mais de uma opção */}
-          {artigo && inciso && listaAlineas.length > 1 && (
-            <div className="sm:col-span-1">
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                {listaAlineas[0].letter ? "Alínea / Conduta *" : "Conduta *"}
-              </label>
-              <select
-                value={ruleId}
-                onChange={(e) => {
-                  const r = regras.find((x) => x.id === e.target.value);
-                  if (r) selecionarRegra(r);
-                }}
-                className="input"
-                required
-              >
-                <option value="">Selecione a conduta</option>
-                {listaAlineas.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.letter ? `Al. ${r.letter} — ` : ""}{r.description}
+                <option value="">Selecione o artigo</option>
+                {listaArtigos.map((a) => (
+                  <option key={a.article} value={a.article}>
+                    Art. {a.article}{a.theme ? ` — ${a.theme}` : ""}
                   </option>
                 ))}
               </select>
             </div>
-          )}
-        </div>
 
-        {/* Descrição completa da conduta selecionada */}
-        {regraAtual && (
-          <div className="mt-3 bg-white border border-green-200 rounded-lg px-4 py-3">
-            <p className="text-xs text-gray-500 mb-0.5">Conduta selecionada:</p>
-            <p className="text-sm text-gray-800 font-medium">
-              Art. {regraAtual.article}
-              {regraAtual.item && `, Inc. ${regraAtual.item}`}
-              {regraAtual.letter && `, Al. ${regraAtual.letter}`}
-            </p>
-            <p className="text-sm text-gray-700 mt-1">{regraAtual.description}</p>
+            {/* 2) INCISO */}
+            {artigo && (
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Inciso *</label>
+                <select
+                  value={inciso}
+                  onChange={(e) => handleIncisoChange(e.target.value)}
+                  className="input"
+                  required
+                >
+                  <option value="">Selecione o inciso</option>
+                  {listaIncisos.map((i) => (
+                    <option key={i} value={i}>Inciso {i}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* 3) ALÍNEA / CONDUTA */}
+            {artigo && inciso && listaAlineas.length > 1 && (
+              <div className="sm:col-span-1">
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  {listaAlineas[0].letter ? "Alínea / Conduta *" : "Conduta *"}
+                </label>
+                <select
+                  value={ruleId}
+                  onChange={(e) => {
+                    const r = regras.find((x) => x.id === e.target.value);
+                    if (r) selecionarRegra(r);
+                  }}
+                  className="input"
+                  required
+                >
+                  <option value="">Selecione a conduta</option>
+                  {listaAlineas.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.letter ? `Al. ${r.letter} — ` : ""}{r.description}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
-        )}
 
-        {!dispositivoCompleto && artigo && (
-          <p className="text-xs text-orange-700 mt-2">Complete a seleção do inciso e alínea para prosseguir.</p>
-        )}
-        {!artigo && (
-          <p className="text-xs text-gray-500 mt-2">Selecione o artigo para iniciar.</p>
-        )}
-      </fieldset>
+          {regraAtual && (
+            <div className="mt-3 bg-white border border-green-200 rounded-lg px-4 py-3">
+              <p className="text-xs text-gray-500 mb-0.5">Conduta selecionada:</p>
+              <p className="text-sm text-gray-800 font-medium">
+                Art. {regraAtual.article}
+                {regraAtual.item && `, Inc. ${regraAtual.item}`}
+                {regraAtual.letter && `, Al. ${regraAtual.letter}`}
+              </p>
+              <p className="text-sm text-gray-700 mt-1">{regraAtual.description}</p>
+            </div>
+          )}
+
+          {!dispositivoCompleto && artigo && (
+            <p className="text-xs text-orange-700 mt-2">Complete a seleção do inciso e alínea para prosseguir.</p>
+          )}
+          {!artigo && (
+            <p className="text-xs text-gray-500 mt-2">Selecione o artigo para iniciar.</p>
+          )}
+        </fieldset>
+      )}
 
       {/* ── DADOS DA COMUNICAÇÃO ──────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -450,45 +631,59 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
           placeholder="Descreva o fato ocorrido..." />
       </div>
 
+      {/* ── ANEXOS (meios de prova) ───────────────────────────────── */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Anexos — Meios de Prova
+          <span className="ml-1.5 text-gray-400 font-normal text-xs">opcional · PNG, JPEG ou PDF · máx. 5 MB total</span>
+        </label>
+        <div
+          className="border-2 border-dashed border-gray-200 rounded-lg px-4 py-3 flex items-center gap-3 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <span className="text-xl shrink-0">📎</span>
+          <div className="min-w-0">
+            <p className="text-sm text-gray-600 font-medium">Clique para selecionar arquivos</p>
+            <p className="text-xs text-gray-400">Imagens (PNG, JPEG) ou PDF</p>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            name="file"
+            multiple
+            accept=".png,.jpg,.jpeg,.pdf"
+            className="hidden"
+            onChange={(e) => setArquivos(Array.from(e.target.files ?? []))}
+          />
+        </div>
+        {arquivos.length > 0 && (
+          <ul className="mt-2 space-y-1.5">
+            {arquivos.map((f, i) => (
+              <li key={i} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                <span className="text-sm shrink-0">{f.type === "application/pdf" ? "📄" : "🖼️"}</span>
+                <span className="flex-1 text-sm text-gray-700 truncate">{f.name}</span>
+                <span className="text-xs text-gray-400 shrink-0">{(f.size / 1024).toFixed(0)} KB</span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); removerArquivo(i); }}
+                  className="text-gray-400 hover:text-red-500 transition-colors shrink-0 text-base leading-none"
+                  aria-label="Remover arquivo"
+                >×</button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       {/* ── TESTEMUNHA(S) ─────────────────────────────────────────── */}
       <fieldset className="border border-gray-200 rounded-lg p-4 bg-gray-50">
         <legend className="text-sm font-semibold text-gray-700 px-2">Testemunha(s)</legend>
         <div className="space-y-3 mt-2">
-          {testemunhas.length === 0 && (
+          {testemunhaKeys.length === 0 && (
             <p className="text-xs text-gray-400">Nenhuma testemunha adicionada.</p>
           )}
-          {testemunhas.map((w, i) => (
-            <div key={i} className="grid grid-cols-1 sm:grid-cols-[180px_1fr_auto] gap-2 items-end">
-              <div>
-                {i === 0 && <label className="block text-xs font-medium text-gray-600 mb-1">Posto/Graduação</label>}
-                <select
-                  name="witnessRank"
-                  value={w.rank}
-                  onChange={(e) => updateTestemunha(i, "rank", e.target.value)}
-                  className="input text-sm"
-                >
-                  <option value="">Selecione</option>
-                  {POSTOS.map((p) => <option key={p} value={p}>{p}</option>)}
-                </select>
-              </div>
-              <div>
-                {i === 0 && <label className="block text-xs font-medium text-gray-600 mb-1">Nome</label>}
-                <input
-                  name="witnessName"
-                  value={w.name}
-                  onChange={(e) => updateTestemunha(i, "name", e.target.value)}
-                  placeholder="Nome completo ou de guerra"
-                  className="input text-sm"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => removeTestemunha(i)}
-                className="text-red-500 hover:text-red-700 text-xs font-medium px-2 py-2 whitespace-nowrap"
-              >
-                Remover
-              </button>
-            </div>
+          {testemunhaKeys.map((key, idx) => (
+            <TestemunhaRow key={key} idx={idx} onRemove={() => removeTestemunha(key)} />
           ))}
           <button
             type="button"

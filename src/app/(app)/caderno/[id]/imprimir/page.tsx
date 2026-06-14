@@ -18,7 +18,7 @@ async function fetchCaderno(id: string) {
       items: {
         include: {
           student: { include: { course: true, platoon: true } },
-          communication: { select: { protocolNumber: true, article: true, item: true, letter: true, bgpmNumber: true, bgpmYear: true } },
+          communication: { select: { protocolNumber: true, article: true, item: true, letter: true, bgpmNumber: true, bgpmYear: true, adaptationPeriod: true } },
         },
       },
       aacp: {
@@ -72,6 +72,7 @@ function normalizarPeriodo(p: string): string {
 }
 
 function obsCell(item: Item): string {
+  if (item.communication.adaptationPeriod) return "Período de Adaptação";
   if (item.decisionSummary === "Reenquadrar artigo") {
     return fmtOrigEnq(item.originalArticle ?? null, item.originalItem ?? null, item.originalLetter ?? null);
   }

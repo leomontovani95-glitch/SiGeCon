@@ -48,9 +48,10 @@ const SUGESTOES: Record<string, Sugestao[]> = {
 };
 
 type ManualRule = { id: string; article: string; item: string | null; letter: string | null; description: string };
-type Props = { communicationId: string; manualRules: ManualRule[] };
+type Props = { communicationId: string; typeName: string; manualRules: ManualRule[] };
 
-export default function ParecerForm({ communicationId, manualRules }: Props) {
+export default function ParecerForm({ communicationId, typeName, manualRules }: Props) {
+  const isElogiosa = typeName.toLowerCase().includes("elogiosa") || typeName.toLowerCase().includes("elogio");
   const [state, formAction, pending] = useActionState(emitirParecer, undefined);
   const [recomendacao, setRecomendacao] = useState("");
   const [texto, setTexto] = useState("");
@@ -104,10 +105,18 @@ export default function ParecerForm({ communicationId, manualRules }: Props) {
             onChange={(e) => { setRecomendacao(e.target.value); setRuleId(""); }}
           >
             <option value="">Selecione</option>
-            <option value="Sugiro punição">Sugiro punição</option>
-            <option value="Sugiro arquivamento">Sugiro arquivamento</option>
-            <option value="Sugiro reenquadramento de artigo">Sugiro reenquadramento de artigo</option>
-            <option value="Sugiro homologação (Referência Elogiosa)">Sugiro homologação (Referência Elogiosa)</option>
+            {isElogiosa ? (
+              <>
+                <option value="Sugiro homologação (Referência Elogiosa)">Sugiro homologação</option>
+                <option value="Sugiro arquivamento">Sugiro arquivamento</option>
+              </>
+            ) : (
+              <>
+                <option value="Sugiro punição">Sugiro punição</option>
+                <option value="Sugiro arquivamento">Sugiro arquivamento</option>
+                <option value="Sugiro reenquadramento de artigo">Sugiro reenquadramento de artigo</option>
+              </>
+            )}
           </select>
         </div>
 

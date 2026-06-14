@@ -423,17 +423,27 @@ export default function AcoesComm({
                   const tipo = e.target.value;
                   setDecisaoTipo(tipo);
                   setNovoRuleId("");
-                  if (tipo !== "Reenquadrar artigo") {
+                  if (tipo === "Arquivamento") {
+                    setFinalScoreDecisao("0");
+                  } else if (tipo !== "Reenquadrar artigo") {
                     const def = pontuacaoPadrao(comm.typeName, comm.item);
                     if (def !== null) setFinalScoreDecisao(def.toFixed(1));
                   }
                 }}
               >
                 <option value="">Selecione</option>
-                <option value="Punição">Punição</option>
-                <option value="Arquivamento">Arquivamento</option>
-                <option value="Homologação (Referência Elogiosa)">Homologação (Referência Elogiosa)</option>
-                <option value="Reenquadrar artigo">Reenquadrar artigo</option>
+                {comm.typeName.toLowerCase().includes("elogiosa") ? (
+                  <>
+                    <option value="Homologação (Referência Elogiosa)">Homologação (Referência Elogiosa)</option>
+                    <option value="Arquivamento">Arquivamento</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="Punição">Punição</option>
+                    <option value="Arquivamento">Arquivamento</option>
+                    <option value="Reenquadrar artigo">Reenquadrar artigo</option>
+                  </>
+                )}
               </select>
             </div>
 
@@ -516,6 +526,17 @@ export default function AcoesComm({
                 className="input max-w-xs"
               />
               {(() => {
+                if (decisaoTipo === "Arquivamento") {
+                  const atual = finalScoreDecisao !== "" ? Number(finalScoreDecisao) : 0;
+                  if (atual !== 0) {
+                    return (
+                      <p className="text-xs text-red-600 mt-1 font-medium">
+                        ⚠ Pontuação diferente do padrão para arquivamento (0 pt)
+                      </p>
+                    );
+                  }
+                  return null;
+                }
                 const isReenq = decisaoTipo === "Reenquadrar artigo";
                 if (isReenq && !novoRuleId) return null;
                 const itemEfetivo = isReenq
@@ -532,9 +553,11 @@ export default function AcoesComm({
                 }
                 return null;
               })()}
-              <p className="text-xs text-gray-400 mt-1">
-                Deixe em branco para pontuação zero (ex: arquivamento).
-              </p>
+              {decisaoTipo === "Arquivamento" && (
+                <p className="text-xs text-teal-700 mt-1 font-medium">
+                  Arquivamento não desconta nem acresce a nota de conduta.
+                </p>
+              )}
             </div>
             {/* Anexo(s) da decisão */}
             <div>

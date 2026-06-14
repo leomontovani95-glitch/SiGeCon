@@ -89,6 +89,18 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
     .map((rank, i) => ({ rank: rank.trim(), name: (witnessNames[i] ?? "").trim() }))
     .filter((w) => w.name);
 
+  // Validar anexos antes de criar a comunicação
+  const arquivosProva = (formData.getAll("file") as File[]).filter((f) => f && f.size > 0);
+  if (arquivosProva.length > 0) {
+    for (const f of arquivosProva) {
+      if (!TIPOS_PERMITIDOS.includes(f.type))
+        return { error: `Tipo de arquivo não permitido (${f.name}). Use PNG, JPEG ou PDF.` };
+    }
+    const totalBytes = arquivosProva.reduce((s, f) => s + f.size, 0);
+    if (totalBytes > LIMITE_TOTAL_BYTES)
+      return { error: `O total dos arquivos excede o limite de 5 MB (${(totalBytes / 1024 / 1024).toFixed(1)} MB enviado).` };
+  }
+
   let commId: string;
   try {
     const comm = await prisma.communication.create({
@@ -122,6 +134,29 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
         })),
       });
     } catch { /* não bloqueia o fluxo */ }
+  }
+
+  // Salvar anexos (meios de prova) vinculados à comunicação
+  if (arquivosProva.length > 0) {
+    try {
+      const dir = path.join(process.cwd(), "public", "uploads", commId);
+      await mkdir(dir, { recursive: true });
+      for (const arquivo of arquivosProva) {
+        const ext = arquivo.name.split(".").pop() ?? "bin";
+        const savedName = `${Date.now()}-${Math.random().toString(36).slice(2)}-prova.${ext}`;
+        const buffer = Buffer.from(await arquivo.arrayBuffer());
+        await writeFile(path.join(dir, savedName), buffer);
+        await prisma.attachment.create({
+          data: {
+            communicationId: commId,
+            fileName: arquivo.name,
+            filePath: `/uploads/${commId}/${savedName}`,
+            fileType: arquivo.type,
+            uploadedBy: session.userId,
+          },
+        });
+      }
+    } catch { /* não bloqueia o fluxo principal */ }
   }
 
   try { await auditLog(session.userId, "CREATE", "Communication", commId, `Protocolo: ${protocolNumber}`); } catch {}
