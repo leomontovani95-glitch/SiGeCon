@@ -2,6 +2,7 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
+import { prisma } from "@/lib/db";
 
 export type UserRole =
   | "ADMINISTRADOR"
@@ -42,7 +43,20 @@ export function effectiveRoles(session: { role: string; additionalRoles?: string
 export const verifySession = cache(async () => {
   const session = await getSession();
   if (!session?.userId) redirect("/login");
-  return session;
+  // Reconsulta o banco para que desativação/rebaixamento/troca de escola tenham
+  // efeito imediato (não esperam o token de 8h expirar). cache() dedupa por request.
+  const user = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: { active: true, role: true, additionalRoles: true, escola: true, mustChangePassword: true },
+  });
+  if (!user || !user.active) redirect("/login");
+  return {
+    ...session,
+    role: user.role,
+    additionalRoles: user.additionalRoles,
+    escola: user.escola,
+    mustChangePassword: user.mustChangePassword,
+  };
 });
 
 export const verifyRole = cache(async (...roles: UserRole[]) => {
@@ -168,4 +182,14 @@ export function getSchoolFilter(role: string, escolaUsuario?: string | null): st
   if (escolaUsuario === "ESFAP") return "ESFAP";
   if (escolaUsuario === "ESFO") return "ESFO";
   return null;
+}
+
+// True se a escola da comunicação (course.school) está dentro do escopo do
+// usuário. Escopo nulo (ADMIN/Div.Acadêmica/APM/global) acessa qualquer escola.
+export function escolaNoEscopo(
+  session: { role: string; escola?: string | null },
+  schoolDaComunicacao?: string | null,
+): boolean {
+  const escopo = getSchoolFilter(session.role, session.escola);
+  return !escopo || schoolDaComunicacao === escopo;
 }

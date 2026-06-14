@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/session";
+import { getSchoolFilter } from "@/lib/dal";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -9,14 +10,31 @@ export async function GET(req: NextRequest) {
   const q = (req.nextUrl.searchParams.get("q") ?? "").trim();
   if (!q || q.length < 2) return NextResponse.json({ results: [] });
 
+  // Isolamento por escola: limita quem aparece na busca ao escopo do usuário.
+  // Staff filtra por `escola` (incluindo TODAS/global); aluno filtra pelo curso.
+  const escopo = getSchoolFilter(session.role, session.escola);
+  const escopoFiltro = escopo
+    ? [{
+        OR: [
+          { role: { not: "ALUNO" }, escola: { in: [escopo, "TODAS"] } },
+          { role: "ALUNO", student: { is: { course: { is: { school: escopo } } } } },
+        ],
+      }]
+    : [];
+
   const users = await prisma.user.findMany({
     where: {
       active: true,
-      OR: [
-        { fullName: { contains: q } },
-        { warName: { contains: q } },
-        { rg: { contains: q } },
-        { functionalNumber: { contains: q } },
+      AND: [
+        {
+          OR: [
+            { fullName: { contains: q } },
+            { warName: { contains: q } },
+            { rg: { contains: q } },
+            { functionalNumber: { contains: q } },
+          ],
+        },
+        ...escopoFiltro,
       ],
     },
     select: {

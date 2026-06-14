@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
-import { verifyRole, canManageUserRole, USER_MANAGERS } from "@/lib/dal";
+import { verifyRole, canManageUserRole, USER_MANAGERS, getSchoolFilter } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
 
 type State = { error: string } | undefined;
@@ -32,12 +32,20 @@ export async function salvarUsuario(id: string | null, _prev: State, formData: F
   if (!canManageUserRole(session.role, role)) {
     return { error: "Você não tem permissão para atribuir essa função." };
   }
-  // Se for edição, verifica se o ator pode gerir a função atual do usuário
+  // Isolamento por escola: gestor com escopo só gerencia/cria usuários da própria escola.
+  const escopo = getSchoolFilter(session.role, session.escola);
+  if (escopo && escola !== escopo) {
+    return { error: `Você só pode gerenciar usuários da escola ${escopo}.` };
+  }
+  // Se for edição, verifica se o ator pode gerir a função atual e a escola do usuário
   if (id) {
-    const target = await prisma.user.findUnique({ where: { id }, select: { role: true } });
+    const target = await prisma.user.findUnique({ where: { id }, select: { role: true, escola: true } });
     if (!target) return { error: "Usuário não encontrado." };
     if (!canManageUserRole(session.role, target.role)) {
       return { error: "Você não tem permissão para editar este usuário." };
+    }
+    if (escopo && target.escola !== escopo) {
+      return { error: "Você não tem permissão para editar usuários de outra escola." };
     }
   }
 
@@ -101,6 +109,10 @@ export async function resetarSenha(userId: string, _prev: ResetState, _fd: FormD
   if (!canManageUserRole(session.role, user.role)) {
     return { error: "Você não tem permissão para redefinir a senha deste usuário." };
   }
+  const escopoReset = getSchoolFilter(session.role, session.escola);
+  if (escopoReset && user.escola !== escopoReset) {
+    return { error: "Você não tem permissão para redefinir a senha de usuários de outra escola." };
+  }
   if (!user.functionalNumber) return { error: "Número Funcional não cadastrado. Não é possível redefinir a senha automaticamente." };
   const novaSenha = senhaInicial(user.functionalNumber, user.rg);
   await prisma.user.update({
@@ -117,6 +129,10 @@ export async function excluirUsuario(id: string, _prev: { error: string } | unde
   if (!user) return { error: "Usuário não encontrado." };
   if (!canManageUserRole(session.role, user.role)) {
     return { error: "Você não tem permissão para excluir este usuário." };
+  }
+  const escopoExcluir = getSchoolFilter(session.role, session.escola);
+  if (escopoExcluir && user.escola !== escopoExcluir) {
+    return { error: "Você não tem permissão para excluir usuários de outra escola." };
   }
   if (user.role === "ADMINISTRADOR") {
     const adminCount = await prisma.user.count({ where: { role: "ADMINISTRADOR" } });

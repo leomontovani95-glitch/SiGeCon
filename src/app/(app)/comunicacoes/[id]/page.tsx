@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { verifySession, canEmitOpinion, canDecide } from "@/lib/dal";
+import { verifySession, canEmitOpinion, canDecide, getSchoolFilter } from "@/lib/dal";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -52,6 +52,10 @@ export default async function ComunicacaoPage({
     const ehEsteAluno = comm.student.userId === session.userId;
     const ehComunicanteRegistrado = comm.communicantUserId === session.userId;
     if (!ehEsteAluno && !ehComunicanteRegistrado) notFound();
+  } else {
+    // Isolamento por escola: staff fora do escopo não acessa a comunicação.
+    const escopo = getSchoolFilter(session.role, session.escola);
+    if (escopo && comm.student.course.school !== escopo) notFound();
   }
 
   // True quando o ALUNO logado é o comunicante (não o aluno comunicado)

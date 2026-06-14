@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/db";
-import { verifyRole, verifySession, canEmitOpinion, canDecide, ESFO_CFO_RANK, cursosPermitidosParaCPI } from "@/lib/dal";
+import { verifyRole, verifySession, canEmitOpinion, canDecide, ESFO_CFO_RANK, cursosPermitidosParaCPI, escolaNoEscopo } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
 import { criarComProtocoloUnico } from "@/lib/protocolo";
 import { comTransacaoRetry, adicionarAoCaderno } from "@/lib/caderno";
@@ -267,8 +267,8 @@ export async function tomarCienciaComDefesa(_prev: State, formData: FormData): P
     include: { student: true },
   });
   if (!comm) return { error: "Comunicação não encontrada." };
-  if (session.role === "ALUNO" && comm.student.userId !== session.userId)
-    return { error: "Sem permissão." };
+  if (comm.student.userId !== session.userId)
+    return { error: "Apenas o próprio aluno pode tomar ciência ou apresentar defesa." };
   if (comm.status !== "AGUARDANDO_CIENCIA")
     return { error: "Esta comunicação não aguarda ciência." };
   if (comm.adaptationPeriod)
@@ -341,8 +341,8 @@ export async function tomarCienciaSemDefesa(_prev: State, formData: FormData): P
     include: { student: true },
   });
   if (!comm) return { error: "Comunicação não encontrada." };
-  if (session.role === "ALUNO" && comm.student.userId !== session.userId)
-    return { error: "Sem permissão." };
+  if (comm.student.userId !== session.userId)
+    return { error: "Apenas o próprio aluno pode tomar ciência ou apresentar defesa." };
   if (comm.status !== "AGUARDANDO_CIENCIA")
     return { error: "Esta comunicação não aguarda ciência." };
 
@@ -372,8 +372,8 @@ export async function tomarCienciaAdaptacao(_prev: State, formData: FormData): P
     include: { student: true, type: true },
   });
   if (!comm) return { error: "Comunicação não encontrada." };
-  if (session.role === "ALUNO" && comm.student.userId !== session.userId)
-    return { error: "Sem permissão." };
+  if (comm.student.userId !== session.userId)
+    return { error: "Apenas o próprio aluno pode tomar ciência ou apresentar defesa." };
   if (comm.status !== "AGUARDANDO_CIENCIA")
     return { error: "Esta comunicação não aguarda ciência." };
   if (!comm.adaptationPeriod)
@@ -457,6 +457,16 @@ export async function emitirParecer(_prev: State, formData: FormData): Promise<S
       return { error: `O total dos arquivos excede o limite de 5 MB (${(totalBytes / 1024 / 1024).toFixed(1)} MB enviado).` };
   }
 
+  const commEscopo = await prisma.communication.findUnique({
+    where: { id: communicationId },
+    include: { course: { select: { school: true } } },
+  });
+  if (!commEscopo) return { error: "Comunicação não encontrada." };
+  if (!escolaNoEscopo(session, commEscopo.course.school))
+    return { error: "Sem permissão: comunicação de outra escola." };
+  if (!["AGUARDANDO_PARECER", "JUSTIFICATIVA_APRESENTADA"].includes(commEscopo.status))
+    return { error: "Esta comunicação não está aguardando parecer." };
+
   const existente = await prisma.opinion.findFirst({ where: { communicationId } });
   if (existente) return { error: "Já existe um parecer registrado para esta comunicação." };
 
@@ -517,8 +527,13 @@ export async function proferirDecisao(_prev: State, formData: FormData): Promise
   // Captura artigo original antes de qualquer atualização (para histórico de reenquadramento)
   const commOriginal = await prisma.communication.findUnique({
     where: { id: communicationId },
-    select: { article: true, item: true, letter: true },
+    select: { article: true, item: true, letter: true, status: true, course: { select: { school: true } } },
   });
+  if (!commOriginal) return { error: "Comunicação não encontrada." };
+  if (!escolaNoEscopo(session, commOriginal.course.school))
+    return { error: "Sem permissão: comunicação de outra escola." };
+  if (commOriginal.status !== "AGUARDANDO_DECISAO")
+    return { error: "Esta comunicação não está aguardando decisão." };
   const originalArticle = commOriginal?.article ?? null;
   const originalItem    = commOriginal?.item    ?? null;
   const originalLetter  = commOriginal?.letter  ?? null;
@@ -620,8 +635,11 @@ export async function corrigirPontuacao(_prev: State, formData: FormData): Promi
 
   const decision = await prisma.decision.findFirst({
     where: { id: decisionId, communicationId },
+    include: { communication: { select: { course: { select: { school: true } } } } },
   });
   if (!decision) return { error: "Decisão não encontrada." };
+  if (!escolaNoEscopo(session, decision.communication.course.school))
+    return { error: "Sem permissão: comunicação de outra escola." };
 
   await prisma.decision.update({ where: { id: decisionId }, data: { finalScore: novaScore } });
   await prisma.communication.update({ where: { id: communicationId }, data: { finalScore: novaScore } });
