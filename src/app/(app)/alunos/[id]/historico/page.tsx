@@ -60,20 +60,27 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
   ];
 
   // Evolução da nota por caderno publicado
+  // Ordena por (data de publicação, número) para desempate estável quando
+  // cadernos de cursos diferentes são publicados na mesma data.
   const cadernosOrdenados = Array.from(
     new Map(
       pubItems
         .filter((i) => i.disciplinaryBook.publicationDate)
         .map((i) => [i.disciplinaryBook.id, i.disciplinaryBook])
     ).values()
-  ).sort((a, b) => new Date(a.publicationDate!).getTime() - new Date(b.publicationDate!).getTime());
+  ).sort((a, b) => {
+    const dt = new Date(a.publicationDate!).getTime() - new Date(b.publicationDate!).getTime();
+    return dt !== 0 ? dt : a.number - b.number;
+  });
 
+  // Acumula por pertencimento ao caderno (e não por comparação de data), para
+  // que cadernos publicados no mesmo dia não somem os itens um do outro.
   const evolucao: { label: string; date: Date; nota: number }[] = [];
+  const idsAteAqui = new Set<string>();
   for (const caderno of cadernosOrdenados) {
-    const itensTeCaderno = pubItems.filter((i) =>
-      new Date(i.disciplinaryBook.publicationDate!).getTime() <= new Date(caderno.publicationDate!).getTime()
-    );
-    const notaApos = calcularNotaPublicada(itensTeCaderno);
+    idsAteAqui.add(caderno.id);
+    const itensAteCaderno = pubItems.filter((i) => idsAteAqui.has(i.disciplinaryBook.id));
+    const notaApos = calcularNotaPublicada(itensAteCaderno);
     evolucao.push({
       label: `CD Nº ${String(caderno.number).padStart(2, "0")}${caderno.course ? ` — ${caderno.course.name}` : ""}`,
       date: new Date(caderno.publicationDate!),

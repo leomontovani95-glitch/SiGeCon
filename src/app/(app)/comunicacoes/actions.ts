@@ -5,11 +5,15 @@ import path from "path";
 import { prisma } from "@/lib/db";
 import { verifyRole, verifySession, canEmitOpinion, canDecide, ESFO_CFO_RANK, cursosPermitidosParaCPI } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
-import { gerarProtocolo } from "@/lib/protocolo";
+import { criarComProtocoloUnico } from "@/lib/protocolo";
+import { comTransacaoRetry, adicionarAoCaderno } from "@/lib/caderno";
 import { calcularPrazoDefesa } from "@/lib/prazos";
 
 type State = { error: string } | undefined;
-export type LoteState = { error: string } | { success: true; count: number; protocols: string[] } | undefined;
+export type LoteState =
+  | { error: string }
+  | { success: true; count: number; protocols: string[]; falhas: { label: string; motivo: string }[] }
+  | undefined;
 
 const TIPOS_PERMITIDOS = ["image/png", "image/jpeg", "application/pdf"];
 const LIMITE_TOTAL_BYTES = 5 * 1024 * 1024; // 5 MB total
@@ -81,7 +85,6 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
     return { error: "Sem permissão." };
   }
 
-  const protocolNumber = await gerarProtocolo(tipo.name, aluno.course.name);
   // Testemunhas
   const witnessRanks = formData.getAll("witnessRank") as string[];
   const witnessNames = formData.getAll("witnessName") as string[];
@@ -102,25 +105,30 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
   }
 
   let commId: string;
+  let protocolNumber: string;
   try {
-    const comm = await prisma.communication.create({
-      data: {
-        protocolNumber, typeId, studentId,
-        courseId: aluno.courseId, courseNumber: aluno.courseNumber, platoonId: aluno.platoonId,
-        reporterId: session.userId, factDate: new Date(factDate + "T12:00:00"),
-        factTime, factPlace, factDescription,
-        manualRuleId,
-        article: regra.article,
-        item: regra.item,
-        letter: regra.letter,
-        suggestedScore, communicantName, communicantUserId,
-        adaptationPeriod,
-        status: "AGUARDANDO_CIENCIA",
-        defenseDeadline: calcularPrazoDefesa(new Date()),
-      },
-    });
+    const comm = await criarComProtocoloUnico(tipo.name, aluno.course.name, (pn) =>
+      prisma.communication.create({
+        data: {
+          protocolNumber: pn, typeId, studentId,
+          courseId: aluno.courseId, courseNumber: aluno.courseNumber, platoonId: aluno.platoonId,
+          reporterId: session.userId, factDate: new Date(factDate + "T12:00:00"),
+          factTime, factPlace, factDescription,
+          manualRuleId,
+          article: regra.article,
+          item: regra.item,
+          letter: regra.letter,
+          suggestedScore, communicantName, communicantUserId,
+          adaptationPeriod,
+          status: "AGUARDANDO_CIENCIA",
+          defenseDeadline: calcularPrazoDefesa(new Date()),
+        },
+      }),
+    );
     commId = comm.id;
-  } catch {
+    protocolNumber = comm.protocolNumber;
+  } catch (e) {
+    console.error("[registrarComunicacao] erro ao criar:", e);
     return { error: "Erro ao registrar comunicação." };
   }
 
@@ -203,24 +211,29 @@ export async function registrarComunicacaoEmLote(_prev: LoteState, formData: For
     .filter((w) => w.name);
 
   const protocols: string[] = [];
+  const falhas: { label: string; motivo: string }[] = [];
   for (const studentId of studentIds) {
     const aluno = await prisma.student.findUnique({ where: { id: studentId }, include: { course: true } });
-    if (!aluno) continue;
+    if (!aluno) {
+      falhas.push({ label: studentId, motivo: "Aluno não encontrado." });
+      continue;
+    }
 
-    const protocolNumber = await gerarProtocolo(tipo.name, aluno.course.name);
     try {
-      const comm = await prisma.communication.create({
-        data: {
-          protocolNumber, typeId, studentId,
-          courseId: aluno.courseId, courseNumber: aluno.courseNumber, platoonId: aluno.platoonId,
-          reporterId: session.userId, factDate: new Date(factDate + "T12:00:00"),
-          factTime, factPlace, factDescription,
-          manualRuleId, article: regra.article, item: regra.item, letter: regra.letter,
-          suggestedScore, communicantName, communicantUserId, adaptationPeriod,
-          status: "AGUARDANDO_CIENCIA",
-          defenseDeadline: calcularPrazoDefesa(new Date()),
-        },
-      });
+      const comm = await criarComProtocoloUnico(tipo.name, aluno.course.name, (pn) =>
+        prisma.communication.create({
+          data: {
+            protocolNumber: pn, typeId, studentId,
+            courseId: aluno.courseId, courseNumber: aluno.courseNumber, platoonId: aluno.platoonId,
+            reporterId: session.userId, factDate: new Date(factDate + "T12:00:00"),
+            factTime, factPlace, factDescription,
+            manualRuleId, article: regra.article, item: regra.item, letter: regra.letter,
+            suggestedScore, communicantName, communicantUserId, adaptationPeriod,
+            status: "AGUARDANDO_CIENCIA",
+            defenseDeadline: calcularPrazoDefesa(new Date()),
+          },
+        }),
+      );
       if (testemunhas.length > 0) {
         await prisma.witness.createMany({
           data: testemunhas.map((w) => ({
@@ -229,13 +242,16 @@ export async function registrarComunicacaoEmLote(_prev: LoteState, formData: For
           })),
         }).catch(() => {});
       }
-      await auditLog(session.userId, "CREATE", "Communication", comm.id, `Lote — Protocolo: ${protocolNumber}`).catch(() => {});
-      protocols.push(protocolNumber);
-    } catch { /* continua para próximo aluno */ }
+      await auditLog(session.userId, "CREATE", "Communication", comm.id, `Lote — Protocolo: ${comm.protocolNumber}`).catch(() => {});
+      protocols.push(comm.protocolNumber);
+    } catch (e) {
+      console.error("[registrarComunicacaoEmLote] falha ao registrar aluno", studentId, e);
+      falhas.push({ label: `${aluno.warName} (Nº ${aluno.courseNumber})`, motivo: "Erro ao registrar." });
+    }
   }
 
   if (protocols.length === 0) return { error: "Nenhuma comunicação pôde ser registrada. Verifique os dados." };
-  return { success: true, count: protocols.length, protocols };
+  return { success: true, count: protocols.length, protocols, falhas };
 }
 
 // ── Tomar ciência e apresentar defesa (formulário único) ─────────────────
@@ -393,41 +409,21 @@ export async function tomarCienciaAdaptacao(_prev: State, formData: FormData): P
       "Período de Adaptação — decisão automática, sem impacto na nota");
 
     // Adiciona ao caderno rascunho do mesmo curso
-    const courseId = comm.courseId;
-    let caderno = await prisma.disciplinaryBook.findFirst({
-      where: { status: "RASCUNHO", courseId },
-      orderBy: { number: "desc" },
-    });
-    if (!caderno) {
-      const ultimoDoCurso = await prisma.disciplinaryBook.findFirst({
-        where: { courseId },
-        orderBy: { number: "desc" },
-      });
-      caderno = await prisma.disciplinaryBook.create({
-        data: { number: (ultimoDoCurso?.number ?? 0) + 1, courseId, createdById: authorityId },
-      });
-    }
-    const jaExiste = await prisma.disciplinaryBookItem.findFirst({
-      where: { disciplinaryBookId: caderno.id, communicationId },
-    });
-    if (!jaExiste) {
-      await prisma.disciplinaryBookItem.create({
-        data: {
-          disciplinaryBookId: caderno.id,
-          communicationId,
-          studentId: comm.studentId,
-          courseId: comm.courseId,
-          platoonId: comm.platoonId,
-          studentCourseNumber: comm.courseNumber,
-          studentWarName: comm.student.warName,
-          recordType: comm.type.name,
-          factDate: comm.factDate,
-          decisionSummary: "Período de Adaptação",
-          shortObservation: "Período de Adaptação",
-          score: 0,
-        },
-      });
-    }
+    await comTransacaoRetry((tx) =>
+      adicionarAoCaderno(tx, comm.courseId, authorityId, {
+        communicationId,
+        studentId: comm.studentId,
+        courseId: comm.courseId,
+        platoonId: comm.platoonId,
+        studentCourseNumber: comm.courseNumber,
+        studentWarName: comm.student.warName,
+        recordType: comm.type.name,
+        factDate: comm.factDate,
+        decisionSummary: "Período de Adaptação",
+        shortObservation: "Período de Adaptação",
+        score: 0,
+      }),
+    );
   } catch {
     return { error: "Erro ao registrar ciência. Tente novamente." };
   }
@@ -587,45 +583,23 @@ export async function proferirDecisao(_prev: State, formData: FormData): Promise
     include: { student: true, type: true },
   });
   if (comm) {
-    const courseId = comm.courseId;
-    // Busca o caderno em rascunho para este curso específico
-    let caderno = await prisma.disciplinaryBook.findFirst({
-      where: { status: "RASCUNHO", courseId },
-      orderBy: { number: "desc" },
-    });
-    if (!caderno) {
-      // Próximo número dentro deste curso
-      const ultimoDoCurso = await prisma.disciplinaryBook.findFirst({
-        where: { courseId },
-        orderBy: { number: "desc" },
-      });
-      caderno = await prisma.disciplinaryBook.create({
-        data: { number: (ultimoDoCurso?.number ?? 0) + 1, courseId, createdById: session.userId },
-      });
-    }
-    const jaExiste = await prisma.disciplinaryBookItem.findFirst({
-      where: { disciplinaryBookId: caderno.id, communicationId },
-    });
-    if (!jaExiste) {
-      await prisma.disciplinaryBookItem.create({
-        data: {
-          disciplinaryBookId: caderno.id,
-          communicationId,
-          studentId: comm.studentId,
-          courseId: comm.courseId,
-          platoonId: comm.platoonId,
-          studentCourseNumber: comm.courseNumber,
-          studentWarName: comm.student.warName,
-          recordType: comm.type.name,
-          factDate: comm.factDate,
-          decisionSummary: decisionType,
-          score: finalScore,
-          originalArticle,
-          originalItem,
-          originalLetter,
-        },
-      });
-    }
+    await comTransacaoRetry((tx) =>
+      adicionarAoCaderno(tx, comm.courseId, session.userId, {
+        communicationId,
+        studentId: comm.studentId,
+        courseId: comm.courseId,
+        platoonId: comm.platoonId,
+        studentCourseNumber: comm.courseNumber,
+        studentWarName: comm.student.warName,
+        recordType: comm.type.name,
+        factDate: comm.factDate,
+        decisionSummary: decisionType,
+        score: finalScore,
+        originalArticle,
+        originalItem,
+        originalLetter,
+      }),
+    );
   }
 
   redirect(`/comunicacoes/${communicationId}`);
@@ -693,8 +667,6 @@ export async function registrarElogioBi(_prev: State, formData: FormData): Promi
 
   const score = tipo.score; // 1.0 conforme seed
 
-  const protocolo = await gerarProtocolo("Elogio publicado em BI", aluno.course.name);
-
   const descricao = [
     `Elogio publicado em BI`,
     `Art. ${regra.article}${regra.item ? `, Inc. ${regra.item}` : ""}${regra.letter ? `, Al. ${regra.letter}` : ""}`,
@@ -702,57 +674,45 @@ export async function registrarElogioBi(_prev: State, formData: FormData): Promi
     `BGPM Nº ${bgpmNumber}/${bgpmYear}.`,
   ].filter(Boolean).join(" — ");
 
-  const comm = await prisma.communication.create({
-    data: {
-      protocolNumber:  protocolo,
-      typeId:          tipo.id,
-      studentId,
-      courseId,
-      courseNumber:    aluno.courseNumber,
-      platoonId:       aluno.platoonId ?? undefined,
-      reporterId:      session.userId,
-      factDate:        new Date(),
-      factDescription: descricao,
-      finalScore:      score,
-      status:          "DECIDIDA",
-      bgpmNumber,
-      bgpmYear,
-      manualRuleId:    regra.id,
-      article:         regra.article,
-      item:            regra.item,
-      letter:          regra.letter,
-    },
-  });
+  const comm = await criarComProtocoloUnico("Elogio publicado em BI", aluno.course.name, (pn) =>
+    prisma.communication.create({
+      data: {
+        protocolNumber:  pn,
+        typeId:          tipo.id,
+        studentId,
+        courseId,
+        courseNumber:    aluno.courseNumber,
+        platoonId:       aluno.platoonId ?? undefined,
+        reporterId:      session.userId,
+        factDate:        new Date(),
+        factDescription: descricao,
+        finalScore:      score,
+        status:          "DECIDIDA",
+        bgpmNumber,
+        bgpmYear,
+        manualRuleId:    regra.id,
+        article:         regra.article,
+        item:            regra.item,
+        letter:          regra.letter,
+      },
+    }),
+  );
+  const protocolo = comm.protocolNumber;
 
-  let caderno = await prisma.disciplinaryBook.findFirst({
-    where: { status: "RASCUNHO", courseId },
-    orderBy: { number: "desc" },
-  });
-  if (!caderno) {
-    const ultimo = await prisma.disciplinaryBook.findFirst({
-      where: { courseId },
-      orderBy: { number: "desc" },
-    });
-    caderno = await prisma.disciplinaryBook.create({
-      data: { number: (ultimo?.number ?? 0) + 1, courseId, createdById: session.userId },
-    });
-  }
-
-  await prisma.disciplinaryBookItem.create({
-    data: {
-      disciplinaryBookId:  caderno.id,
+  await comTransacaoRetry((tx) =>
+    adicionarAoCaderno(tx, courseId, session.userId, {
       communicationId:     comm.id,
       studentId,
       courseId,
-      platoonId:           aluno.platoonId ?? undefined,
+      platoonId:           aluno.platoonId,
       studentCourseNumber: aluno.courseNumber,
       studentWarName:      aluno.warName,
       recordType:          "Elogio publicado em BI",
       factDate:            comm.factDate,
       decisionSummary:     "Elogio publicado em BI",
       score,
-    },
-  });
+    }),
+  );
 
   await auditLog(session.userId, "CREATE", "Communication", comm.id, protocolo);
   redirect(`/comunicacoes/${comm.id}`);
@@ -787,60 +747,46 @@ export async function registrarTransgressao(_prev: State, formData: FormData): P
   if (!aluno) return { error: "Aluno não encontrado." };
   if (!tipo)  return { error: "Tipo de transgressão não cadastrado no sistema." };
 
-  const protocolo = await gerarProtocolo(tipoComunicacao, aluno.course.name);
-
   const descricao = tipoComunicacao === "TAC"
     ? `Termo de Ajuste de Conduta (equivalente a ${tacEquivalent}) — BGPM Nº ${bgpmNumber}/${bgpmYear}.`
     : `${tipoComunicacao} — BGPM Nº ${bgpmNumber}/${bgpmYear}.`;
 
-  const comm = await prisma.communication.create({
-    data: {
-      protocolNumber:  protocolo,
-      typeId:          tipo.id,
-      studentId,
-      courseId,
-      courseNumber:    aluno.courseNumber,
-      platoonId:       aluno.platoonId ?? undefined,
-      reporterId:      session.userId,
-      factDate:        new Date(),
-      factDescription: descricao,
-      finalScore:      score,
-      status:          "DECIDIDA",
-      bgpmNumber,
-      bgpmYear,
-      tacEquivalent:   tacEquivalent ?? undefined,
-    },
-  });
+  const comm = await criarComProtocoloUnico(tipoComunicacao, aluno.course.name, (pn) =>
+    prisma.communication.create({
+      data: {
+        protocolNumber:  pn,
+        typeId:          tipo.id,
+        studentId,
+        courseId,
+        courseNumber:    aluno.courseNumber,
+        platoonId:       aluno.platoonId ?? undefined,
+        reporterId:      session.userId,
+        factDate:        new Date(),
+        factDescription: descricao,
+        finalScore:      score,
+        status:          "DECIDIDA",
+        bgpmNumber,
+        bgpmYear,
+        tacEquivalent:   tacEquivalent ?? undefined,
+      },
+    }),
+  );
+  const protocolo = comm.protocolNumber;
 
-  let caderno = await prisma.disciplinaryBook.findFirst({
-    where: { status: "RASCUNHO", courseId },
-    orderBy: { number: "desc" },
-  });
-  if (!caderno) {
-    const ultimo = await prisma.disciplinaryBook.findFirst({
-      where: { courseId },
-      orderBy: { number: "desc" },
-    });
-    caderno = await prisma.disciplinaryBook.create({
-      data: { number: (ultimo?.number ?? 0) + 1, courseId, createdById: session.userId },
-    });
-  }
-
-  await prisma.disciplinaryBookItem.create({
-    data: {
-      disciplinaryBookId:  caderno.id,
+  await comTransacaoRetry((tx) =>
+    adicionarAoCaderno(tx, courseId, session.userId, {
       communicationId:     comm.id,
       studentId,
       courseId,
-      platoonId:           aluno.platoonId ?? undefined,
+      platoonId:           aluno.platoonId,
       studentCourseNumber: aluno.courseNumber,
       studentWarName:      aluno.warName,
       recordType:          tipoComunicacao,
       factDate:            comm.factDate,
       decisionSummary:     tipoComunicacao === "TAC" ? `TAC — ${tacEquivalent}` : tipoComunicacao,
       score,
-    },
-  });
+    }),
+  );
 
   await auditLog(session.userId, "CREATE", "Communication", comm.id, protocolo);
   redirect(`/comunicacoes/${comm.id}`);

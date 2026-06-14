@@ -18,7 +18,7 @@ export default function NotaChart({ data }: { data: Ponto[] }) {
         <XAxis dataKey="label" tick={{ fontSize: 10 }} />
         <YAxis domain={[minY, maxY]} tick={{ fontSize: 10 }} />
         <ReferenceLine y={7} stroke="#ef4444" strokeDasharray="4 3" label={{ value: "7,0", position: "insideTopLeft", fontSize: 9, fill: "#ef4444" }} />
-        <Tooltip formatter={(v: number) => [v.toFixed(2), "Nota"]} />
+        <Tooltip formatter={(v) => [Number(v).toFixed(2), "Nota"]} />
         <Line
           type="monotone"
           dataKey="nota"

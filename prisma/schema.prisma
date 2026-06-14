@@ -264,6 +264,9 @@ model DisciplinaryBook {
   course      Course?                @relation(fields: [courseId], references: [id])
   items       DisciplinaryBookItem[]
   aacp        Aacp?
+
+  // Numeração do caderno é única por curso (não mais global).
+  @@unique([courseId, number])
 }
 
 model Aacp {
@@ -353,6 +356,9 @@ model DisciplinaryBookItem {
   disciplinaryBook DisciplinaryBook @relation(fields: [disciplinaryBookId], references: [id])
   communication    Communication    @relation(fields: [communicationId], references: [id])
   student          Student          @relation(fields: [studentId], references: [id])
+
+  // Uma comunicação não pode ser lançada duas vezes no mesmo caderno.
+  @@unique([disciplinaryBookId, communicationId])
 }
 
 model AuditLog {

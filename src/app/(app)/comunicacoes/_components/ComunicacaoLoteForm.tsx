@@ -190,6 +190,18 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
             <li key={p} className="font-mono">{p}</li>
           ))}
         </ul>
+        {"falhas" in state && state.falhas.length > 0 && (
+          <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+            <p className="text-sm font-semibold text-amber-900 mb-1">
+              ⚠ {state.falhas.length} aluno(s) não foram registrados:
+            </p>
+            <ul className="text-sm text-amber-800 space-y-0.5">
+              {state.falhas.map((f, i) => (
+                <li key={i}>{f.label} — {f.motivo}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="flex gap-3">
           <a href="/comunicacoes" className="btn-primary text-sm">Ver comunicações</a>
           <button type="button" onClick={() => window.location.reload()} className="btn-secondary text-sm">

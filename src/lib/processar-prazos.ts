@@ -1,5 +1,6 @@
 "server-only";
 import { prisma } from "@/lib/db";
+import { comTransacaoRetry, adicionarAoCaderno } from "@/lib/caderno";
 
 const NOTA_AUTO =
   "Prazo de 2 dias úteis encerrado sem que o aluno tomasse ciência ou apresentasse defesa. " +
@@ -32,7 +33,7 @@ export async function processarPrazosExpirados(): Promise<number> {
       // Período de Adaptação: decisão automática + caderno + sem parecer
       const authorityId = admin?.id ?? comm.reporterId;
 
-      await prisma.$transaction(async (tx) => {
+      await comTransacaoRetry(async (tx) => {
         await tx.studentAcknowledgement.create({
           data: {
             communicationId: comm.id,
@@ -58,41 +59,19 @@ export async function processarPrazosExpirados(): Promise<number> {
         });
 
         // Adiciona ao caderno rascunho
-        const courseId = comm.courseId;
-        let caderno = await tx.disciplinaryBook.findFirst({
-          where: { status: "RASCUNHO", courseId },
-          orderBy: { number: "desc" },
+        await adicionarAoCaderno(tx, comm.courseId, authorityId, {
+          communicationId: comm.id,
+          studentId: comm.studentId,
+          courseId: comm.courseId,
+          platoonId: comm.platoonId,
+          studentCourseNumber: comm.courseNumber,
+          studentWarName: comm.student.warName,
+          recordType: comm.type.name,
+          factDate: comm.factDate,
+          decisionSummary: "Período de Adaptação",
+          shortObservation: "Período de Adaptação",
+          score: 0,
         });
-        if (!caderno) {
-          const ultimoDoCurso = await tx.disciplinaryBook.findFirst({
-            where: { courseId },
-            orderBy: { number: "desc" },
-          });
-          caderno = await tx.disciplinaryBook.create({
-            data: { number: (ultimoDoCurso?.number ?? 0) + 1, courseId, createdById: authorityId },
-          });
-        }
-        const jaExiste = await tx.disciplinaryBookItem.findFirst({
-          where: { disciplinaryBookId: caderno.id, communicationId: comm.id },
-        });
-        if (!jaExiste) {
-          await tx.disciplinaryBookItem.create({
-            data: {
-              disciplinaryBookId: caderno.id,
-              communicationId: comm.id,
-              studentId: comm.studentId,
-              courseId: comm.courseId,
-              platoonId: comm.platoonId,
-              studentCourseNumber: comm.courseNumber,
-              studentWarName: comm.student.warName,
-              recordType: comm.type.name,
-              factDate: comm.factDate,
-              decisionSummary: "Período de Adaptação",
-              shortObservation: "Período de Adaptação",
-              score: 0,
-            },
-          });
-        }
       });
     } else {
       // Fluxo normal: encaminha para parecer
