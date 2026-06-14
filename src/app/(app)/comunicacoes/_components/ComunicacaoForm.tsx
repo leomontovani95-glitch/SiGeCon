@@ -8,6 +8,7 @@ const POSTOS = [
   "OUTRO (CIVIL)",
 ];
 import { registrarComunicacao } from "../actions";
+import { dataLocalISO } from "@/lib/utils";
 
 type Tipo  = { id: string; name: string; score: number };
 type Regra = {
@@ -617,7 +618,7 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Data do Fato *</label>
-          <input name="factDate" type="date" required className="input" defaultValue={new Date().toISOString().split("T")[0]} />
+          <input name="factDate" type="date" required className="input" defaultValue={dataLocalISO()} />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Hora do Fato</label>

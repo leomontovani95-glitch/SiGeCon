@@ -1,6 +1,7 @@
 "use client";
 import { useCallback } from "react";
 import { faixaNota } from "@/lib/score";
+import { dataLocalISO } from "@/lib/utils";
 
 export type RankingItem = {
   warName: string;
@@ -158,7 +159,7 @@ export default function RankingPDF({ ranking, label }: { ranking: RankingItem[];
       doc.text("Documento de uso interno — APM/ES", mL, pH - 7);
     }
 
-    doc.save(`ranking-conduta-${agora.toISOString().split("T")[0]}.pdf`);
+    doc.save(`ranking-conduta-${dataLocalISO(agora)}.pdf`);
   }, [ranking, label]);
 
   return (

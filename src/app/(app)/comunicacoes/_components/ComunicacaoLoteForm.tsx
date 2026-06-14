@@ -1,6 +1,7 @@
 "use client";
 import { useActionState, useState, useRef, useCallback, useMemo } from "react";
 import { registrarComunicacaoEmLote, type LoteState } from "../actions";
+import { dataLocalISO } from "@/lib/utils";
 
 const POSTOS = [
   "CEL", "TEN CEL", "MAJ", "CAP", "1º TEN", "2º TEN", "ASP OF",
@@ -441,7 +442,7 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
         )}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">{isRef ? "Data do Elogio *" : "Data do Fato *"}</label>
-          <input name="factDate" type="date" required className="input" defaultValue={new Date().toISOString().split("T")[0]} />
+          <input name="factDate" type="date" required className="input" defaultValue={dataLocalISO()} />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">{isRef ? "Hora" : "Hora do Fato"}</label>

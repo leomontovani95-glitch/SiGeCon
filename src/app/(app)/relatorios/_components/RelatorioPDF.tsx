@@ -1,5 +1,6 @@
 "use client";
 import { useCallback } from "react";
+import { dataLocalISO } from "@/lib/utils";
 
 export type RelatorioItem = {
   protocolNumber: string;
@@ -181,7 +182,7 @@ export default function RelatorioPDF({ items, meta }: { items: RelatorioItem[]; 
       doc.text("Documento de uso interno — APM/ES", mL, pH - 7);
     }
 
-    const slug = agora.toISOString().split("T")[0];
+    const slug = dataLocalISO(agora);
     doc.save(`relatorio-comunicacoes-${slug}.pdf`);
   }, [items, meta]);
 
