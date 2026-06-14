@@ -1,9 +1,3 @@
-// Mantido por compatibilidade com código legado
-export const STATUS_COM_PONTUACAO = [
-  "PUBLICADA_CADERNO",
-  "FINALIZADA",
-] as const;
-
 // Calcula a nota a partir de itens de cadernos PUBLICADOS.
 // score positivo = favorável (RE, EBI), negativo = desfavorável (CPI).
 // Alunos podem ultrapassar 10 com registros elogiosos.
@@ -21,24 +15,6 @@ export function calcularNotaPublicada(
       nota -= magnitude;
     } else {
       nota += magnitude;
-    }
-  }
-  return Math.round(nota * 100) / 100;
-}
-
-export function calcularNota(
-  comunicacoesDecididas: Array<{
-    finalScore: number | null;
-    type: { scoreNature: string };
-  }>
-): number {
-  let nota = 10;
-  for (const c of comunicacoesDecididas) {
-    if (c.finalScore == null) continue;
-    if (c.type.scoreNature === "DESFAVORAVEL") {
-      nota -= c.finalScore;
-    } else {
-      nota += c.finalScore;
     }
   }
   return Math.round(nota * 100) / 100;

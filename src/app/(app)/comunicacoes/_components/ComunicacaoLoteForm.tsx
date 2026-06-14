@@ -110,8 +110,11 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
   function selecionarRegra(r: Regra) {
     setRuleId(r.id);
     if (modo === "CPI") {
-      if (r.defaultCommunicationType) { const tid = tipoByName[r.defaultCommunicationType]; if (tid) setTypeId(tid); }
-      if (r.defaultScore != null) setScore(String(r.defaultScore));
+      // Pontuação sugerida vem do score do tipo (CommunicationType) — fonte única.
+      if (r.defaultCommunicationType) {
+        const tipo = tipos.find((t) => t.name === r.defaultCommunicationType);
+        if (tipo) { setTypeId(tipo.id); setScore(String(tipo.score)); }
+      }
     }
   }
   function handleArtigoChange(val: string) { setArtigo(val); setInciso(""); setRuleId(""); if (modo === "CPI") { setTypeId(""); setScore(""); } }

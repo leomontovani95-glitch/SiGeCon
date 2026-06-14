@@ -53,19 +53,6 @@ const SUGESTOES_DECISAO: Record<string, Sugestao[]> = {
   ],
 };
 
-function pontuacaoPadrao(typeName: string, item: string | null): number | null {
-  const name = typeName.toLowerCase();
-  if (name.includes("referência elogiosa") || name.includes("referencia elogiosa")) return 0.2;
-  if (name.startsWith("cpi")) {
-    if (!item) return 0.1;
-    if (item === "I") return 0.2;
-    if (item === "II") return 0.4;
-    if (item === "III") return 0.6;
-    return 0.1;
-  }
-  return null;
-}
-
 function nomeCpiDoInciso(typeName: string, item: string | null): string {
   const name = typeName.toLowerCase();
   if (name.includes("referência elogiosa") || name.includes("referencia elogiosa")) return "Referência Elogiosa";
@@ -94,14 +81,25 @@ type CommInfo = {
 type SessionInfo = { role: string; userId: string; email: string };
 
 export default function AcoesComm({
-  comm, session, alunoEhEssePerfil, mostraFormDefesa, manualRules,
+  comm, session, alunoEhEssePerfil, mostraFormDefesa, manualRules, tiposScore,
 }: {
   comm: CommInfo;
   session: SessionInfo;
   alunoEhEssePerfil: boolean;
   mostraFormDefesa: boolean;
   manualRules: ManualRule[];
+  tiposScore: Record<string, number>;
 }) {
+  // Pontuação padrão de cada inciso vem do banco (CommunicationType.score),
+  // editável em /tipos conforme a legislação vigente — não fica fixa no código.
+  const pontuacaoPadrao = (typeName: string, item: string | null): number | null => {
+    const name = typeName.toLowerCase();
+    if (name.includes("referência elogiosa") || name.includes("referencia elogiosa"))
+      return tiposScore["Referência Elogiosa"] ?? null;
+    if (name.startsWith("cpi")) return tiposScore[nomeCpiDoInciso(typeName, item)] ?? null;
+    return null;
+  };
+
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [arquivoErro, setArquivoErro] = useState("");
   const [arquivosDecisao, setArquivosDecisao] = useState<File[]>([]);
@@ -109,10 +107,11 @@ export default function AcoesComm({
   const fileDecisaoRef = useRef<HTMLInputElement>(null);
   const [decisaoTipo, setDecisaoTipo] = useState("");
   const [decisaoTexto, setDecisaoTexto] = useState("");
-  const [finalScoreDecisao, setFinalScoreDecisao] = useState<string>(() => {
-    const def = pontuacaoPadrao(comm.typeName, comm.item);
-    return def !== null ? def.toFixed(1) : "";
-  });
+  // Padrão da decisão = pontuação registrada (snapshot). A comunicação mantém o
+  // valor com que foi registrada mesmo que /tipos mude depois.
+  const [finalScoreDecisao, setFinalScoreDecisao] = useState<string>(() =>
+    comm.suggestedScore != null ? comm.suggestedScore.toFixed(1) : "",
+  );
   const [novoRuleId, setNovoRuleId] = useState<string>("");
   const [mostraCorrecao, setMostraCorrecao] = useState(false);
   const [novaPontuacao, setNovaPontuacao] = useState<string>("");
@@ -378,12 +377,12 @@ export default function AcoesComm({
                   className="input max-w-xs"
                 />
                 {(() => {
-                  const padrao = pontuacaoPadrao(comm.typeName, comm.item);
+                  const padrao = comm.suggestedScore;
                   const atual = novaPontuacao !== "" ? Number(novaPontuacao) : null;
-                  if (padrao !== null && atual !== null && Math.abs(atual - padrao) > 0.001) {
+                  if (padrao != null && atual !== null && Math.abs(atual - padrao) > 0.001) {
                     return (
                       <p className="text-xs text-red-600 mt-1 font-medium">
-                        ⚠ Pontuação diferente do padrão {nomeCpiDoInciso(comm.typeName, comm.item)} ({padrao.toFixed(1)} pt)
+                        ⚠ Pontuação diferente do padrão registrado ({padrao.toFixed(1)} pt)
                       </p>
                     );
                   }
@@ -426,8 +425,7 @@ export default function AcoesComm({
                   if (tipo === "Arquivamento") {
                     setFinalScoreDecisao("0");
                   } else if (tipo !== "Reenquadrar artigo") {
-                    const def = pontuacaoPadrao(comm.typeName, comm.item);
-                    if (def !== null) setFinalScoreDecisao(def.toFixed(1));
+                    if (comm.suggestedScore != null) setFinalScoreDecisao(comm.suggestedScore.toFixed(1));
                   }
                 }}
               >
@@ -542,12 +540,15 @@ export default function AcoesComm({
                 const itemEfetivo = isReenq
                   ? (manualRules.find((r) => r.id === novoRuleId)?.item ?? null)
                   : comm.item;
-                const padrao = pontuacaoPadrao(comm.typeName, itemEfetivo);
+                // Original: compara com o que foi registrado (snapshot).
+                // Reenquadramento: compara com o padrão atual do novo enquadramento.
+                const padrao = isReenq ? pontuacaoPadrao(comm.typeName, itemEfetivo) : comm.suggestedScore;
+                const rotulo = isReenq ? nomeCpiDoInciso(comm.typeName, itemEfetivo) : "registrado";
                 const atual = finalScoreDecisao !== "" ? Number(finalScoreDecisao) : null;
-                if (padrao !== null && atual !== null && Math.abs(atual - padrao) > 0.001) {
+                if (padrao != null && atual !== null && Math.abs(atual - padrao) > 0.001) {
                   return (
                     <p className="text-xs text-red-600 mt-1 font-medium">
-                      ⚠ Pontuação diferente do padrão {nomeCpiDoInciso(comm.typeName, itemEfetivo)} ({padrao.toFixed(1)} pt)
+                      ⚠ Pontuação diferente do padrão {rotulo} ({padrao.toFixed(1)} pt)
                     </p>
                   );
                 }

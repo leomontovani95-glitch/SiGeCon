@@ -30,7 +30,7 @@ export default async function ComunicacaoPage({
   const sp = await searchParams;
   const mostraFormDefesa = sp.defesa === "1";
 
-  const [manualRules, comm] = await Promise.all([
+  const [manualRules, comm, tipos] = await Promise.all([
     prisma.manualRule.findMany({ where: { active: true }, orderBy: [{ article: "asc" }, { item: "asc" }] }),
     prisma.communication.findUnique({
       where: { id },
@@ -45,8 +45,10 @@ export default async function ComunicacaoPage({
         communicantUser: { select: { id: true, role: true, student: { select: { id: true } } } },
       },
     }),
+    prisma.communicationType.findMany({ select: { name: true, score: true } }),
   ]);
   if (!comm) notFound();
+  const tiposScore = Object.fromEntries(tipos.map((t) => [t.name, t.score]));
 
   if (session.role === "ALUNO") {
     const ehEsteAluno = comm.student.userId === session.userId;
@@ -449,6 +451,7 @@ export default async function ComunicacaoPage({
           letter: r.letter ?? null,
           description: r.description,
         }))}
+        tiposScore={tiposScore}
       />}
     </div>
   );

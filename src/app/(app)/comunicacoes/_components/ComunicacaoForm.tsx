@@ -252,9 +252,12 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
     if (!regraAutoFill?.defaultCommunicationType) return "";
     return tipos.find((t) => t.name === regraAutoFill.defaultCommunicationType)?.id ?? "";
   });
-  const [score, setScore] = useState(() =>
-    regraAutoFill?.defaultScore != null ? String(regraAutoFill.defaultScore) : ""
-  );
+  const [score, setScore] = useState(() => {
+    const t = regraAutoFill?.defaultCommunicationType
+      ? tipos.find((x) => x.name === regraAutoFill.defaultCommunicationType)
+      : undefined;
+    return t ? String(t.score) : "";
+  });
 
   // Período de Adaptação
   const [adaptationPeriod, setAdaptationPeriod] = useState(false);
@@ -289,11 +292,12 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
   // ── auto-fill ao selecionar alínea ───────────────────────────────────
   function selecionarRegra(r: Regra) {
     setRuleId(r.id);
+    // Pontuação sugerida vem do score do tipo (CommunicationType) — fonte única,
+    // editável em /tipos. Assim novas comunicações seguem a legislação vigente.
     if (r.defaultCommunicationType) {
-      const tid = tipoByName[r.defaultCommunicationType];
-      if (tid) setTypeId(tid);
+      const tipo = tipos.find((t) => t.name === r.defaultCommunicationType);
+      if (tipo) { setTypeId(tipo.id); setScore(String(tipo.score)); }
     }
-    if (r.defaultScore != null) setScore(String(r.defaultScore));
   }
 
   // ── reset em cascata ─────────────────────────────────────────────────
