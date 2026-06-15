@@ -34,18 +34,12 @@ export default function RegraForm({ defaultValues, id }: Props) {
         <label className="block text-sm font-medium text-gray-700 mb-1">Descrição da conduta *</label>
         <textarea name="description" defaultValue={defaultValues?.description} required rows={3} className="input" placeholder="Fardamento em desalinho" />
       </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de comunicação sugerido</label>
-          <select name="defaultCommunicationType" defaultValue={defaultValues?.defaultCommunicationType ?? ""} className="input">
-            <option value="">Selecione</option>
-            {TIPOS.map((t) => <option key={t} value={t}>{t}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Pontuação padrão</label>
-          <input name="defaultScore" type="number" step="0.1" defaultValue={defaultValues?.defaultScore} className="input" placeholder="0.1" />
-        </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de comunicação sugerido</label>
+        <select name="defaultCommunicationType" defaultValue={defaultValues?.defaultCommunicationType ?? ""} className="input">
+          <option value="">Selecione</option>
+          {TIPOS.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Situação</label>

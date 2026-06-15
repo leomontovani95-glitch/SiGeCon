@@ -14,13 +14,12 @@ export async function salvarRegra(id: string | null, _prev: State, formData: For
   const letter = String(formData.get("letter") ?? "").trim() || null;
   const description = String(formData.get("description") ?? "").trim();
   const defaultCommunicationType = String(formData.get("defaultCommunicationType") ?? "").trim() || null;
-  const defaultScore = formData.get("defaultScore") ? Number(formData.get("defaultScore")) : null;
   const active = formData.get("active") === "true";
 
   if (!article || !description) return { error: "Artigo e descrição são obrigatórios." };
 
   const theme = String(formData.get("theme") ?? "").trim() || null;
-  const data = { article, item, letter, description, theme, defaultCommunicationType, defaultScore, active };
+  const data = { article, item, letter, description, theme, defaultCommunicationType, active };
   try {
     if (id) {
       await prisma.manualRule.update({ where: { id }, data });
@@ -32,6 +31,19 @@ export async function salvarRegra(id: string | null, _prev: State, formData: For
   } catch (e) {
     logger.error("manual: salvar dispositivo", e);
     return { error: "Erro ao salvar dispositivo." };
+  }
+  redirect("/manual");
+}
+
+export async function excluirRegra(id: string, _prev: State, _formData: FormData): Promise<State> {
+  const session = await verifyRole("ADMINISTRADOR");
+  const regra = await prisma.manualRule.findUnique({ where: { id } });
+  try {
+    await prisma.manualRule.delete({ where: { id } });
+    await auditLog(session.userId, "DELETE", "ManualRule", id, regra?.description ?? id);
+  } catch (e) {
+    logger.error("manual: excluir dispositivo", e);
+    return { error: "Não foi possível excluir o dispositivo." };
   }
   redirect("/manual");
 }

@@ -61,6 +61,7 @@ const nav: NavItem[] = [
   { href: "/analise",      label: "Análise",              icon: "📊", roles: STAFF },
   { href: "/usuarios",     label: "Usuários",             icon: "👥", roles: [...COMANDANTES, ...VIEWERS_APM] },
   { href: "/cursos",       label: "Cursos",               icon: "🎓", roles: COMANDANTES },
+  { href: "/manual",       label: "Manual do Aluno",      icon: "📕", roles: ["ADMINISTRADOR"] },
   { href: "/tipos",        label: "Tipos de Comunicação", icon: "⚙️", roles: TIPOS_ROLES },
   { href: "/auditoria",    label: "Auditoria",            icon: "🔍", roles: ["ADMINISTRADOR"] },
   { href: "/meus-registros", label: "Meus Registros",       icon: "✍️" },
