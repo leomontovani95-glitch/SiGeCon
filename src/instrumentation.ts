@@ -8,16 +8,23 @@ export async function register() {
   if (!process.env.TZ) process.env.TZ = "America/Sao_Paulo";
 
   const { processarPrazosExpirados } = await import("./lib/processar-prazos");
+  const { logger } = await import("./lib/logger");
 
-  // Executa imediatamente ao iniciar o servidor
-  await processarPrazosExpirados().catch((e: unknown) =>
-    console.error("[SiGeCon] Erro ao processar prazos na inicialização:", e)
-  );
+  // Guarda de re-entrância: evita execuções sobrepostas no mesmo processo
+  // (ex.: a do boot com a primeira do intervalo, ou um ciclo que demore).
+  let rodando = false;
+  const rodar = async () => {
+    if (rodando) return;
+    rodando = true;
+    try {
+      await processarPrazosExpirados();
+    } catch (e) {
+      logger.error("processarPrazosExpirados (scheduler)", e);
+    } finally {
+      rodando = false;
+    }
+  };
 
-  // Executa a cada 30 minutos enquanto o servidor estiver rodando
-  setInterval(async () => {
-    await processarPrazosExpirados().catch((e: unknown) =>
-      console.error("[SiGeCon] Erro ao processar prazos:", e)
-    );
-  }, 30 * 60 * 1000);
+  await rodar(); // ao iniciar o servidor
+  setInterval(rodar, 30 * 60 * 1000); // a cada 30 minutos
 }
