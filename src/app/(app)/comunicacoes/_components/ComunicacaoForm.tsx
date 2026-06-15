@@ -10,6 +10,7 @@ const POSTOS = [
 ];
 import { registrarComunicacao } from "../actions";
 import { dataLocalISO } from "@/lib/utils";
+import ResultadosPessoa from "./ResultadosPessoa";
 
 type Tipo  = { id: string; name: string; score: number };
 type Regra = {
@@ -153,28 +154,7 @@ function TestemunhaRow({ idx, onRemove }: { idx: number; onRemove: () => void })
               {!buscando && !buscaErro && query.length >= 2 && results.length === 0 && (
                 <p className="text-xs text-gray-400">Nenhum resultado. Use &quot;Preencher manualmente&quot;.</p>
               )}
-              {results.length > 0 && (
-                <ul className="border border-gray-200 rounded-lg bg-white divide-y divide-gray-100 max-h-40 overflow-y-auto">
-                  {results.map((r) => (
-                    <li
-                      key={r.key}
-                      onClick={() => selecionar(r)}
-                      className="px-3 py-2 hover:bg-blue-50 cursor-pointer flex items-center gap-2"
-                    >
-                      <span className="bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded font-mono whitespace-nowrap">
-                        {r.rank || "—"}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-900 truncate">{r.name}</p>
-                        <p className="text-xs text-gray-500 truncate">{r.fullName} · {r.detail}</p>
-                      </div>
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap ${
-                        r.tipo === "Usuário" ? "bg-indigo-100 text-indigo-700" : "bg-blue-100 text-blue-700"
-                      }`}>{r.tipo}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <ResultadosPessoa results={results} onSelecionar={selecionar} />
             </div>
           ) : (
             <div className="flex items-center gap-3 bg-white border border-green-200 rounded-lg px-3 py-2">
@@ -794,28 +774,7 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
                     {!commBuscando && !commErro && commQuery.length >= 2 && commResults.length === 0 && (
                       <p className="text-xs text-gray-400">Nenhum resultado encontrado. Use &quot;Preencher manualmente&quot;.</p>
                     )}
-                    {commResults.length > 0 && (
-                      <ul className="border border-gray-200 rounded-lg bg-white divide-y divide-gray-100 max-h-48 overflow-y-auto">
-                        {commResults.map((r) => (
-                          <li
-                            key={r.key}
-                            onClick={() => selecionarComunicante(r)}
-                            className="px-3 py-2 hover:bg-blue-50 cursor-pointer flex items-center gap-2"
-                          >
-                            <span className="inline-block bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded font-mono whitespace-nowrap">
-                              {r.rank || "—"}
-                            </span>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium text-gray-900 truncate">{r.name}</p>
-                              <p className="text-xs text-gray-500 truncate">{r.fullName} · {r.detail}</p>
-                            </div>
-                            <span className={`text-xs px-1.5 py-0.5 rounded-full whitespace-nowrap ${
-                              r.tipo === "Usuário" ? "bg-indigo-100 text-indigo-700" : "bg-blue-100 text-blue-700"
-                            }`}>{r.tipo}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                    <ResultadosPessoa results={commResults} onSelecionar={selecionarComunicante} />
                   </>
                 ) : (
                   <div className="flex items-center gap-3 bg-white border border-green-200 rounded-lg px-3 py-2">

@@ -3,6 +3,7 @@ import { useActionState, useState, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { registrarComunicacaoEmLote, type LoteState } from "../actions";
 import { dataLocalISO } from "@/lib/utils";
+import ResultadosPessoa from "./ResultadosPessoa";
 
 const POSTOS = [
   "CEL", "TEN CEL", "MAJ", "CAP", "1º TEN", "2º TEN", "ASP OF",
@@ -539,19 +540,7 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
                 {!commBuscando && !commErro && commQuery.length >= 2 && commResults.length === 0 && (
                   <p className="text-xs text-gray-400">Nenhum resultado. Use &quot;Preencher manualmente&quot;.</p>
                 )}
-                {commResults.length > 0 && (
-                  <ul className="border border-gray-200 rounded-lg bg-white divide-y divide-gray-100 max-h-48 overflow-y-auto">
-                    {commResults.map((r) => (
-                      <li key={r.key} onClick={() => selecionarComunicante(r)} className="px-3 py-2 hover:bg-blue-50 cursor-pointer flex items-center gap-2">
-                        <span className="bg-gray-100 text-gray-600 text-xs px-1.5 py-0.5 rounded font-mono whitespace-nowrap">{r.rank || "—"}</span>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-gray-900 truncate">{r.name}</p>
-                          <p className="text-xs text-gray-500 truncate">{r.fullName} · {r.detail}</p>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                <ResultadosPessoa results={commResults} onSelecionar={selecionarComunicante} />
               </>
             ) : (
               <div className="flex items-center gap-3 bg-white border border-green-200 rounded-lg px-3 py-2">
