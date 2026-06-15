@@ -24,6 +24,13 @@ export const COMANDANTES: UserRole[] = [
   "ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA",
 ];
 
+// Acesso à aba "Manual do Aluno" (gerir dispositivos legais)
+export const MANUAL_ROLES: UserRole[] = [
+  "ADMINISTRADOR", "CHEFE_DIVISAO_ACADEMICA",
+  "COMANDANTE_ESFO", "SUBCOMANDANTE_ESFO",
+  "COMANDANTE_ESFAP", "SUBCOMANDANTE_ESFAP",
+];
+
 // Acesso de consulta geral: veem despachos mas não agem
 export const VIEWERS_APM: UserRole[] = ["COMANDANTE_APM", "SUBCOMANDANTE_APM"];
 

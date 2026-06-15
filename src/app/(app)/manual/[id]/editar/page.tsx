@@ -1,9 +1,9 @@
 import { prisma } from "@/lib/db";
-import { verifyRole } from "@/lib/dal";
+import { verifyRole, MANUAL_ROLES } from "@/lib/dal";
 import { notFound } from "next/navigation";
 import RegraForm from "../../_components/RegraForm";
 export default async function EditarRegraPage({ params }: { params: Promise<{ id: string }> }) {
-  await verifyRole("ADMINISTRADOR");
+  await verifyRole(...MANUAL_ROLES);
   const { id } = await params;
   const regra = await prisma.manualRule.findUnique({ where: { id } });
   if (!regra) notFound();

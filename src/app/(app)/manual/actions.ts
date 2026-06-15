@@ -1,14 +1,14 @@
 "use server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { verifyRole } from "@/lib/dal";
+import { verifyRole, MANUAL_ROLES } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 
 type State = { error: string } | undefined;
 
 export async function salvarRegra(id: string | null, _prev: State, formData: FormData): Promise<State> {
-  const session = await verifyRole("ADMINISTRADOR");
+  const session = await verifyRole(...MANUAL_ROLES);
   const article = String(formData.get("article") ?? "").trim();
   const item = String(formData.get("item") ?? "").trim() || null;
   const letter = String(formData.get("letter") ?? "").trim() || null;
@@ -36,7 +36,7 @@ export async function salvarRegra(id: string | null, _prev: State, formData: For
 }
 
 export async function excluirRegra(id: string, _prev: State, _formData: FormData): Promise<State> {
-  const session = await verifyRole("ADMINISTRADOR");
+  const session = await verifyRole(...MANUAL_ROLES);
   const regra = await prisma.manualRule.findUnique({ where: { id } });
   try {
     await prisma.manualRule.delete({ where: { id } });

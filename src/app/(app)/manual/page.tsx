@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/db";
-import { verifyRole } from "@/lib/dal";
+import { verifyRole, MANUAL_ROLES } from "@/lib/dal";
 import Link from "next/link";
 import ExcluirRegraBtn from "./_components/ExcluirRegraBtn";
 
 export default async function ManualPage() {
-  await verifyRole("ADMINISTRADOR");
+  await verifyRole(...MANUAL_ROLES);
   const regras = await prisma.manualRule.findMany({ orderBy: [{ article: "asc" }, { item: "asc" }, { letter: "asc" }] });
 
   return (
