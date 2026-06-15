@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { verifyRole, canManageUserRole, USER_MANAGERS, getSchoolFilter } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
+import { logger } from "@/lib/logger";
 
 type State = { error: string } | undefined;
 
@@ -82,7 +83,7 @@ export async function salvarUsuario(id: string | null, _prev: State, formData: F
       await auditLog(session.userId, "CREATE", "User", user.id, `Criado: ${fullName}`);
     }
   } catch (e: unknown) {
-    console.error("[salvarUsuario] erro:", e);
+    logger.error("usuarios: salvar usuário", e);
     const code = (e as { code?: string })?.code;
     const msg  = e instanceof Error ? e.message : String(e);
     if (code === "P2002" || msg.toLowerCase().includes("unique")) {
@@ -141,7 +142,8 @@ export async function excluirUsuario(id: string, _prev: { error: string } | unde
   try {
     await prisma.user.delete({ where: { id } });
     await auditLog(session.userId, "DELETE", "User", id, user.fullName);
-  } catch {
+  } catch (e) {
+    logger.error("usuarios: excluir usuário", e, { id });
     return { error: "Não é possível excluir: usuário possui registros vinculados." };
   }
   redirect("/usuarios");

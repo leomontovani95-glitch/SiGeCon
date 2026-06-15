@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { verifyRole } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
+import { logger } from "@/lib/logger";
 
 type State = { error: string } | undefined;
 
@@ -20,7 +21,8 @@ export async function salvarPelotao(id: string | null, _prev: State, formData: F
       const p = await prisma.platoon.create({ data: { name, courseId, active } });
       await auditLog(session.userId, "CREATE", "Platoon", p.id, name);
     }
-  } catch {
+  } catch (e) {
+    logger.error("pelotons: salvar pelotão", e);
     return { error: "Erro ao salvar pelotão." };
   }
   redirect("/pelotons");

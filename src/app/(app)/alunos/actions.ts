@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { verifyStaff, verifyRole, VIEWERS_APM } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
+import { logger } from "@/lib/logger";
 
 type State = { error: string } | undefined;
 
@@ -57,7 +58,7 @@ export async function salvarAluno(id: string | null, _prev: State, formData: For
             where: { id: existing.userId },
             data: { fullName, warName, rank, rg, ...(functionalNumber ? { functionalNumber } : {}) },
           });
-        } catch { /* silently ignore unique constraint violations */ }
+        } catch (e) { logger.warn("alunos: atualizar conta do aluno (best-effort)", e, { studentId: id }); }
       } else if (functionalNumber) {
         try {
           const passwordHash = await bcrypt.hash(senhaInicial(functionalNumber, rg), 10);
@@ -65,7 +66,7 @@ export async function salvarAluno(id: string | null, _prev: State, formData: For
             data: { fullName, warName, rank, rg, functionalNumber, passwordHash, role: "ALUNO", escola: "TODAS", active: true, mustChangePassword: true },
           });
           await prisma.student.update({ where: { id }, data: { userId: userAluno.id } });
-        } catch { /* conta já existe — admin pode usar o botão explícito */ }
+        } catch (e) { logger.warn("alunos: criar conta do aluno (best-effort, conta pode já existir)", e, { studentId: id }); }
       }
       await auditLog(session.userId, "UPDATE", "Student", id, fullName);
     } else {

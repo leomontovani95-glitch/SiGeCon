@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { verifyRole } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
+import { logger } from "@/lib/logger";
 
 type State = { error: string } | undefined;
 
@@ -22,7 +23,8 @@ export async function salvarTipo(id: string | null, _prev: State, formData: Form
       const t = await prisma.communicationType.create({ data: { name, description, score, scoreNature, active } });
       await auditLog(session.userId, "CREATE", "CommunicationType", t.id, name);
     }
-  } catch {
+  } catch (e) {
+    logger.error("tipos: salvar tipo", e);
     return { error: "Erro ao salvar. Verifique se o nome já existe." };
   }
   redirect("/tipos");

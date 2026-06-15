@@ -7,6 +7,7 @@ import { verifyRole, verifySession, canEmitOpinion, canDecide, ESFO_CFO_RANK, cu
 import { auditLog } from "@/lib/audit";
 import { criarComProtocoloUnico } from "@/lib/protocolo";
 import { comTransacaoRetry, adicionarAoCaderno } from "@/lib/caderno";
+import { logger } from "@/lib/logger";
 import { calcularPrazoDefesa } from "@/lib/prazos";
 
 type State = { error: string } | undefined;
@@ -128,7 +129,7 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
     commId = comm.id;
     protocolNumber = comm.protocolNumber;
   } catch (e) {
-    console.error("[registrarComunicacao] erro ao criar:", e);
+    logger.error("registrarComunicacao: criar comunicação", e);
     return { error: "Erro ao registrar comunicação." };
   }
 
@@ -141,7 +142,7 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
           name: w.rank ? `${w.rank} ${w.name}` : w.name,
         })),
       });
-    } catch { /* não bloqueia o fluxo */ }
+    } catch (e) { logger.error("registrarComunicacao: salvar testemunhas (best-effort)", e, { commId }); }
   }
 
   // Salvar anexos (meios de prova) vinculados à comunicação
@@ -164,10 +165,11 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
           },
         });
       }
-    } catch { /* não bloqueia o fluxo principal */ }
+    } catch (e) { logger.error("registrarComunicacao: salvar anexos (best-effort)", e, { commId }); }
   }
 
-  try { await auditLog(session.userId, "CREATE", "Communication", commId, `Protocolo: ${protocolNumber}`); } catch {}
+  try { await auditLog(session.userId, "CREATE", "Communication", commId, `Protocolo: ${protocolNumber}`); }
+  catch (e) { logger.error("registrarComunicacao: auditLog (best-effort)", e, { commId }); }
   redirect(`/comunicacoes/${commId}`);
 }
 
@@ -240,12 +242,13 @@ export async function registrarComunicacaoEmLote(_prev: LoteState, formData: For
             communicationId: comm.id,
             name: w.rank ? `${w.rank} ${w.name}` : w.name,
           })),
-        }).catch(() => {});
+        }).catch((e) => logger.error("registrarComunicacaoEmLote: testemunhas (best-effort)", e, { commId: comm.id }));
       }
-      await auditLog(session.userId, "CREATE", "Communication", comm.id, `Lote — Protocolo: ${comm.protocolNumber}`).catch(() => {});
+      await auditLog(session.userId, "CREATE", "Communication", comm.id, `Lote — Protocolo: ${comm.protocolNumber}`)
+        .catch((e) => logger.error("registrarComunicacaoEmLote: auditLog (best-effort)", e, { commId: comm.id }));
       protocols.push(comm.protocolNumber);
     } catch (e) {
-      console.error("[registrarComunicacaoEmLote] falha ao registrar aluno", studentId, e);
+      logger.error("registrarComunicacaoEmLote: registrar aluno", e, { studentId });
       falhas.push({ label: `${aluno.warName} (Nº ${aluno.courseNumber})`, motivo: "Erro ao registrar." });
     }
   }
@@ -325,7 +328,8 @@ export async function tomarCienciaComDefesa(_prev: State, formData: FormData): P
     });
     await auditLog(session.userId, "CIENCIA_COM_DEFESA", "Communication", communicationId,
       arquivos.length > 0 ? `Com ${arquivos.length} anexo(s) — encaminhado ao Subcomandante/Oficial` : "Sem anexo — encaminhado ao Subcomandante/Oficial");
-  } catch {
+  } catch (e) {
+    logger.error("tomarCienciaComDefesa", e, { communicationId });
     return { error: "Erro ao registrar ciência/defesa. Tente novamente." };
   }
   redirect(`/comunicacoes/${communicationId}`);
@@ -356,7 +360,8 @@ export async function tomarCienciaSemDefesa(_prev: State, formData: FormData): P
     });
     await auditLog(session.userId, "CIENCIA_SEM_DEFESA", "Communication", communicationId,
       "Sem defesa — encaminhado ao Subcomandante/Oficial para parecer");
-  } catch {
+  } catch (e) {
+    logger.error("tomarCienciaSemDefesa", e, { communicationId });
     return { error: "Erro ao registrar ciência. Tente novamente." };
   }
   redirect(`/comunicacoes/${communicationId}`);
@@ -424,7 +429,8 @@ export async function tomarCienciaAdaptacao(_prev: State, formData: FormData): P
         score: 0,
       }),
     );
-  } catch {
+  } catch (e) {
+    logger.error("tomarCienciaAdaptacao", e, { communicationId });
     return { error: "Erro ao registrar ciência. Tente novamente." };
   }
   redirect(`/comunicacoes/${communicationId}`);

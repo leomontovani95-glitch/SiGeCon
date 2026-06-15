@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { verifyRole } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
+import { logger } from "@/lib/logger";
 
 type State = { error: string } | undefined;
 
@@ -28,7 +29,8 @@ export async function salvarRegra(id: string | null, _prev: State, formData: For
       const r = await prisma.manualRule.create({ data });
       await auditLog(session.userId, "CREATE", "ManualRule", r.id, description);
     }
-  } catch {
+  } catch (e) {
+    logger.error("manual: salvar dispositivo", e);
     return { error: "Erro ao salvar dispositivo." };
   }
   redirect("/manual");
