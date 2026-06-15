@@ -20,6 +20,11 @@ describe("calcularPrazoDefesa (2 dias úteis)", () => {
     // 2026-06-12 sexta → seg (1) → ter (2) = 16
     expect(ymd(calcularPrazoDefesa(d(2026, 6, 12)))).toEqual([2026, 6, 16]);
   });
+
+  it("pula feriado: segunda → quinta quando terça é Tiradentes (21/04)", () => {
+    // 2026-04-20 segunda → ter 21/04 (feriado, pula) → qua (1) → qui (2) = 23
+    expect(ymd(calcularPrazoDefesa(d(2026, 4, 20)))).toEqual([2026, 4, 23]);
+  });
 });
 
 describe("prazoExpirado", () => {

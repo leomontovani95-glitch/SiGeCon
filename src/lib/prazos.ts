@@ -1,4 +1,5 @@
 import { addDays } from "date-fns";
+import { ehFeriado } from "./feriados";
 
 export function calcularPrazoDefesa(dataBase: Date): Date {
   let dias = 0;
@@ -6,7 +7,8 @@ export function calcularPrazoDefesa(dataBase: Date): Date {
   while (dias < 2) {
     atual = addDays(atual, 1);
     const diaSemana = atual.getDay();
-    if (diaSemana !== 0 && diaSemana !== 6) {
+    // Dia útil = não é fim de semana nem feriado.
+    if (diaSemana !== 0 && diaSemana !== 6 && !ehFeriado(atual)) {
       dias++;
     }
   }
