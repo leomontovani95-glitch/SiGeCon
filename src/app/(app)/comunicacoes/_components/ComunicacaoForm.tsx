@@ -74,20 +74,29 @@ function TestemunhaRow({ idx, onRemove }: { idx: number; onRemove: () => void })
   const [rank, setRank] = useState("");
   const [name, setName] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [buscaErro, setBuscaErro] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
 
   async function buscar(q: string) {
-    if (q.length < 2) { setResults([]); return; }
-    setBuscando(true);
+    if (q.length < 2) { setResults([]); setBuscaErro(""); return; }
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+    setBuscando(true); setBuscaErro("");
     try {
-      const res = await fetch(`/api/comunicante/buscar?q=${encodeURIComponent(q)}`);
+      const res = await fetch(`/api/comunicante/buscar?q=${encodeURIComponent(q)}`, { signal: ac.signal });
       const data = await res.json();
       setResults(data.results ?? []);
-    } catch { setResults([]); }
-    finally { setBuscando(false); }
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return; // resposta obsoleta, ignora
+      setResults([]); setBuscaErro("Erro ao buscar. Tente novamente.");
+    } finally {
+      if (abortRef.current === ac) setBuscando(false);
+    }
   }
 
   function handleQueryChange(val: string) {
-    setQuery(val); setSelected(null); setResults([]);
+    setQuery(val); setSelected(null); setResults([]); setBuscaErro("");
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => buscar(val), 400);
   }
@@ -139,7 +148,8 @@ function TestemunhaRow({ idx, onRemove }: { idx: number; onRemove: () => void })
                 autoComplete="off"
               />
               {buscando && <p className="text-xs text-blue-600">Buscando...</p>}
-              {!buscando && query.length >= 2 && results.length === 0 && (
+              {buscaErro && <p className="text-xs text-red-600">{buscaErro}</p>}
+              {!buscando && !buscaErro && query.length >= 2 && results.length === 0 && (
                 <p className="text-xs text-gray-400">Nenhum resultado. Use &quot;Preencher manualmente&quot;.</p>
               )}
               {results.length > 0 && (
@@ -222,6 +232,7 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
   const [buscando, setBuscando] = useState(false);
   const [erroAluno, setErroAluno] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const alunoAbortRef = useRef<AbortController | null>(null);
 
   // Comunicante
   const commDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -229,6 +240,8 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
   const [commQuery, setCommQuery] = useState("");
   const [commResults, setCommResults] = useState<CommResult[]>([]);
   const [commBuscando, setCommBuscando] = useState(false);
+  const [commErro, setCommErro] = useState("");
+  const commAbortRef = useRef<AbortController | null>(null);
   const [commSelecionado, setCommSelecionado] = useState<CommResult | null>(null);
   const [commRank, setCommRank] = useState(comunicanteFixo?.rank ?? "");
   const [commName, setCommName] = useState(comunicanteFixo?.name ?? "");
@@ -315,16 +328,23 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
   // ── busca de aluno ───────────────────────────────────────────────────
   const buscarAluno = useCallback(async (num: string) => {
     if (!num.trim()) { setAluno(null); setErroAluno(""); return; }
+    alunoAbortRef.current?.abort();
+    const ac = new AbortController();
+    alunoAbortRef.current = ac;
     setBuscando(true); setErroAluno("");
     try {
       const params = new URLSearchParams({ q: num.trim() });
       if (cursoSelecionadoId) params.set("courseId", cursoSelecionadoId);
-      const res = await fetch(`/api/alunos/por-numero?${params}`);
+      const res = await fetch(`/api/alunos/por-numero?${params}`, { signal: ac.signal });
       const data = await res.json();
       if (data.aluno) { setAluno(data.aluno); setErroAluno(""); }
       else { setAluno(null); setErroAluno("Nenhum aluno encontrado com este número ou nome de guerra."); }
-    } catch { setErroAluno("Erro ao buscar aluno."); }
-    finally { setBuscando(false); }
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return;
+      setErroAluno("Erro ao buscar aluno.");
+    } finally {
+      if (alunoAbortRef.current === ac) setBuscando(false);
+    }
   }, [cursoSelecionadoId]);
 
   function handleNumChange(val: string) {
@@ -334,19 +354,27 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
   }
 
   async function buscarComunicante(q: string) {
-    if (q.length < 2) { setCommResults([]); return; }
-    setCommBuscando(true);
+    if (q.length < 2) { setCommResults([]); setCommErro(""); return; }
+    commAbortRef.current?.abort();
+    const ac = new AbortController();
+    commAbortRef.current = ac;
+    setCommBuscando(true); setCommErro("");
     try {
-      const res = await fetch(`/api/comunicante/buscar?q=${encodeURIComponent(q)}`);
+      const res = await fetch(`/api/comunicante/buscar?q=${encodeURIComponent(q)}`, { signal: ac.signal });
       const data = await res.json();
       setCommResults(data.results ?? []);
-    } catch { setCommResults([]); }
-    finally { setCommBuscando(false); }
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return;
+      setCommResults([]); setCommErro("Erro ao buscar. Tente novamente.");
+    } finally {
+      if (commAbortRef.current === ac) setCommBuscando(false);
+    }
   }
   function handleCommQueryChange(val: string) {
     setCommQuery(val);
     setCommSelecionado(null);
     setCommResults([]);
+    setCommErro("");
     if (commDebounceRef.current) clearTimeout(commDebounceRef.current);
     commDebounceRef.current = setTimeout(() => buscarComunicante(val), 400);
   }
@@ -766,7 +794,8 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
                       autoComplete="off"
                     />
                     {commBuscando && <p className="text-xs text-blue-600">Buscando...</p>}
-                    {!commBuscando && commQuery.length >= 2 && commResults.length === 0 && (
+                    {commErro && <p className="text-xs text-red-600">{commErro}</p>}
+                    {!commBuscando && !commErro && commQuery.length >= 2 && commResults.length === 0 && (
                       <p className="text-xs text-gray-400">Nenhum resultado encontrado. Use &quot;Preencher manualmente&quot;.</p>
                     )}
                     {commResults.length > 0 && (
