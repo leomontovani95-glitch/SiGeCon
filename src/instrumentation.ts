@@ -2,6 +2,10 @@ export async function register() {
   // Roda apenas no runtime Node.js (não no Edge runtime)
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
+  // Falha cedo e claro se faltar variável obrigatória (SESSION_SECRET/DATABASE_URL).
+  const { validarEnv } = await import("./lib/env");
+  validarEnv();
+
   // Fixa o fuso em horário de Brasília (ES = UTC-3, sem horário de verão) para
   // o comportamento de datas/prazos ser determinístico onde quer que o app rode.
   // Em produção, idealmente também definir TZ=America/Sao_Paulo no ambiente.
