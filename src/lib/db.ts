@@ -2,16 +2,20 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaLibSql } from "@prisma/adapter-libsql";
 import path from "path";
 
+// Caminho absoluto do arquivo SQLite, derivado do DATABASE_URL. null se o banco
+// não for um arquivo local (ex.: URL remota). Fonte única usada pelo cliente
+// Prisma e pelo backup, evitando caminho fixo divergente.
+export function dbFilePath(): string | null {
+  const rawUrl = process.env.DATABASE_URL ?? "";
+  if (!rawUrl.startsWith("file:")) return null;
+  const filePath = rawUrl.replace("file:", "").replace("./", "");
+  return path.resolve(process.cwd(), filePath);
+}
+
 function createPrismaClient() {
   const rawUrl = process.env.DATABASE_URL ?? "";
-  let url: string;
-  if (rawUrl.startsWith("file:")) {
-    const filePath = rawUrl.replace("file:", "").replace("./", "");
-    const abs = path.resolve(process.cwd(), filePath).replace(/\\/g, "/");
-    url = `file:///${abs}`;
-  } else {
-    url = rawUrl;
-  }
+  const file = dbFilePath();
+  const url = file ? `file:///${file.replace(/\\/g, "/")}` : rawUrl;
   const adapter = new PrismaLibSql({ url });
   return new PrismaClient({ adapter });
 }
