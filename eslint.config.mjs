@@ -12,7 +12,20 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Scripts utilitários/diagnóstico e cliente Prisma gerado — não são código de app.
+    "scripts/**",
+    "src/generated/**",
   ]),
+  {
+    rules: {
+      // Args/vars intencionalmente não usados podem ser prefixados com "_"
+      // (ex.: `_prev`, `_fd` na assinatura das server actions).
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

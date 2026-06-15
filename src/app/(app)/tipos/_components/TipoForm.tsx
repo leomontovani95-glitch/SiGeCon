@@ -1,5 +1,6 @@
 "use client";
 import { useActionState } from "react";
+import Link from "next/link";
 import { salvarTipo } from "../actions";
 type Props = { defaultValues?: Record<string, string>; id?: string };
 export default function TipoForm({ defaultValues, id }: Props) {
@@ -26,7 +27,7 @@ export default function TipoForm({ defaultValues, id }: Props) {
       {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
       <div className="flex gap-3 pt-2">
         <button type="submit" disabled={pending} className="btn-primary">{pending ? "Salvando..." : "Salvar"}</button>
-        <a href="/tipos" className="btn-secondary">Cancelar</a>
+        <Link href="/tipos" className="btn-secondary">Cancelar</Link>
       </div>
     </form>
   );

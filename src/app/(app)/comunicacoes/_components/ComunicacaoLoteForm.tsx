@@ -1,5 +1,6 @@
 "use client";
 import { useActionState, useState, useRef, useCallback, useMemo } from "react";
+import Link from "next/link";
 import { registrarComunicacaoEmLote, type LoteState } from "../actions";
 import { dataLocalISO } from "@/lib/utils";
 
@@ -93,7 +94,6 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
   // Testemunhas
   const [testemunhas, setTestemunhas] = useState<{ rank: string; name: string }[]>([]);
 
-  const tipoByName = useMemo(() => Object.fromEntries(tipos.map((t) => [t.name, t.id])), [tipos]);
   const tiposCPI   = useMemo(() => tipos.filter((t) => t.name.startsWith("CPI")), [tipos]);
   const tipoRef    = useMemo(() => tipos.find((t) => t.name === "Referência Elogiosa") ?? null, [tipos]);
   const listaArtigos = useMemo(() => artigos(regras), [regras]);
@@ -224,7 +224,7 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
           </div>
         )}
         <div className="flex gap-3">
-          <a href="/comunicacoes" className="btn-primary text-sm">Ver comunicações</a>
+          <Link href="/comunicacoes" className="btn-primary text-sm">Ver comunicações</Link>
           <button type="button" onClick={() => window.location.reload()} className="btn-secondary text-sm">
             Novo registro em lote
           </button>
@@ -603,7 +603,7 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
               : `Registrar para ${alunos.length} aluno${alunos.length !== 1 ? "s" : ""}`
           }
         </button>
-        <a href="/comunicacoes" className="btn-secondary">Cancelar</a>
+        <Link href="/comunicacoes" className="btn-secondary">Cancelar</Link>
       </div>
       {!canSubmit && (
         <p className="text-xs text-gray-400">

@@ -1,5 +1,6 @@
 "use client";
 import { useActionState } from "react";
+import Link from "next/link";
 import { salvarRegra } from "../actions";
 
 const TIPOS = ["CPI 0", "CPI 1", "CPI 2", "CPI 3", "Referência Elogiosa", "Elogio publicado em BI", "Arquivamento"];
@@ -56,7 +57,7 @@ export default function RegraForm({ defaultValues, id }: Props) {
       {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
       <div className="flex gap-3 pt-2">
         <button type="submit" disabled={pending} className="btn-primary">{pending ? "Salvando..." : "Salvar"}</button>
-        <a href="/manual" className="btn-secondary">Cancelar</a>
+        <Link href="/manual" className="btn-secondary">Cancelar</Link>
       </div>
     </form>
   );

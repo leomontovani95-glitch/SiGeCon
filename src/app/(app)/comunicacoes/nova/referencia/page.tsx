@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { verifySession, verifyStaff, ESFO_CFO_RANK, cursosPermitidosParaCPI } from "@/lib/dal";
 import ComunicacaoForm from "../../_components/ComunicacaoForm";
@@ -55,9 +56,9 @@ export default async function NovaReferenciaPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Nova Referência Elogiosa</h1>
         {!isAluno && (
-          <a href="/comunicacoes/nova/lote" className="text-sm text-[#1e3a5f] hover:underline font-medium">
+          <Link href="/comunicacoes/nova/lote" className="text-sm text-[#1e3a5f] hover:underline font-medium">
             Registrar para múltiplos alunos →
-          </a>
+          </Link>
         )}
       </div>
       <ComunicacaoForm tipos={tipos} regras={regras} cursos={cursos} comunicanteFixo={comunicanteFixo} />

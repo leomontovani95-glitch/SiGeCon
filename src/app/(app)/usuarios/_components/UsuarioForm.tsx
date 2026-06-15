@@ -1,5 +1,6 @@
 "use client";
 import { useActionState, useState } from "react";
+import Link from "next/link";
 import { salvarUsuario } from "../actions";
 
 // Posto padrão sugerido por função (pode ser alterado manualmente)
@@ -161,7 +162,7 @@ export default function UsuarioForm({ defaultValues, additionalRolesDefault = []
         <button type="submit" disabled={pending} className="btn-primary">
           {pending ? "Salvando..." : "Salvar"}
         </button>
-        <a href="/usuarios" className="btn-secondary">Cancelar</a>
+        <Link href="/usuarios" className="btn-secondary">Cancelar</Link>
       </div>
     </form>
     </>

@@ -1,5 +1,6 @@
 "use client";
 import { useActionState, useState, useRef, useCallback } from "react";
+import Link from "next/link";
 import { registrarTransgressao } from "../actions";
 
 type Curso = { id: string; name: string };
@@ -311,7 +312,7 @@ export default function TransgressaoForm({ cursos }: { cursos: Curso[] }) {
         >
           {pending ? "Registrando..." : "Registrar"}
         </button>
-        <a href="/comunicacoes" className="btn-secondary">Cancelar</a>
+        <Link href="/comunicacoes" className="btn-secondary">Cancelar</Link>
       </div>
 
       {!formOk && (

@@ -1,5 +1,6 @@
 "use client";
 import { useActionState, useState, useRef, useCallback, useMemo } from "react";
+import Link from "next/link";
 
 const POSTOS = [
   "CEL", "TEN CEL", "MAJ", "CAP", "1º TEN", "2º TEN", "ASP OF",
@@ -292,11 +293,6 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
     setArquivos(Array.from(dt.files));
   }
 
-  // Lookup: nome do tipo → id
-  const tipoByName = useMemo(
-    () => Object.fromEntries(tipos.map((t) => [t.name, t.id])),
-    [tipos]
-  );
 
   const listaArtigos  = useMemo(() => artigos(regras), [regras]);
   const listaIncisos  = useMemo(() => incisos(regras, artigo), [regras, artigo]);
@@ -889,7 +885,7 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
         >
           {pending ? "Registrando..." : "Registrar Comunicação"}
         </button>
-        <a href="/comunicacoes" className="btn-secondary">Cancelar</a>
+        <Link href="/comunicacoes" className="btn-secondary">Cancelar</Link>
       </div>
       {(!cursoOk || !aluno || !dispositivoCompleto || !commOk) && (
         <p className="text-xs text-gray-400">

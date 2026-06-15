@@ -44,8 +44,12 @@ export default function NotificacoesAluno({ notificacoes }: { notificacoes: Noti
   const [montado, setMontado] = useState(false);
 
   useEffect(() => {
+    // Lê o localStorage só após montar para evitar mismatch de hidratação
+    // (SSR não tem o estado de dispensadas). setState aqui é intencional.
+    /* eslint-disable react-hooks/set-state-in-effect */
     setDispensadas(getDismissed());
     setMontado(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
   const visiveis = notificacoes.filter((n) => !dispensadas.has(n.id));

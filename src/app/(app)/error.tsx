@@ -1,5 +1,6 @@
 "use client";
 import { useEffect } from "react";
+import Link from "next/link";
 import { logger } from "@/lib/logger";
 
 // Error boundary da área autenticada: substitui a tela de erro genérica do Next
@@ -27,9 +28,9 @@ export default function Error({
           <button onClick={() => reset()} className="btn-primary text-sm">
             Tentar novamente
           </button>
-          <a href="/dashboard" className="btn-secondary text-sm">
+          <Link href="/dashboard" className="btn-secondary text-sm">
             Ir ao Painel
-          </a>
+          </Link>
         </div>
       </div>
     </div>

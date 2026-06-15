@@ -1,5 +1,6 @@
 "use client";
 import { useActionState, useState } from "react";
+import Link from "next/link";
 import { salvarAluno } from "../actions";
 
 type PlatoonOption = { id: string; name: string };
@@ -121,7 +122,7 @@ export default function AlunoForm({ defaultValues, id, courses }: Props) {
         <button type="submit" disabled={pending} className="btn-primary">
           {pending ? "Salvando..." : "Salvar"}
         </button>
-        <a href="/alunos" className="btn-secondary">Cancelar</a>
+        <Link href="/alunos" className="btn-secondary">Cancelar</Link>
       </div>
     </form>
   );

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { verifySession, canEmitOpinion, canDecide, getSchoolFilter } from "@/lib/dal";
+import { verifySession, canEmitOpinion, getSchoolFilter } from "@/lib/dal";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";

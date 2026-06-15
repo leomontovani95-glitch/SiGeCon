@@ -6,7 +6,7 @@ import { ptBR } from "date-fns/locale";
 import PrintLayout from "@/components/PrintLayout";
 
 export default async function ImprimirParecerPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await verifySession();
+  await verifySession();
   const { id } = await params;
 
   const comm = await prisma.communication.findUnique({

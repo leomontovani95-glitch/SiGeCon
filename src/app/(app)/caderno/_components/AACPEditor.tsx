@@ -172,7 +172,7 @@ function EditableList({
           </div>
         ))}
         {items.length === 0 && (
-          <p className="text-xs text-gray-400 italic">Nenhum item. Clique em "+ Adicionar".</p>
+          <p className="text-xs text-gray-400 italic">Nenhum item. Clique em &quot;+ Adicionar&quot;.</p>
         )}
       </div>
     </div>
@@ -358,7 +358,7 @@ export default function AACPEditor({ aacp }: { aacp: AACPProps }) {
             />
           ))}
           {sabGroups.length === 0 && (
-            <p className="text-xs text-gray-400 italic">Nenhum grupo. Clique em "+ Adicionar grupo".</p>
+            <p className="text-xs text-gray-400 italic">Nenhum grupo. Clique em &quot;+ Adicionar grupo&quot;.</p>
           )}
         </div>
       </div>
@@ -382,7 +382,7 @@ export default function AACPEditor({ aacp }: { aacp: AACPProps }) {
             />
           ))}
           {domGroups.length === 0 && (
-            <p className="text-xs text-gray-400 italic">Nenhum grupo. Clique em "+ Adicionar grupo".</p>
+            <p className="text-xs text-gray-400 italic">Nenhum grupo. Clique em &quot;+ Adicionar grupo&quot;.</p>
           )}
         </div>
       </div>

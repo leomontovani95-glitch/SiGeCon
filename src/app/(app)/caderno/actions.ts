@@ -30,7 +30,6 @@ export async function criarCaderno() {
   }
 
   let primeiroCaderno: { id: string } | null = null;
-  let totalItens = 0;
 
   for (const [courseKey, comms] of porCurso) {
     const courseId = courseKey === "__sem_curso__" ? null : courseKey;
@@ -71,7 +70,6 @@ export async function criarCaderno() {
           score: comm.finalScore,
         },
       });
-      totalItens++;
     }
     await auditLog(session.userId, "CREATE_OR_UPDATE", "DisciplinaryBook", caderno.id, `${comms.length} registro(s)`);
   }

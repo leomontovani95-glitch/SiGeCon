@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/db";
-import { verifyRole, verifySession, canEmitOpinion, canDecide, ESFO_CFO_RANK, cursosPermitidosParaCPI, escolaNoEscopo } from "@/lib/dal";
+import { verifySession, canEmitOpinion, canDecide, ESFO_CFO_RANK, cursosPermitidosParaCPI, escolaNoEscopo } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
 import { criarComProtocoloUnico } from "@/lib/protocolo";
 import { comTransacaoRetry, adicionarAoCaderno } from "@/lib/caderno";

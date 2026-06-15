@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import Link from "next/link";
 import { verifySession } from "@/lib/dal";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
@@ -95,7 +96,7 @@ export default async function AuditoriaPage({
         </div>
         <div className="flex gap-2 mt-3">
           <button type="submit" className="btn-primary text-sm px-4">Filtrar</button>
-          <a href="/auditoria" className="btn-secondary text-sm px-4">Limpar</a>
+          <Link href="/auditoria" className="btn-secondary text-sm px-4">Limpar</Link>
         </div>
       </form>
 

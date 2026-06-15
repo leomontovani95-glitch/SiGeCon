@@ -1,5 +1,6 @@
 "use client";
 import { useActionState, useState, useRef, useCallback } from "react";
+import Link from "next/link";
 import { registrarElogioBi } from "../actions";
 
 type Curso = { id: string; name: string };
@@ -153,7 +154,7 @@ export default function ElogioBiForm({ cursos, regras }: { cursos: Curso[]; regr
           ) : (
             <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
               Nenhum dispositivo legal cadastrado para &quot;Elogio publicado em BI&quot;. Cadastre em{" "}
-              <a href="/manual" className="underline">Manual do Aluno</a>.
+              <Link href="/manual" className="underline">Manual do Aluno</Link>.
             </p>
           )}
         </div>
@@ -207,7 +208,7 @@ export default function ElogioBiForm({ cursos, regras }: { cursos: Curso[]; regr
         >
           {pending ? "Registrando..." : "Registrar"}
         </button>
-        <a href="/comunicacoes" className="btn-secondary">Cancelar</a>
+        <Link href="/comunicacoes" className="btn-secondary">Cancelar</Link>
       </div>
 
       {!formOk && (

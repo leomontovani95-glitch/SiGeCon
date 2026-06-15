@@ -171,8 +171,8 @@ export default async function RankingComunicantesPage({
     return <span className="text-blue-300 text-xs ml-1">{sortDir === "desc" ? "↓" : "↑"}</span>;
   }
 
-  // ── Header cell component (rendered inline) ───────────────────────────────
-  function Th({ col, label, center }: { col: string; label: string; center?: boolean }) {
+  // ── Célula de cabeçalho (helper de render, não um componente) ─────────────
+  function thCell({ col, label, center }: { col: string; label: string; center?: boolean }) {
     const active = sortBy === col;
     return (
       <th className={`px-3 py-3 text-xs font-semibold whitespace-nowrap ${center ? "text-center" : "text-left"}`}>
@@ -242,19 +242,19 @@ export default async function RankingComunicantesPage({
             <thead className="bg-[#1e3a5f] border-b border-[#16304f]">
               <tr>
                 <th className="px-3 py-3 text-left text-xs font-semibold text-gray-400 w-10">#</th>
-                <Th col="posto"    label="Posto/Grad" />
-                <Th col="nome"     label="Nome de guerra" />
-                <Th col="rg"       label="RG" />
-                <Th col="nf"       label="NF" />
-                <Th col="curso"    label="Curso" />
-                <Th col="pelotao"  label="Pel." />
-                <Th col="numcurso" label="Nº Curso" center />
-                <Th col="total"    label="Total"    center />
-                <Th col="cpi0"     label="CPI 0"    center />
-                <Th col="cpi1"     label="CPI 1"    center />
-                <Th col="cpi2"     label="CPI 2"    center />
-                <Th col="cpi3"     label="CPI 3"    center />
-                <Th col="ref"      label="Ref. Elogiosa" center />
+                {thCell({ col: "posto",    label: "Posto/Grad" })}
+                {thCell({ col: "nome",     label: "Nome de guerra" })}
+                {thCell({ col: "rg",       label: "RG" })}
+                {thCell({ col: "nf",       label: "NF" })}
+                {thCell({ col: "curso",    label: "Curso" })}
+                {thCell({ col: "pelotao",  label: "Pel." })}
+                {thCell({ col: "numcurso", label: "Nº Curso", center: true })}
+                {thCell({ col: "total",    label: "Total",    center: true })}
+                {thCell({ col: "cpi0",     label: "CPI 0",    center: true })}
+                {thCell({ col: "cpi1",     label: "CPI 1",    center: true })}
+                {thCell({ col: "cpi2",     label: "CPI 2",    center: true })}
+                {thCell({ col: "cpi3",     label: "CPI 3",    center: true })}
+                {thCell({ col: "ref",      label: "Ref. Elogiosa", center: true })}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">

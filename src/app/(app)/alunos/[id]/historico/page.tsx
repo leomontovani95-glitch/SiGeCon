@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import PrintLayout from "@/components/PrintLayout";
-import { calcularNotaPublicada, faixaNota } from "@/lib/score";
+import { calcularNotaPublicada } from "@/lib/score";
 
 export default async function HistoricoAlunoPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await verifySession();
@@ -37,7 +37,6 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
 
   const pubItems = pubItemsRaw;
   const nota  = calcularNotaPublicada(pubItems);
-  const faixa = faixaNota(nota);
 
   const desfavoravel = pubItems.filter((i) => i.communication.type.scoreNature === "DESFAVORAVEL").reduce((s, i) => s + Math.abs(i.score ?? 0), 0);
   const favoravel    = pubItems.filter((i) => i.communication.type.scoreNature === "FAVORAVEL").reduce((s, i) => s + Math.abs(i.score ?? 0), 0);
