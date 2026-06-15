@@ -34,8 +34,23 @@ export type ArtigoEntry      = { dispositivo: string; count: number };
 export type AlunoEntry       = { studentId: string; warName: string; courseName: string; platoonName: string; total: number };
 
 const PRIMARY     = "#1e3a5f";
-const CPI_COLORS  = ["#22c55e", "#eab308", "#f97316", "#ef4444"];
-const PIE_COLORS  = ["#1e3a5f", "#2a6496", "#3b82c4", "#60a5fa", "#93c5fd", "#bfdbfe", "#6b7280", "#374151"];
+// Escala de gravidade crescente: rosa claro (CPI 0) → vermelho escuro (CPI 3).
+const CPI_COLORS  = ["#fecdd3", "#fb7185", "#ef4444", "#b91c1c"];
+const REF_COLOR   = "#22c55e"; // verde — Referência Elogiosa
+const REF_BI_COLOR = "#15803d"; // verde escuro — Elogio publicado em BI
+const NEUTRO      = "#9ca3af"; // cinza — demais tipos (ex.: Arquivamento)
+
+// Cor de cada fatia do gráfico de pizza conforme o tipo de comunicação,
+// seguindo o mesmo padrão das CPIs (0→3) e das referências favoráveis.
+function corPorTipo(nome: string): string {
+  const lower = nome.toLowerCase();
+  const cpi = lower.match(/cpi\s*(\d)/);
+  if (cpi) return CPI_COLORS[Math.min(3, parseInt(cpi[1], 10))];
+  if (lower.includes("elogi") || lower.includes("refer")) {
+    return lower.includes("bi") || lower.includes("boletim") ? REF_BI_COLOR : REF_COLOR;
+  }
+  return NEUTRO;
+}
 
 function Panel({
   title,
@@ -125,7 +140,7 @@ function PelotaoTooltip({
         <span>Total CPIs</span>
         <span className="font-medium tabular-nums">{totalCpi}</span>
       </div>
-      {linha("#22c55e", "Ref. Elogiosa", p.refElogiosa)}
+      {linha(REF_COLOR, "Ref. Elogiosa", p.refElogiosa)}
     </div>
   );
 }
@@ -171,7 +186,7 @@ export default function AnaliseCharts({
 
   const totalFiltrado = pelotaoFiltrado.reduce((s, p) => s + p.valor, 0);
   const corBarra =
-    categoria === "REF" ? "#22c55e"
+    categoria === "REF" ? REF_COLOR
     : grauCpi === "todas" ? PRIMARY
     : CPI_COLORS[Number(grauCpi)];
   const rotuloBarra =
@@ -340,8 +355,8 @@ export default function AnaliseCharts({
                 }
                 labelLine
               >
-                {tipoData.map((_, i) => (
-                  <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                {tipoData.map((t, i) => (
+                  <Cell key={i} fill={corPorTipo(t.name)} />
                 ))}
               </Pie>
               <Tooltip formatter={(v) => [v, "Comunicações"]} />
