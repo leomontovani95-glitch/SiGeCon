@@ -1,6 +1,8 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
+import { abreviarPelotao, platoonOrder } from "@/lib/utils";
 import {
   BarChart,
   Bar,
@@ -15,6 +17,7 @@ import {
   PieChart,
   Pie,
   Cell,
+  LabelList,
 } from "recharts";
 
 export type DiaSemanaEntry   = { dia: string; total: number };
@@ -25,7 +28,7 @@ export type EvolucaoEntry    = {
   "CPI (ano ant.)"?: number;
   "Ref. Elogiosa (ano ant.)"?: number;
 };
-export type PelotaoEntry     = { pelotao: string; cpi0: number; cpi1: number; cpi2: number; cpi3: number; total: number };
+export type PelotaoEntry     = { pelotao: string; cpi0: number; cpi1: number; cpi2: number; cpi3: number; refElogiosa: number; total: number };
 export type TipoEntry        = { name: string; value: number };
 export type ArtigoEntry      = { dispositivo: string; count: number };
 export type AlunoEntry       = { studentId: string; warName: string; courseName: string; platoonName: string; total: number };
@@ -65,6 +68,68 @@ function Vazio() {
   );
 }
 
+// Botão-caixa selecionável usado no filtro do comparativo entre pelotões.
+function Chip({
+  ativo,
+  onClick,
+  children,
+}: {
+  ativo: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
+        ativo
+          ? "bg-[#1e3a5f] text-white border-[#1e3a5f]"
+          : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+// Caixa de detalhamento exibida ao passar o mouse sobre a barra de um pelotão:
+// sempre mostra a quantidade de cada tipo de comunicação, independente do filtro.
+function PelotaoTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: PelotaoEntry }>;
+}) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0].payload;
+  const totalCpi = p.cpi0 + p.cpi1 + p.cpi2 + p.cpi3;
+  const linha = (cor: string, rotulo: string, n: number) => (
+    <div className="flex items-center justify-between gap-4">
+      <span className="flex items-center gap-1.5">
+        <span className="inline-block w-2 h-2 rounded-sm" style={{ background: cor }} />
+        {rotulo}
+      </span>
+      <span className="font-medium tabular-nums">{n}</span>
+    </div>
+  );
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-3 py-2 text-xs text-gray-700 space-y-1">
+      <p className="font-semibold text-gray-900 mb-1">{p.pelotao}</p>
+      {linha(CPI_COLORS[0], "CPI 0", p.cpi0)}
+      {linha(CPI_COLORS[1], "CPI 1", p.cpi1)}
+      {linha(CPI_COLORS[2], "CPI 2", p.cpi2)}
+      {linha(CPI_COLORS[3], "CPI 3", p.cpi3)}
+      <div className="flex items-center justify-between gap-4 border-t border-gray-100 pt-1">
+        <span>Total CPIs</span>
+        <span className="font-medium tabular-nums">{totalCpi}</span>
+      </div>
+      {linha("#22c55e", "Ref. Elogiosa", p.refElogiosa)}
+    </div>
+  );
+}
+
 export default function AnaliseCharts({
   total,
   diaSemanaData,
@@ -82,8 +147,37 @@ export default function AnaliseCharts({
   topArtigos: ArtigoEntry[];
   topAlunos: AlunoEntry[];
 }) {
-  const totalCPIs = pelotaoData.reduce((s, p) => s + p.total, 0);
   const hasComparison = evolucaoMensalData.some((d) => d["CPI (ano ant.)"] !== undefined);
+
+  // ── Filtro do comparativo entre pelotões ────────────────────────────────────
+  const [categoria, setCategoria] = useState<"CPI" | "REF">("CPI");
+  const [grauCpi, setGrauCpi]     = useState<"todas" | "0" | "1" | "2" | "3">("todas");
+
+  const pelotaoFiltrado = useMemo(() => {
+    const valorDe = (p: PelotaoEntry) => {
+      if (categoria === "REF") return p.refElogiosa;
+      switch (grauCpi) {
+        case "0": return p.cpi0;
+        case "1": return p.cpi1;
+        case "2": return p.cpi2;
+        case "3": return p.cpi3;
+        default:  return p.cpi0 + p.cpi1 + p.cpi2 + p.cpi3;
+      }
+    };
+    return pelotaoData
+      .map((p) => ({ ...p, valor: valorDe(p) }))
+      .sort((a, b) => platoonOrder(a.pelotao) - platoonOrder(b.pelotao));
+  }, [pelotaoData, categoria, grauCpi]);
+
+  const totalFiltrado = pelotaoFiltrado.reduce((s, p) => s + p.valor, 0);
+  const corBarra =
+    categoria === "REF" ? "#22c55e"
+    : grauCpi === "todas" ? PRIMARY
+    : CPI_COLORS[Number(grauCpi)];
+  const rotuloBarra =
+    categoria === "REF" ? "Ref. Elogiosa"
+    : grauCpi === "todas" ? "CPIs (todas)"
+    : `CPI ${grauCpi}`;
 
   return (
     <div className="space-y-6">
@@ -159,67 +253,104 @@ export default function AnaliseCharts({
           )}
         </Panel>
 
-        {/* 3 — Comparativo entre pelotões */}
-        <Panel
-          title="Comparativo entre Pelotões"
-          subtitle="CPIs por pelotão agrupadas por grau de gravidade (0 a 3)"
-          total={totalCPIs}
-        >
-          {pelotaoData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={pelotaoData} margin={{ top: 4, right: 12, left: -16, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="pelotao" tick={{ fontSize: 11 }} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="cpi0" name="CPI 0" fill={CPI_COLORS[0]} radius={[2, 2, 0, 0]} />
-                <Bar dataKey="cpi1" name="CPI 1" fill={CPI_COLORS[1]} radius={[2, 2, 0, 0]} />
-                <Bar dataKey="cpi2" name="CPI 2" fill={CPI_COLORS[2]} radius={[2, 2, 0, 0]} />
-                <Bar dataKey="cpi3" name="CPI 3" fill={CPI_COLORS[3]} radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-[260px] flex items-center justify-center text-gray-400 text-sm">
-              Nenhuma CPI registrada no período selecionado
+      </div>
+
+      {/* 3 — Comparativo entre pelotões (largura total: até 28 pelotões) */}
+      <Panel
+        title="Comparativo entre Pelotões"
+        subtitle={`Uma barra por pelotão — exibindo ${rotuloBarra}. Passe o mouse para ver o detalhamento por tipo.`}
+        total={totalFiltrado}
+      >
+        {/* Filtro: tipo de registro e, para CPI, o grau */}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mb-4">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-gray-500">Registro:</span>
+            <Chip ativo={categoria === "CPI"} onClick={() => setCategoria("CPI")}>CPI</Chip>
+            <Chip ativo={categoria === "REF"} onClick={() => setCategoria("REF")}>Ref. Elogiosa</Chip>
+          </div>
+          {categoria === "CPI" && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-gray-500">Grau:</span>
+              <Chip ativo={grauCpi === "todas"} onClick={() => setGrauCpi("todas")}>Todas</Chip>
+              <Chip ativo={grauCpi === "0"} onClick={() => setGrauCpi("0")}>CPI 0</Chip>
+              <Chip ativo={grauCpi === "1"} onClick={() => setGrauCpi("1")}>CPI 1</Chip>
+              <Chip ativo={grauCpi === "2"} onClick={() => setGrauCpi("2")}>CPI 2</Chip>
+              <Chip ativo={grauCpi === "3"} onClick={() => setGrauCpi("3")}>CPI 3</Chip>
             </div>
           )}
-        </Panel>
+        </div>
 
-        {/* 4 — Distribuição por tipo */}
-        <Panel
-          title="Distribuição por Tipo"
-          subtitle="Percentual de cada tipo de comunicação no período"
-          total={total}
-        >
-          {tipoData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie
-                  data={tipoData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={95}
-                  label={({ name, percent }: { name?: string; percent?: number }) =>
-                    `${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%`
-                  }
-                  labelLine
-                >
-                  {tipoData.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(v) => [v, "Comunicações"]} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <Vazio />
-          )}
-        </Panel>
+        {pelotaoFiltrado.length > 0 ? (
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={pelotaoFiltrado} margin={{ top: 24, right: 12, left: -16, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="pelotao"
+                tick={{ fontSize: 11 }}
+                interval={0}
+                tickFormatter={abreviarPelotao}
+              />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 12 }}
+                domain={[0, (dataMax: number) => Math.ceil(dataMax * 1.12) || 1]}
+              />
+              <Tooltip cursor={{ fill: "#f0f4f8" }} content={<PelotaoTooltip />} />
+              <Bar dataKey="valor" name={rotuloBarra} fill={corBarra} radius={[4, 4, 0, 0]}>
+                <LabelList
+                  dataKey="valor"
+                  position="top"
+                  fill="#000000"
+                  fontSize={11}
+                  formatter={(v) => {
+                    const n = Number(v);
+                    return n > 0
+                      ? `${n} (${totalFiltrado > 0 ? ((n / totalFiltrado) * 100).toFixed(0) : 0}%)`
+                      : "";
+                  }}
+                />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="h-[300px] flex items-center justify-center text-gray-400 text-sm">
+            Nenhum registro no período selecionado
+          </div>
+        )}
+      </Panel>
 
-      </div>
+      {/* 4 — Distribuição por tipo */}
+      <Panel
+        title="Distribuição por Tipo"
+        subtitle="Percentual de cada tipo de comunicação no período"
+        total={total}
+      >
+        {tipoData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={260}>
+            <PieChart>
+              <Pie
+                data={tipoData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={95}
+                label={({ name, percent }: { name?: string; percent?: number }) =>
+                  `${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%`
+                }
+                labelLine
+              >
+                {tipoData.map((_, i) => (
+                  <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(v) => [v, "Comunicações"]} />
+            </PieChart>
+          </ResponsiveContainer>
+        ) : (
+          <Vazio />
+        )}
+      </Panel>
 
       {/* 6 — Top artigos infringidos */}
       <Panel

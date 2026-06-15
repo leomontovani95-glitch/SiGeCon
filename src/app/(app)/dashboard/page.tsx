@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { verifySession, getSchoolFilter } from "@/lib/dal";
 import { calcularNotaPublicada, faixaNota, zonaDeRisco } from "@/lib/score";
-import { abreviarPelotao } from "@/lib/utils";
+import { abreviarPelotao, platoonOrder } from "@/lib/utils";
 import Link from "next/link";
 import { format, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -354,7 +354,7 @@ export default async function DashboardPage({
 
   const platoesNaZona = Array.from(
     new Map(data.zonaRisco.filter((s) => s.platoon).map((s) => [s.platoonId!, s.platoon!])).entries()
-  ).sort((a, b) => a[1].name.localeCompare(b[1].name));
+  ).sort((a, b) => platoonOrder(a[1].name) - platoonOrder(b[1].name));
 
   function commUrl(status?: string, nat?: string) {
     const p = new URLSearchParams();

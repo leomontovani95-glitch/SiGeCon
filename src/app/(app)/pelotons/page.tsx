@@ -1,14 +1,18 @@
 import { prisma } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
+import { platoonOrder } from "@/lib/utils";
 import Link from "next/link";
 
 export default async function PelotonsPage() {
   const session = await verifySession();
   const canManage = ["ADMINISTRADOR", "PROTOCOLO"].includes(session.role);
-  const pelotoes = await prisma.platoon.findMany({
-    orderBy: { name: "asc" },
+  const pelotoes = (await prisma.platoon.findMany({
     include: { course: true, _count: { select: { students: true } } },
-  });
+  })).sort(
+    (a, b) =>
+      a.course.name.localeCompare(b.course.name) ||
+      platoonOrder(a.name) - platoonOrder(b.name),
+  );
 
   return (
     <div className="p-6">

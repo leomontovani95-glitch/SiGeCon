@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { verifySession, getSchoolFilter } from "@/lib/dal";
+import { platoonOrder } from "@/lib/utils";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import AnaliseCharts from "./AnaliseCharts";
@@ -35,6 +36,9 @@ export default async function AnalisePage({
         })
       : Promise.resolve([] as { id: string; name: string }[]),
   ]);
+
+  // SQLite ordena por texto ("10º" antes de "2º"); reordena numericamente.
+  platoesDisponiveis.sort((a, b) => platoonOrder(a.name) - platoonOrder(b.name));
 
   const courseFilter = cursoId
     ? { courseId: cursoId }
@@ -141,16 +145,26 @@ export default async function AnalisePage({
     });
 
   // ── 3. Comparativo entre pelotões ─────────────────────────────────────────
-  const pelotaoMap = new Map<string, { cpi0: number; cpi1: number; cpi2: number; cpi3: number }>();
+  // Conta CPIs (por grau, derivado do nome "CPI 0".."CPI 3") e Referências
+  // Elogiosas (qualquer tipo FAVORAVEL) por pelotão; o filtro do gráfico é
+  // aplicado no cliente sobre esses contadores.
+  const pelotaoMap = new Map<string, { cpi0: number; cpi1: number; cpi2: number; cpi3: number; refElogiosa: number }>();
   for (const c of allComms) {
-    if (!c.type.name.toLowerCase().includes("cpi")) continue;
+    const isCpi = c.type.name.toLowerCase().includes("cpi");
+    const isRef = c.type.scoreNature === "FAVORAVEL";
+    if (!isCpi && !isRef) continue;
     const pelotao = c.platoon?.name ?? c.student.platoon?.name ?? "Sem pelotão";
-    const prev    = pelotaoMap.get(pelotao) ?? { cpi0: 0, cpi1: 0, cpi2: 0, cpi3: 0 };
-    const grau    = Math.min(3, Math.max(0, Math.round(c.type.score)));
-    if (grau === 0)      prev.cpi0++;
-    else if (grau === 1) prev.cpi1++;
-    else if (grau === 2) prev.cpi2++;
-    else                 prev.cpi3++;
+    const prev    = pelotaoMap.get(pelotao) ?? { cpi0: 0, cpi1: 0, cpi2: 0, cpi3: 0, refElogiosa: 0 };
+    if (isCpi) {
+      const m    = c.type.name.match(/(\d)/);
+      const grau = m ? Math.min(3, Math.max(0, parseInt(m[1], 10))) : 0;
+      if (grau === 0)      prev.cpi0++;
+      else if (grau === 1) prev.cpi1++;
+      else if (grau === 2) prev.cpi2++;
+      else                 prev.cpi3++;
+    } else {
+      prev.refElogiosa++;
+    }
     pelotaoMap.set(pelotao, prev);
   }
   const pelotaoData = Array.from(pelotaoMap.entries())

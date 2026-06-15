@@ -124,7 +124,8 @@ export default async function AnaliseImprimirPage({
     if (!c.type.name.toLowerCase().includes("cpi")) continue;
     const pelotao = c.platoon?.name ?? c.student.platoon?.name ?? "Sem pelotão";
     const prev    = pelotaoMap.get(pelotao) ?? { cpi0: 0, cpi1: 0, cpi2: 0, cpi3: 0 };
-    const grau    = Math.min(3, Math.max(0, Math.round(c.type.score)));
+    const m       = c.type.name.match(/(\d)/);
+    const grau    = m ? Math.min(3, Math.max(0, parseInt(m[1], 10))) : 0;
     if (grau === 0) prev.cpi0++; else if (grau === 1) prev.cpi1++; else if (grau === 2) prev.cpi2++; else prev.cpi3++;
     pelotaoMap.set(pelotao, prev);
   }

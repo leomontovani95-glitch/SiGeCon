@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { verifyRole } from "@/lib/dal";
+import { platoonOrder } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import CursoForm from "../../_components/CursoForm";
 import GerenciarPelotoes from "../../_components/GerenciarPelotoes";
@@ -34,7 +35,10 @@ export default async function EditarCursoPage({ params }: { params: Promise<{ id
       />
       <GerenciarPelotoes
         courseId={curso.id}
-        platoons={curso.platoons.map((p) => ({ id: p.id, name: p.name, studentCount: p._count.students }))}
+        platoons={curso.platoons
+          .slice()
+          .sort((a, b) => platoonOrder(a.name) - platoonOrder(b.name))
+          .map((p) => ({ id: p.id, name: p.name, studentCount: p._count.students }))}
       />
     </div>
   );
