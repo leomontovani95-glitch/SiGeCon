@@ -70,14 +70,6 @@ export async function salvarCurso(id: string | null, _prev: State, formData: For
     try {
       const atual = await prisma.course.findUnique({ where: { id }, select: { active: true, name: true } });
       if (!atual) return { error: "Curso não encontrado." };
-      // Reativando: não pode haver outro curso ATIVO com a mesma sigla.
-      if (!atual.active && active) {
-        const outroAtivo = await prisma.course.findFirst({
-          where: { name: atual.name, active: true, id: { not: id } },
-          select: { id: true },
-        });
-        if (outroAtivo) return { error: `Já existe um curso ativo com a sigla "${atual.name}".` };
-      }
       await prisma.course.update({ where: { id }, data: { description, active } });
       // Ao inativar o curso, os alunos ainda ATIVOS são automaticamente inativados.
       // Eles permanecem cadastrados e podem ser transferidos/ascender de curso.
@@ -117,10 +109,10 @@ export async function salvarCurso(id: string | null, _prev: State, formData: For
   const name = gerarSiglaCurso({ baseCourse: baseCourse as BaseCurso, academicYear, startYear, remnant });
 
   try {
-    // Bloqueia apenas se já houver um curso ATIVO com a mesma sigla
-    // (cursos inativos de turmas anteriores podem manter o nome).
-    const existenteAtivo = await prisma.course.findFirst({ where: { name, active: true }, select: { id: true } });
-    if (existenteAtivo) return { error: `Já existe um curso ativo com a sigla "${name}".` };
+    // Bloqueia curso idêntico (mesma sigla E mesmo ano de início), ativo ou não.
+    // Siglas iguais com anos de início diferentes são permitidas.
+    const existente = await prisma.course.findFirst({ where: { name, year: startYear }, select: { id: true } });
+    if (existente) return { error: `Já existe um curso "${name}" com início em ${startYear}.` };
 
     const c = await prisma.course.create({
       data: { name, acronym: baseCourse, school, year: startYear, description, active },

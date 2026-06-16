@@ -36,8 +36,8 @@ model User {
 
 model Course {
   id          String   @id @default(cuid())
-  // Unicidade do nome (sigla) é garantida no app apenas entre cursos ATIVOS,
-  // permitindo reaproveitar o nome quando o curso anterior está inativo.
+  // A sigla (name) pode se repetir entre turmas; o que torna o curso único é a
+  // combinação sigla + ano de início (year) — ver @@unique abaixo.
   name        String
   acronym     String
   year        Int?
@@ -52,6 +52,9 @@ model Course {
   communications    Communication[]
   disciplinaryBooks DisciplinaryBook[]
 
+  // Não pode haver dois cursos idênticos (mesma sigla E mesmo ano de início),
+  // mesmo que um esteja inativo. Siglas iguais com anos diferentes são válidas.
+  @@unique([name, year])
   @@index([school])
 }
 
