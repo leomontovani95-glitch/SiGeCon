@@ -73,7 +73,19 @@ export async function salvarCurso(id: string | null, _prev: State, formData: For
 
   try {
     if (id) {
+      const atual = await prisma.course.findUnique({ where: { id }, select: { active: true } });
       await prisma.course.update({ where: { id }, data: { name, acronym, school, year, description, active } });
+      // Ao inativar o curso, os alunos ainda ATIVOS são automaticamente inativados.
+      // Eles permanecem cadastrados e podem ser transferidos/ascender de curso.
+      if (atual?.active && !active) {
+        const r = await prisma.student.updateMany({
+          where: { courseId: id, status: "ATIVO" },
+          data: { status: "INATIVO" },
+        });
+        if (r.count > 0) {
+          await auditLog(session.userId, "UPDATE", "Course", id, `${name} — ${r.count} aluno(s) inativado(s) ao inativar o curso`);
+        }
+      }
       await auditLog(session.userId, "UPDATE", "Course", id, name);
     } else {
       const c = await prisma.course.create({ data: { name, acronym, school, year, description, active } });

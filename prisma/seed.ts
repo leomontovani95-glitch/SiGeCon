@@ -202,7 +202,10 @@ async function main() {
       { fullName: "Felipe Augusto Souza",  warName: "SOUZA",   courseId: cfo1Id, courseNumber: "004", platoonId: p2.id, rg: "4567890", status: "ATIVO" },
     ];
     for (const a of alunosData) {
-      await prisma.student.upsert({ where: { rg: a.rg }, update: {}, create: a });
+      // rg deixou de ser único (a mesma pessoa pode ter vários cadastros);
+      // mantém idempotência verificando existência antes de criar.
+      const existe = await prisma.student.findFirst({ where: { rg: a.rg } });
+      if (!existe) await prisma.student.create({ data: a });
     }
     console.log("✅ Alunos de exemplo criados/verificados");
   }

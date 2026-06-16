@@ -48,21 +48,20 @@ export default async function RankingImprimirPage({
     ? [cursoId]
     : cursosDisponiveis.map((c) => c.id);
 
-  const [rankingStudents, publishedItems] = await Promise.all([
-    prisma.student.findMany({
-      where: { status: "ATIVO", courseId: { in: scopeIds } },
-      include: { course: true, platoon: true },
-    }),
-    prisma.disciplinaryBookItem.findMany({
-      where: {
-        disciplinaryBook: { status: "PUBLICADO" },
-        courseId: { in: scopeIds },
-      },
-      include: {
-        communication: { include: { type: { select: { scoreNature: true } } } },
-      },
-    }),
-  ]);
+  const rankingStudents = await prisma.student.findMany({
+    where: { status: "ATIVO", courseId: { in: scopeIds } },
+    include: { course: true, platoon: true },
+  });
+  // Notas agregadas por aluno (studentId): o histórico acompanha o remanescente.
+  const publishedItems = await prisma.disciplinaryBookItem.findMany({
+    where: {
+      disciplinaryBook: { status: "PUBLICADO" },
+      studentId: { in: rankingStudents.map((s) => s.id) },
+    },
+    include: {
+      communication: { include: { type: { select: { scoreNature: true } } } },
+    },
+  });
 
   const pubPorAluno = new Map<string, typeof publishedItems>();
   for (const item of publishedItems) {

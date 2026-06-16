@@ -124,13 +124,15 @@ async function getDashboardGeral(role: string, userId: string, scopeCourseIds: s
   const naoArquivadaDec = { decisions: { none: { decisionType: { contains: "rquiv" } } } };
   const pubCaderno      = { disciplinaryBookItems: { some: { disciplinaryBook: { status: "PUBLICADO" } } } };
 
-  const [students, allPubItems, cpisPublicadas, cpisArquivadas, elogiososPublicados, elogiososArquivados] = await Promise.all([
-    prisma.student.findMany({
-      where: { status: "ATIVO", ...cf },
-      include: { course: true, platoon: true },
-    }),
+  const students = await prisma.student.findMany({
+    where: { status: "ATIVO", ...cf },
+    include: { course: true, platoon: true },
+  });
+
+  const [allPubItems, cpisPublicadas, cpisArquivadas, elogiososPublicados, elogiososArquivados] = await Promise.all([
+    // Notas agregadas por aluno (studentId): o histórico acompanha o remanescente.
     prisma.disciplinaryBookItem.findMany({
-      where: { disciplinaryBook: { status: "PUBLICADO" }, ...(scopeCourseIds.length ? { courseId: { in: scopeCourseIds } } : {}) },
+      where: { disciplinaryBook: { status: "PUBLICADO" }, studentId: { in: students.map((s) => s.id) } },
       include: { communication: { include: { type: { select: { scoreNature: true } } } } },
     }),
     // DECIDIDA_PUBLICADA sem arquivamento (alinha com filtro da aba Comunicações)

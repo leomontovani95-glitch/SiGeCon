@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
+import Link from "next/link";
+import { formatCourseNumber } from "@/lib/utils";
 import TrocarSenhaForm from "./_components/TrocarSenhaForm";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -26,6 +28,15 @@ export default async function PerfilPage({ searchParams }: { searchParams: Promi
     include: { student: { include: { course: true } } },
   });
   if (!user) return null;
+
+  // Cadastros anteriores da mesma pessoa (mesmo RG) — ex.: ascensão de curso.
+  const cadastrosAnteriores = user.role === "ALUNO"
+    ? await prisma.student.findMany({
+        where: { rg: user.rg, ...(user.student ? { id: { not: user.student.id } } : {}) },
+        include: { course: true },
+        orderBy: { createdAt: "desc" },
+      })
+    : [];
 
   const mustChange = sp.mustChange === "1" || user.mustChangePassword;
 
@@ -76,6 +87,27 @@ export default async function PerfilPage({ searchParams }: { searchParams: Promi
           ))}
         </dl>
       </div>
+
+      {cadastrosAnteriores.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Cadastros anteriores</h2>
+          <p className="text-xs text-gray-500 mb-3">
+            Histórico de conduta em cursos anteriores. Cada curso possui histórico próprio.
+          </p>
+          <ul className="divide-y divide-gray-100">
+            {cadastrosAnteriores.map((c) => (
+              <li key={c.id} className="py-2 flex items-center justify-between gap-3">
+                <span className="text-sm text-gray-900">
+                  {c.course.name} <span className="text-gray-500">— Nº {formatCourseNumber(c.courseNumber)}</span>
+                </span>
+                <Link href={`/alunos/${c.id}/historico`} className="text-xs text-[#1e3a5f] hover:underline">
+                  Ver histórico
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Alterar senha</h2>

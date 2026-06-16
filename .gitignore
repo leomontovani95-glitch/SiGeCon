@@ -16,6 +16,7 @@ out/
 *.db
 *.db-shm
 *.db-wal
+*.db.bak-*
 
 # OS
 .DS_Store

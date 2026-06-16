@@ -2,11 +2,23 @@
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
-import { verifyStaff, verifyRole, VIEWERS_APM } from "@/lib/dal";
+import { verifyStaff, verifyRole, VIEWERS_APM, getSchoolFilter } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
 import { logger } from "@/lib/logger";
+import { formatCourseNumber } from "@/lib/utils";
 
 type State = { error: string } | undefined;
+
+// Perfis autorizados a mover alunos de curso (transferência remanescente e
+// ascensão de curso): admin, Chefe da Divisão Acadêmica e os comandos das escolas.
+const PODE_MOVER_CURSO = [
+  "ADMINISTRADOR",
+  "CHEFE_DIVISAO_ACADEMICA",
+  "COMANDANTE_ESFAP",
+  "COMANDANTE_ESFO",
+  "SUBCOMANDANTE_ESFAP",
+  "SUBCOMANDANTE_ESFO",
+] as const;
 
 function senhaInicial(functionalNumber: string, rg: string): string {
   return functionalNumber + rg.replace(/[^a-zA-Z0-9]/g, "");
@@ -30,7 +42,9 @@ export async function salvarAluno(id: string | null, _prev: State, formData: For
   const warName          = String(formData.get("warName") ?? "").trim();
   const courseId         = String(formData.get("courseId") ?? "").trim();
   const platoonId        = String(formData.get("platoonId") ?? "").trim() || null;
-  const courseNumber     = String(formData.get("courseNumber") ?? "").trim();
+  // Padroniza para dois dígitos: "1" -> "01", "10" -> "10".
+  const courseNumberRaw  = String(formData.get("courseNumber") ?? "").trim();
+  const courseNumber     = courseNumberRaw ? formatCourseNumber(courseNumberRaw) : "";
   const rg               = String(formData.get("rg") ?? "").trim();
   const functionalNumber = String(formData.get("functionalNumber") ?? "").trim() || null;
   const status           = String(formData.get("status") ?? "ATIVO");
@@ -70,25 +84,59 @@ export async function salvarAluno(id: string | null, _prev: State, formData: For
       }
       await auditLog(session.userId, "UPDATE", "Student", id, fullName);
     } else {
-      const passwordHash = await bcrypt.hash(senhaInicial(functionalNumber, rg), 10);
-      const userAluno = await prisma.user.create({
-        data: {
-          fullName,
-          warName,
-          rank,
-          rg,
-          functionalNumber,
-          passwordHash,
-          role: "ALUNO",
-          escola: "TODAS",
-          active: true,
-          mustChangePassword: true,
-        },
+      // Verifica se a pessoa (mesmo RG ou NF) já possui conta de aluno. Se sim,
+      // trata-se de ASCENSÃO/novo cadastro: reaproveita o login e cria uma nova
+      // matrícula com histórico zerado (nota 10). A matrícula anterior é
+      // preservada (acessível depois), porém desvinculada do login.
+      const contaExistente = await prisma.user.findFirst({
+        where: { role: "ALUNO", OR: [{ rg }, { functionalNumber }] },
+        include: { student: { include: { course: true } } },
       });
-      const s = await prisma.student.create({
-        data: { fullName, warName, courseId, courseNumber, platoonId, rg, functionalNumber, status, userId: userAluno.id },
-      });
-      await auditLog(session.userId, "CREATE", "Student", s.id, fullName);
+
+      if (contaExistente) {
+        const matriculaAtual = contaExistente.student;
+        // Só é permitido recadastrar se a matrícula anterior estiver em curso INATIVO.
+        if (matriculaAtual && matriculaAtual.course.active) {
+          return {
+            error: "Já existe um cadastro ativo para este RG/Número Funcional. " +
+              "Inative o curso anterior antes de cadastrar a pessoa em um novo curso " +
+              "(ou use a transferência de remanescente, se for o caso).",
+          };
+        }
+        // Desvincula a matrícula anterior (libera o vínculo único com o login).
+        if (matriculaAtual) {
+          await prisma.student.update({ where: { id: matriculaAtual.id }, data: { userId: null } });
+        }
+        // Atualiza os dados da conta conforme o novo curso.
+        await prisma.user.update({
+          where: { id: contaExistente.id },
+          data: { fullName, warName, rank, rg, ...(functionalNumber ? { functionalNumber } : {}) },
+        });
+        const s = await prisma.student.create({
+          data: { fullName, warName, courseId, courseNumber, platoonId, rg, functionalNumber, status, userId: contaExistente.id },
+        });
+        await auditLog(session.userId, "CREATE", "Student", s.id, `${fullName} (novo cadastro / ascensão de curso)`);
+      } else {
+        const passwordHash = await bcrypt.hash(senhaInicial(functionalNumber, rg), 10);
+        const userAluno = await prisma.user.create({
+          data: {
+            fullName,
+            warName,
+            rank,
+            rg,
+            functionalNumber,
+            passwordHash,
+            role: "ALUNO",
+            escola: "TODAS",
+            active: true,
+            mustChangePassword: true,
+          },
+        });
+        const s = await prisma.student.create({
+          data: { fullName, warName, courseId, courseNumber, platoonId, rg, functionalNumber, status, userId: userAluno.id },
+        });
+        await auditLog(session.userId, "CREATE", "Student", s.id, fullName);
+      }
     }
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "";
@@ -96,6 +144,171 @@ export async function salvarAluno(id: string | null, _prev: State, formData: For
     return { error: "Erro ao salvar aluno." };
   }
   redirect("/alunos");
+}
+
+// Valida o pelotão (opcional) escolhido para o curso de destino.
+// Retorna o id do pelotão, null (sem pelotão) ou false (pelotão inválido).
+async function validarPelotaoDoCurso(raw: FormDataEntryValue | null, courseId: string): Promise<string | null | false> {
+  const platoonId = String(raw ?? "").trim();
+  if (!platoonId) return null;
+  const pel = await prisma.platoon.findUnique({ where: { id: platoonId }, select: { courseId: true } });
+  if (!pel || pel.courseId !== courseId) return false;
+  return platoonId;
+}
+
+// ── Transferência de curso (aluno remanescente) ─────────────────────────
+// O número novo sempre recebe o sufixo "-R" (remanescente). O histórico e as
+// comunicações (publicadas e em trâmite) permanecem inalterados — snapshot.
+export async function transferirAluno(studentId: string, _prev: State, formData: FormData): Promise<State> {
+  const session = await verifyRole(...PODE_MOVER_CURSO);
+
+  const destinoCourseId = String(formData.get("destinoCourseId") ?? "").trim();
+
+  if (!destinoCourseId) return { error: "Selecione o curso de destino." };
+
+  const aluno = await prisma.student.findUnique({ where: { id: studentId }, include: { course: true } });
+  if (!aluno) return { error: "Aluno não encontrado." };
+  if (aluno.courseId === destinoCourseId) return { error: "O curso de destino deve ser diferente do curso atual." };
+
+  // Comando de escola só atua sobre alunos da própria escola.
+  const escopo = getSchoolFilter(session.role, session.escola);
+  if (escopo && aluno.course.school !== escopo) {
+    return { error: "Sem permissão para mover alunos de outra escola." };
+  }
+
+  const destino = await prisma.course.findUnique({ where: { id: destinoCourseId } });
+  if (!destino) return { error: "Curso de destino não encontrado." };
+  if (!destino.active) return { error: "O curso de destino está inativo." };
+  // A escola continua a mesma — não é permitido transferir entre escolas.
+  if (destino.school !== aluno.course.school) {
+    return { error: "O curso de destino deve pertencer à mesma escola do aluno." };
+  }
+
+  // Número remanescente atribuído automaticamente em sequência: o primeiro
+  // transferido recebe "01-R", o próximo "02-R", e assim por diante.
+  const remanescentes = await prisma.student.findMany({
+    where: { courseId: destinoCourseId, courseNumber: { endsWith: "-R" } },
+    select: { courseNumber: true },
+  });
+  const maxSeq = remanescentes.reduce((max, s) => {
+    const n = parseInt(s.courseNumber, 10);
+    return Number.isFinite(n) && n > max ? n : max;
+  }, 0);
+  const proximo = maxSeq + 1;
+  const novoNumero = `${String(proximo).padStart(2, "0")}-R`;
+
+  // Pelotão (opcional) escolhido entre os pelotões do curso de destino.
+  const platoonId = await validarPelotaoDoCurso(formData.get("platoonId"), destinoCourseId);
+  if (platoonId === false) return { error: "Pelotão inválido para o curso de destino." };
+
+  try {
+    await prisma.student.update({
+      where: { id: studentId },
+      // O aluno volta a ATIVO no curso remanescente (caso tenha sido inativado
+      // com o curso antigo). O pelotão passa a ser o escolhido no destino.
+      data: { courseId: destinoCourseId, courseNumber: novoNumero, platoonId, status: "ATIVO" },
+    });
+    // Atualiza posto/graduação da conta vinculada conforme o novo curso (best-effort).
+    if (aluno.userId) {
+      try {
+        await prisma.user.update({ where: { id: aluno.userId }, data: { rank: rankDeAluno(destino.name) } });
+      } catch (e) { logger.warn("alunos: atualizar posto após transferência (best-effort)", e, { studentId }); }
+    }
+    await auditLog(
+      session.userId, "TRANSFER", "Student", studentId,
+      `${aluno.warName}: ${aluno.course.name} Nº ${aluno.courseNumber} → ${destino.name} Nº ${novoNumero}`,
+    );
+  } catch (e) {
+    logger.error("alunos: transferir aluno", e, { studentId });
+    return { error: "Erro ao transferir aluno." };
+  }
+  redirect(`/alunos/${studentId}`);
+}
+
+// ── Ascensão de curso ───────────────────────────────────────────────────
+// O aluno sobe de um curso de menor hierarquia para outro de maior (ex.: CFO 2
+// -> CFO 3). Cria uma NOVA matrícula (Student) com histórico zerado (nota 10) e
+// número escolhido pelo operador. Os dados pessoais e o login/senha são mantidos
+// (o vínculo do login passa para a nova matrícula). A matrícula anterior é
+// preservada como histórico (marcada como TRANSFERIDA e desvinculada do login).
+export async function ascenderAluno(studentId: string, _prev: State, formData: FormData): Promise<State> {
+  const session = await verifyRole(...PODE_MOVER_CURSO);
+
+  const destinoCourseId = String(formData.get("destinoCourseId") ?? "").trim();
+  const novoNumeroRaw   = String(formData.get("novoNumero") ?? "").trim();
+
+  if (!destinoCourseId) return { error: "Selecione o curso de destino." };
+  if (!novoNumeroRaw)   return { error: "Informe o novo número de curso." };
+
+  const aluno = await prisma.student.findUnique({ where: { id: studentId }, include: { course: true } });
+  if (!aluno) return { error: "Aluno não encontrado." };
+  if (aluno.courseId === destinoCourseId) return { error: "O curso de destino deve ser diferente do curso atual." };
+
+  // Comando de escola só atua sobre alunos da própria escola.
+  const escopo = getSchoolFilter(session.role, session.escola);
+  if (escopo && aluno.course.school !== escopo) {
+    return { error: "Sem permissão para mover alunos de outra escola." };
+  }
+
+  const destino = await prisma.course.findUnique({ where: { id: destinoCourseId } });
+  if (!destino) return { error: "Curso de destino não encontrado." };
+  if (!destino.active) return { error: "O curso de destino está inativo." };
+  // Ascensão PODE cruzar escolas (ex.: CFSd/EsFAP -> CFO/EsFO).
+
+  // Número de curso escolhido pelo operador, padronizado em dois dígitos.
+  const novoNumero = formatCourseNumber(novoNumeroRaw);
+
+  // Não pode haver dois alunos com o mesmo número no curso de destino.
+  const duplicado = await prisma.student.findFirst({
+    where: { courseId: destinoCourseId, courseNumber: novoNumero, id: { not: studentId } },
+    select: { id: true },
+  });
+  if (duplicado) return { error: `Já existe um aluno com o número ${novoNumero} neste curso.` };
+
+  // Pelotão (opcional) escolhido entre os pelotões do curso de destino.
+  const platoonId = await validarPelotaoDoCurso(formData.get("platoonId"), destinoCourseId);
+  if (platoonId === false) return { error: "Pelotão inválido para o curso de destino." };
+
+  let novoId: string;
+  try {
+    const userId = aluno.userId;
+    // Desvincula a matrícula anterior do login e marca como transferida (preservada).
+    await prisma.student.update({
+      where: { id: studentId },
+      data: { status: "TRANSFERIDO", ...(userId ? { userId: null } : {}) },
+    });
+    // Mantém o login/senha; apenas atualiza o posto conforme o novo curso.
+    if (userId) {
+      try {
+        await prisma.user.update({ where: { id: userId }, data: { rank: rankDeAluno(destino.name) } });
+      } catch (e) { logger.warn("alunos: atualizar posto na ascensão (best-effort)", e, { studentId }); }
+    }
+    // Nova matrícula com histórico zerado (sem comunicações) — nota volta a 10.
+    const novo = await prisma.student.create({
+      data: {
+        fullName: aluno.fullName,
+        warName: aluno.warName,
+        courseId: destinoCourseId,
+        courseNumber: novoNumero,
+        platoonId,
+        rg: aluno.rg,
+        cpf: aluno.cpf,
+        functionalNumber: aluno.functionalNumber,
+        email: aluno.email,
+        status: "ATIVO",
+        ...(userId ? { userId } : {}),
+      },
+    });
+    novoId = novo.id;
+    await auditLog(
+      session.userId, "ASCEND", "Student", novo.id,
+      `${aluno.warName}: ${aluno.course.name} Nº ${aluno.courseNumber} → ${destino.name} Nº ${novoNumero} (nova matrícula)`,
+    );
+  } catch (e) {
+    logger.error("alunos: ascensão de curso", e, { studentId });
+    return { error: "Erro ao realizar a ascensão de curso." };
+  }
+  redirect(`/alunos/${novoId}`);
 }
 
 type ResetState = { error?: string; success?: string } | undefined;

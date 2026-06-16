@@ -48,6 +48,10 @@ export default function CursoForm({ defaultValues, id }: Props) {
           <option value="true">Ativo</option>
           <option value="false">Inativo</option>
         </select>
+        <p className="text-xs text-gray-400 mt-1">
+          Ao inativar o curso, os alunos ainda ativos são automaticamente inativados (deixam de receber
+          comunicações), mas continuam cadastrados e podem ser transferidos ou ter ascensão de curso.
+        </p>
       </div>
       {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
       <div className="flex gap-3 pt-2">

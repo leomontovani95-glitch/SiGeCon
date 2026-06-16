@@ -8,6 +8,7 @@ type CourseOption  = { id: string; name: string; platoons: PlatoonOption[] };
 
 const STATUS_OPTIONS = [
   { value: "ATIVO",       label: "Ativo" },
+  { value: "INATIVO",     label: "Inativo" },
   { value: "DESLIGADO",   label: "Desligado" },
   { value: "TRANSFERIDO", label: "Transferido" },
   { value: "FORMADO",     label: "Formado" },
@@ -89,7 +90,7 @@ export default function AlunoForm({ defaultValues, id, courses }: Props) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Nº de curso *</label>
-          <input name="courseNumber" defaultValue={defaultValues?.courseNumber} required className="input" placeholder="001" />
+          <input name="courseNumber" defaultValue={defaultValues?.courseNumber} required className="input" placeholder="01" />
         </div>
 
         <div>

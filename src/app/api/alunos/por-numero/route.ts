@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { ESFO_CFO_RANK, cursosPermitidosParaCPI } from "@/lib/dal";
+import { formatCourseNumber } from "@/lib/utils";
 
 export async function GET(req: NextRequest) {
   const session = await getSession();
@@ -23,10 +24,13 @@ export async function GET(req: NextRequest) {
     if (!allowedIds.includes(courseId)) return NextResponse.json({ aluno: null });
   }
 
+  // Aceita o número digitado tanto na forma original ("1") quanto padronizada ("01").
+  const qPadded = formatCourseNumber(q);
   const aluno = await prisma.student.findFirst({
     where: {
       OR: [
         { courseNumber: q },
+        { courseNumber: qPadded },
         { warName: { contains: q } },
       ],
       status: "ATIVO",

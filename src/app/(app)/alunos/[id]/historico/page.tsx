@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import PrintLayout from "@/components/PrintLayout";
 import { calcularNotaPublicada } from "@/lib/score";
+import { formatCourseNumber } from "@/lib/utils";
 
 export default async function HistoricoAlunoPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await verifySession();
@@ -33,7 +34,12 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
   ]);
   if (!aluno) notFound();
 
-  if (session.role === "ALUNO" && aluno.userId !== session.userId) notFound();
+  // Aluno só vê o próprio histórico — inclusive cadastros anteriores da mesma
+  // pessoa (mesmo RG), cujo vínculo de login foi transferido para a matrícula atual.
+  if (session.role === "ALUNO" && aluno.userId !== session.userId) {
+    const atual = await prisma.student.findFirst({ where: { userId: session.userId }, select: { rg: true } });
+    if (!atual || atual.rg !== aluno.rg) notFound();
+  }
 
   const pubItems = pubItemsRaw;
   const nota  = calcularNotaPublicada(pubItems);
@@ -104,7 +110,7 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
           <div className="print-field"><label>Nome completo</label><span>{aluno.fullName}</span></div>
           <div className="print-field"><label>Nome de guerra</label><span>{aluno.warName}</span></div>
           <div className="print-field"><label>Curso</label><span>{aluno.course.name}</span></div>
-          <div className="print-field"><label>Nº de curso</label><span>{aluno.courseNumber}</span></div>
+          <div className="print-field"><label>Nº de curso</label><span>{formatCourseNumber(aluno.courseNumber)}</span></div>
           <div className="print-field"><label>Pelotão</label><span>{aluno.platoon?.name ?? "—"}</span></div>
           <div className="print-field"><label>RG</label><span>{aluno.rg}</span></div>
           <div className="print-field"><label>Situação</label><span>{aluno.status}</span></div>

@@ -38,21 +38,22 @@ export default async function RankingPage({
     ? [cursoId]
     : cursosDisponiveis.map((c) => c.id);
 
-  const [rankingStudents, publishedItems] = await Promise.all([
-    prisma.student.findMany({
-      where: { status: "ATIVO", courseId: { in: scopeIds } },
-      include: { course: true, platoon: true },
-    }),
-    prisma.disciplinaryBookItem.findMany({
-      where: {
-        disciplinaryBook: { status: "PUBLICADO" },
-        courseId: { in: scopeIds },
-      },
-      include: {
-        communication: { include: { type: { select: { scoreNature: true } } } },
-      },
-    }),
-  ]);
+  const rankingStudents = await prisma.student.findMany({
+    where: { status: "ATIVO", courseId: { in: scopeIds } },
+    include: { course: true, platoon: true },
+  });
+  // Notas agregadas por aluno (studentId), não por curso: assim o histórico de
+  // um aluno transferido como remanescente acompanha-o no novo curso, enquanto
+  // um novo cadastro (outro Student) inicia com histórico zerado (nota 10).
+  const publishedItems = await prisma.disciplinaryBookItem.findMany({
+    where: {
+      disciplinaryBook: { status: "PUBLICADO" },
+      studentId: { in: rankingStudents.map((s) => s.id) },
+    },
+    include: {
+      communication: { include: { type: { select: { scoreNature: true } } } },
+    },
+  });
 
   // Agrupa itens publicados por aluno
   const pubPorAluno = new Map<string, typeof publishedItems>();

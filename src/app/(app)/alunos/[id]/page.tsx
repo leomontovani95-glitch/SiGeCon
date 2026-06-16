@@ -6,6 +6,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import NotaChart from "../_components/NotaChart";
+import { formatCourseNumber } from "@/lib/utils";
 
 const STATUS_MAP: Record<string, string> = {
   REGISTRADA: "Registrada",
@@ -61,6 +62,14 @@ export default async function AlunoPage({
     }),
   ]);
   if (!aluno) notFound();
+
+  // Cadastros anteriores da mesma pessoa (mesmo RG) — ex.: ascensão de curso.
+  // Cada matrícula tem histórico próprio; estas permanecem acessíveis.
+  const outrosCadastros = await prisma.student.findMany({
+    where: { rg: aluno.rg, id: { not: aluno.id } },
+    include: { course: true },
+    orderBy: { createdAt: "desc" },
+  });
 
   // Nota sempre calculada sobre todos os itens publicados (não é afetada pelo filtro)
   const nota  = calcularNotaPublicada(pubItems);
@@ -163,7 +172,7 @@ export default async function AlunoPage({
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <p className="text-xs text-gray-500 mb-1">Curso / Nº</p>
           <p className="font-semibold text-gray-900">{aluno.course.name}</p>
-          <p className="text-sm text-gray-600">Nº {aluno.courseNumber}</p>
+          <p className="text-sm text-gray-600">Nº {formatCourseNumber(aluno.courseNumber)}</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <p className="text-xs text-gray-500 mb-1">Pelotão</p>
@@ -194,6 +203,32 @@ export default async function AlunoPage({
           )}
         </div>
       </div>
+
+      {/* Cadastros anteriores (mesma pessoa, outros cursos) */}
+      {outrosCadastros.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            Cadastros Anteriores — Histórico em Outros Cursos
+          </h2>
+          <ul className="divide-y divide-gray-100">
+            {outrosCadastros.map((c) => (
+              <li key={c.id} className="py-2 flex items-center justify-between gap-3">
+                <div className="text-sm">
+                  <span className="font-medium text-gray-900">{c.course.name}</span>
+                  <span className="text-gray-500"> — Nº {formatCourseNumber(c.courseNumber)}</span>
+                  {!c.course.active && (
+                    <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700">Curso inativo</span>
+                  )}
+                </div>
+                <div className="flex gap-3 text-xs">
+                  <Link href={`/alunos/${c.id}`} className="text-[#1e3a5f] hover:underline">Ver ficha</Link>
+                  <Link href={`/alunos/${c.id}/historico`} className="text-gray-500 hover:underline">Histórico</Link>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Gráfico de evolução da nota */}
       {evolucaoNota.length >= 2 && (

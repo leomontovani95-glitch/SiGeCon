@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { verifySession, getSchoolFilter, VIEWERS_APM } from "@/lib/dal";
 import { redirect, notFound } from "next/navigation";
 import { calcularNotaPublicada, faixaNota } from "@/lib/score";
-import { abreviarPelotao } from "@/lib/utils";
+import { abreviarPelotao, platoonOrder, formatCourseNumber } from "@/lib/utils";
 import Link from "next/link";
 import { Suspense } from "react";
 import SortableHeader from "../../_components/SortableHeader";
@@ -11,7 +11,7 @@ import Pagination from "../../_components/Pagination";
 const PAGE_SIZE = 50;
 
 const STATUS: Record<string, string> = {
-  ATIVO: "Ativo", DESLIGADO: "Desligado", TRANSFERIDO: "Transferido",
+  ATIVO: "Ativo", INATIVO: "Inativo", DESLIGADO: "Desligado", TRANSFERIDO: "Transferido",
   FORMADO: "Formado", ARQUIVADO: "Arquivado",
 };
 
@@ -24,11 +24,12 @@ function rankAluno(courseName: string): string {
 }
 
 type SortDir = "asc" | "desc";
-const JS_SORT = ["nota", "courseNumber"];
+// Ordenações numéricas/calculadas feitas em JS (nº de curso, pelotão e nota)
+// para respeitar a ordem numérica (1, 2, ... 10, 11) em vez da alfabética.
+const JS_SORT = ["nota", "courseNumber", "platoon"];
 
 function buildOrderBy(sortBy: string, dir: SortDir) {
   switch (sortBy) {
-    case "platoon": return { platoon: { name: dir } };
     case "status":  return { status: dir };
     default:        return { warName: dir };
   }
@@ -47,8 +48,9 @@ export default async function CursoAlunosPage({
 
   const { id } = await params;
   const sp = await searchParams;
-  const busca        = sp.busca   ?? "";
-  const statusFiltro = sp.status  ?? "";
+  const busca         = sp.busca   ?? "";
+  const statusFiltro  = sp.status  ?? "";
+  const pelotaoFiltro = sp.pelotao ?? "";
   const sortBy  = sp.sortBy ?? "courseNumber";
   const sortDir = (sp.sortDir === "desc" ? "desc" : "asc") as SortDir;
   const page    = Math.max(1, parseInt(sp.page ?? "1") || 1);
@@ -61,6 +63,7 @@ export default async function CursoAlunosPage({
   const where = {
     courseId: id,
     ...(statusFiltro ? { status: statusFiltro } : {}),
+    ...(pelotaoFiltro ? { platoonId: pelotaoFiltro } : {}),
     ...(busca ? {
       OR: [
         { fullName: { contains: busca } },
@@ -71,18 +74,25 @@ export default async function CursoAlunosPage({
     } : {}),
   };
 
-  // Busca alunos e itens de cadernos publicados em paralelo
-  const [allStudents, publishedItems] = await Promise.all([
+  // Busca alunos e pelotões do curso em paralelo
+  const [allStudents, coursePlatoons] = await Promise.all([
     prisma.student.findMany({
       where,
       orderBy: JS_SORT.includes(sortBy) ? { warName: "asc" } : buildOrderBy(sortBy, sortDir),
       include: { platoon: true },
     }),
-    prisma.disciplinaryBookItem.findMany({
-      where: { courseId: id, disciplinaryBook: { status: "PUBLICADO" } },
-      include: { communication: { include: { type: { select: { scoreNature: true } } } } },
-    }),
+    prisma.platoon.findMany({ where: { courseId: id }, select: { id: true, name: true } }),
   ]);
+
+  // Notas agregadas por aluno (studentId), não por curso: o histórico de um
+  // remanescente acompanha-o; um novo cadastro inicia zerado (nota 10).
+  const publishedItems = await prisma.disciplinaryBookItem.findMany({
+    where: { studentId: { in: allStudents.map((s) => s.id) }, disciplinaryBook: { status: "PUBLICADO" } },
+    include: { communication: { include: { type: { select: { scoreNature: true } } } } },
+  });
+
+  // Pelotões em ordem numérica para o filtro
+  const pelotoesOrdenados = [...coursePlatoons].sort((a, b) => platoonOrder(a.name) - platoonOrder(b.name));
 
   // Agrupa itens publicados por aluno
   const pubPorAluno = new Map<string, typeof publishedItems>();
@@ -96,6 +106,8 @@ export default async function CursoAlunosPage({
     ? [...allStudents].sort((a, b) => {
         const diff = sortBy === "courseNumber"
           ? (parseInt(a.courseNumber, 10) || 0) - (parseInt(b.courseNumber, 10) || 0)
+          : sortBy === "platoon"
+          ? platoonOrder(a.platoon?.name) - platoonOrder(b.platoon?.name)
           : calcularNotaPublicada(pubPorAluno.get(a.id) ?? []) - calcularNotaPublicada(pubPorAluno.get(b.id) ?? []);
         return sortDir === "asc" ? diff : -diff;
       })
@@ -141,9 +153,16 @@ export default async function CursoAlunosPage({
           placeholder="Buscar por nome, nome de guerra, RG ou nº de curso..."
           className="w-full max-w-md input"
         />
+        <select name="pelotao" defaultValue={pelotaoFiltro} className="input text-sm">
+          <option value="">Todos os pelotões</option>
+          {pelotoesOrdenados.map((p) => (
+            <option key={p.id} value={p.id}>{abreviarPelotao(p.name)}</option>
+          ))}
+        </select>
         <select name="status" defaultValue={statusFiltro} className="input text-sm">
           <option value="">Todas as situações</option>
           <option value="ATIVO">Ativo</option>
+          <option value="INATIVO">Inativo</option>
           <option value="DESLIGADO">Desligado</option>
           <option value="TRANSFERIDO">Transferido</option>
           <option value="FORMADO">Formado</option>
@@ -152,7 +171,7 @@ export default async function CursoAlunosPage({
         <input type="hidden" name="sortBy"  value={sortBy} />
         <input type="hidden" name="sortDir" value={sortDir} />
         <button type="submit" className="btn-primary px-4">Filtrar</button>
-        {(busca || statusFiltro) && (
+        {(busca || statusFiltro || pelotaoFiltro) && (
           <Link href={`/alunos/curso/${id}`} className="btn-secondary px-4 flex items-center">
             Limpar filtros
           </Link>
@@ -184,7 +203,7 @@ export default async function CursoAlunosPage({
                     <span className="text-xs text-gray-400 font-normal mr-1">{rankAluno(course.name)}</span>
                     <Link href={`/alunos/${a.id}`} className="hover:text-[#1e3a5f] hover:underline">{a.warName}</Link>
                   </td>
-                  <td className="px-4 py-3 text-gray-600 font-mono text-xs">{a.courseNumber}</td>
+                  <td className="px-4 py-3 text-gray-600 font-mono text-xs">{formatCourseNumber(a.courseNumber)}</td>
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{abreviarPelotao(a.platoon?.name)}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${faixa.tailwind}`}>

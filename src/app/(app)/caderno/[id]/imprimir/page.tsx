@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
+import { usuarioAtivoNaFuncao } from "@/lib/signatarios";
 import { platoonOrder, abreviarPelotao } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
@@ -334,15 +335,14 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
         <span>LAVRADO EM: {format(new Date(), "dd/MM/yyyy", { locale: ptBR })}</span>
       </div>
 
-      {/* Assinatura */}
-      {chefe && (
-        <div className="print-signatures" style={{ marginTop: 48 }}>
-          <div className="print-sig-line" style={{ gridColumn: "1 / -1", maxWidth: 400, margin: "0 auto" }}>
-            <p style={{ fontWeight: "bold" }}>{chefe.rank} {chefe.fullName}</p>
-            <p>Chefe da Divisão Acadêmica</p>
-          </div>
+      {/* Assinatura — função sempre preenchida; nome em branco se não houver
+          titular ativo na função no momento da geração. */}
+      <div className="print-signatures" style={{ marginTop: 48 }}>
+        <div className="print-sig-line" style={{ gridColumn: "1 / -1", maxWidth: 400, margin: "0 auto" }}>
+          <p style={{ fontWeight: "bold" }}>{chefe ? `${chefe.rank} ${chefe.fullName}` : " "}</p>
+          <p>Chefe da Divisão Acadêmica</p>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -358,21 +358,13 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
   const schoolRole = escolaEfetiva === "ESFAP" ? "COMANDANTE_ESFAP"
     : escolaEfetiva === "ESFO" ? "COMANDANTE_ESFO"
     : null;
+  // Assinatura sempre com o titular ATIVO da função no momento da geração:
+  // Comandante da escola (caderno) e Chefe da Divisão Acadêmica (AACP).
   const [comandante, chefeDivisao] = await Promise.all([
     schoolRole
-      ? prisma.user.findFirst({
-          where: {
-            active: true,
-            OR: [{ role: schoolRole }, { additionalRoles: { contains: schoolRole } }],
-          },
-        })
+      ? usuarioAtivoNaFuncao(schoolRole)
       : Promise.resolve(caderno.publishedBy ?? null),
-    prisma.user.findFirst({
-      where: {
-        active: true,
-        OR: [{ role: "CHEFE_DIVISAO_ACADEMICA" }, { additionalRoles: { contains: "CHEFE_DIVISAO_ACADEMICA" } }],
-      },
-    }),
+    usuarioAtivoNaFuncao("CHEFE_DIVISAO_ACADEMICA"),
   ]);
 
   const schoolLabel = escolaEfetiva === "ESFAP" ? "EsFAP"
@@ -450,10 +442,11 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
         </div>
       )}
 
-      {comandante && (
+      {(comandante || schoolRole) && (
         <div className="print-signatures" style={{ marginTop: 48 }}>
           <div className="print-sig-line" style={{ gridColumn: "1 / -1", maxWidth: 400, margin: "0 auto" }}>
-            <p style={{ fontWeight: "bold" }}>{comandante.rank} {comandante.fullName}</p>
+            {/* Função sempre preenchida; nome em branco se não houver titular ativo. */}
+            <p style={{ fontWeight: "bold" }}>{comandante ? `${comandante.rank} ${comandante.fullName}` : " "}</p>
             <p>Comandante da {schoolLabel}</p>
           </div>
         </div>

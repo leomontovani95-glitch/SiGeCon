@@ -24,18 +24,35 @@ function formatFuncoes(role: string, additionalRoles: string): string {
   return all.map((r) => ROLES[r] ?? r).join("/");
 }
 
-export default async function UsuariosPage() {
+export default async function UsuariosPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>;
+}) {
   const session = await verifyRole(...USER_MANAGERS, ...VIEWERS_APM);
   const canCreate = (USER_MANAGERS as string[]).includes(session.role);
+
+  const sp = await searchParams;
+  const situacao = sp.situacao === "inativos" ? "inativos" : "ativos";
+  const ativo = situacao === "ativos";
+
   // Alunos ficam apenas na aba Alunos — usuários são apenas o efetivo formado
-  const usuarios = await prisma.user.findMany({ where: { role: { not: "ALUNO" } }, orderBy: { fullName: "asc" } });
+  const usuarios = await prisma.user.findMany({
+    where: { role: { not: "ALUNO" }, active: ativo },
+    orderBy: { fullName: "asc" },
+  });
+
+  const tabs = [
+    { key: "ativos", label: "Ativos" },
+    { key: "inativos", label: "Inativos" },
+  ] as const;
 
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Usuários</h1>
-          <p className="text-sm text-gray-500">{usuarios.length} usuário(s) cadastrado(s)</p>
+          <p className="text-sm text-gray-500">{usuarios.length} usuário(s) {ativo ? "ativo(s)" : "inativo(s)"}</p>
         </div>
         {canCreate && (
           <Link
@@ -45,6 +62,22 @@ export default async function UsuariosPage() {
             + Novo Usuário
           </Link>
         )}
+      </div>
+
+      <div className="flex gap-1 mb-6 border-b border-gray-200">
+        {tabs.map((t) => (
+          <Link
+            key={t.key}
+            href={`/usuarios?situacao=${t.key}`}
+            className={`px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors ${
+              situacao === t.key
+                ? "border-[#1e3a5f] text-[#1e3a5f]"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {t.label}
+          </Link>
+        ))}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -100,6 +133,13 @@ export default async function UsuariosPage() {
                 </td>
               </tr>
             ))}
+            {usuarios.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-4 py-10 text-center text-gray-400">
+                  Nenhum usuário {ativo ? "ativo" : "inativo"} encontrado.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

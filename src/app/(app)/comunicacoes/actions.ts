@@ -58,6 +58,7 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
   ]);
   if (!tipo)  return { error: "Tipo de comunicação não encontrado." };
   if (!aluno) return { error: "Aluno não encontrado." };
+  if (!aluno.course.active) return { error: "Curso inativo: não é possível registrar novas comunicações para alunos deste curso." };
 
   if (isAluno) {
     // Apenas CPI e Referência Elogiosa são permitidos para alunos
@@ -218,6 +219,10 @@ export async function registrarComunicacaoEmLote(_prev: LoteState, formData: For
     const aluno = await prisma.student.findUnique({ where: { id: studentId }, include: { course: true } });
     if (!aluno) {
       falhas.push({ label: studentId, motivo: "Aluno não encontrado." });
+      continue;
+    }
+    if (!aluno.course.active) {
+      falhas.push({ label: `${aluno.warName} (Nº ${aluno.courseNumber})`, motivo: "Curso inativo — não recebe novas comunicações." });
       continue;
     }
 
@@ -686,6 +691,7 @@ export async function registrarElogioBi(_prev: State, formData: FormData): Promi
   ]);
 
   if (!aluno)  return { error: "Aluno não encontrado." };
+  if (!aluno.course.active) return { error: "Curso inativo: não é possível registrar novas comunicações para alunos deste curso." };
   if (!tipo)   return { error: "Tipo 'Elogio publicado em BI' não cadastrado no sistema." };
   if (!regra)  return { error: "Dispositivo legal não encontrado." };
 
@@ -769,6 +775,7 @@ export async function registrarTransgressao(_prev: State, formData: FormData): P
     prisma.communicationType.findFirst({ where: { name: tipoComunicacao } }),
   ]);
   if (!aluno) return { error: "Aluno não encontrado." };
+  if (!aluno.course.active) return { error: "Curso inativo: não é possível registrar novas comunicações para alunos deste curso." };
   if (!tipo)  return { error: "Tipo de transgressão não cadastrado no sistema." };
 
   const descricao = tipoComunicacao === "TAC"

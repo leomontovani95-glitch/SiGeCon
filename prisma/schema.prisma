@@ -75,9 +75,12 @@ model Student {
   courseId         String
   courseNumber     String
   platoonId        String?
-  cpf              String?  @unique
+  // rg/cpf NÃO são únicos: a mesma pessoa pode ter vários cadastros (um por
+  // curso) ao ascender (ex.: CFO 1 -> CFO 2). O login (User) permanece único e
+  // vinculado apenas à matrícula ativa (userId @unique).
+  cpf              String?
   userId           String?  @unique
-  rg               String   @unique
+  rg               String
   functionalNumber String?
   email            String?
   status           String   @default("ATIVO")
@@ -94,6 +97,7 @@ model Student {
 
   @@index([courseId])
   @@index([platoonId])
+  @@index([rg])
 }
 
 model ManualRule {
