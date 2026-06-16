@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import PrintLayout from "@/components/PrintLayout";
+import { escolaHeaderLabel } from "@/lib/utils";
 
 const PRINT_COLORS = [
   "#1e3a5f", "#2563eb", "#0891b2", "#0d9488",
@@ -43,7 +44,7 @@ export default async function AnaliseImprimirPage({
     prisma.course.findMany({
       where: { active: true, ...(school ? { school } : {}) },
       orderBy: { name: "asc" },
-      select: { id: true, name: true },
+      select: { id: true, name: true, school: true },
     }),
     platoonId
       ? prisma.platoon.findUnique({ where: { id: platoonId }, select: { name: true } })
@@ -175,6 +176,8 @@ export default async function AnaliseImprimirPage({
   const cursoSelecionado = cursosDisponiveis.find((c) => c.id === cursoId);
   const labelEscopo = school === "ESFAP" ? "EsFAP" : school === "ESFO" ? "EsFO" : "Todos os cursos";
   const escopo = [cursoSelecionado?.name ?? labelEscopo, plataoSelecionado?.name].filter(Boolean).join(" · ");
+  // Escola do cabeçalho: curso selecionado tem prioridade; sem filtro → DIVISÃO ACADÊMICA.
+  const escolaHeader = cursoSelecionado?.school ?? school ?? null;
 
   const periodoLabel =
     dataInicio && dataFim
@@ -215,7 +218,7 @@ export default async function AnaliseImprimirPage({
   `;
 
   return (
-    <PrintLayout title={`Análise — ${escopo}`} extraStyles={extraStyles}>
+    <PrintLayout title={`Análise — ${escopo}`} escola={escolaHeaderLabel(escolaHeader)} extraStyles={extraStyles}>
 
       {/* ── Título e filtros ── */}
       <div className="print-section">

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import PrintLayout from "@/components/PrintLayout";
+import { escolaHeaderLabel } from "@/lib/utils";
 
 export default async function ImprimirDecisaoPage({ params }: { params: Promise<{ id: string }> }) {
   await verifySession();
@@ -24,7 +25,7 @@ export default async function ImprimirDecisaoPage({ params }: { params: Promise<
   const decision = comm.decisions[0];
 
   return (
-    <PrintLayout title={`Decisão — ${comm.protocolNumber}`}>
+    <PrintLayout title={`Decisão — ${comm.protocolNumber}`} escola={escolaHeaderLabel(comm.student.course.school)}>
       <div className="print-section">
         <h2>Decisão do Comandante da Escola</h2>
         <div className="print-grid">

@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import PrintLayout from "@/components/PrintLayout";
+import { escolaHeaderLabel } from "@/lib/utils";
 
 export default async function ImprimirComunicacaoPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await verifySession();
@@ -32,7 +33,7 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
   const docTitle = isCPI ? `CPI — ${comm.protocolNumber}` : `Referência Elogiosa — ${comm.protocolNumber}`;
 
   return (
-    <PrintLayout title={docTitle}>
+    <PrintLayout title={docTitle} escola={escolaHeaderLabel(comm.student.course.school)}>
       <div className="print-section">
         <h2>{isCPI ? "Conduta Profissional Inadequada (CPI)" : "Referência Elogiosa"}</h2>
         <div className="print-field">

@@ -18,6 +18,14 @@ export function formatCourseNumber(n: string | null | undefined): string {
   return m[1].padStart(2, "0") + m[2];
 }
 
+// Linha da escola para o cabeçalho dos PDFs. Quando não há escola definida
+// (ex.: relatório/ranking de todos os cursos), usa "DIVISÃO ACADÊMICA".
+export function escolaHeaderLabel(school: string | null | undefined): string {
+  if (school === "ESFO") return "ESCOLA DE FORMAÇÃO DE OFICIAIS - EsFO";
+  if (school === "ESFAP") return "ESCOLA DE FORMAÇÃO E APERFEIÇOAMENTO DE PRAÇAS - EsFAP";
+  return "DIVISÃO ACADÊMICA";
+}
+
 // Data LOCAL no formato YYYY-MM-DD. Evita o deslize de dia que ocorre com
 // new Date().toISOString() (que usa UTC) perto da meia-noite no Brasil (UTC-3).
 export function dataLocalISO(d: Date = new Date()): string {

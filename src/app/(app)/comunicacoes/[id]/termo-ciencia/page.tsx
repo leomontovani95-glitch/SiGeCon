@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import PrintLayout from "@/components/PrintLayout";
 import { calcularPrazoDefesa } from "@/lib/prazos";
+import { escolaHeaderLabel } from "@/lib/utils";
 
 export default async function TermoCienciaPage({ params }: { params: Promise<{ id: string }> }) {
   await verifySession();
@@ -28,7 +29,7 @@ export default async function TermoCienciaPage({ params }: { params: Promise<{ i
     : null;
 
   return (
-    <PrintLayout title={`Termo de Ciência — ${comm.protocolNumber}`}>
+    <PrintLayout title={`Termo de Ciência — ${comm.protocolNumber}`} escola={escolaHeaderLabel(comm.student.course.school)}>
       <div className="print-section">
         <h2>Termo de Ciência de Comunicação</h2>
         <div className="print-grid">

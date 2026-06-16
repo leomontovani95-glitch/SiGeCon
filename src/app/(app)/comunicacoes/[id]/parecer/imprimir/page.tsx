@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import PrintLayout from "@/components/PrintLayout";
+import { escolaHeaderLabel } from "@/lib/utils";
 
 export default async function ImprimirParecerPage({ params }: { params: Promise<{ id: string }> }) {
   await verifySession();
@@ -24,7 +25,7 @@ export default async function ImprimirParecerPage({ params }: { params: Promise<
   const opinion = comm.opinions[0];
 
   return (
-    <PrintLayout title={`Parecer — ${comm.protocolNumber}`}>
+    <PrintLayout title={`Parecer — ${comm.protocolNumber}`} escola={escolaHeaderLabel(comm.student.course.school)}>
       <div className="print-section">
         <h2>Parecer — {comm.type.name}</h2>
         <div className="print-grid">

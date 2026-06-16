@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { verifySession, getSchoolFilter } from "@/lib/dal";
 import { redirect } from "next/navigation";
 import { calcularNotaPublicada, faixaNota } from "@/lib/score";
-import { abreviarPelotao } from "@/lib/utils";
+import { abreviarPelotao, escolaHeaderLabel } from "@/lib/utils";
 import PrintLayout from "@/components/PrintLayout";
 
 const ORDENS_VALIDAS = ["desc", "asc", "numAsc", "numDesc"] as const;
@@ -41,7 +41,7 @@ export default async function RankingImprimirPage({
   const cursosDisponiveis = await prisma.course.findMany({
     where: { active: true, ...(school ? { school } : {}) },
     orderBy: { name: "asc" },
-    select: { id: true, name: true },
+    select: { id: true, name: true, school: true },
   });
 
   const scopeIds = cursoId
@@ -90,13 +90,15 @@ export default async function RankingImprimirPage({
   const cursoSelecionado = cursosDisponiveis.find((c) => c.id === cursoId);
   const labelEscopo = school === "ESFAP" ? "EsFAP" : school === "ESFO" ? "EsFO" : "Todos os cursos";
   const escopo = cursoSelecionado?.name ?? labelEscopo;
+  // Escola do cabeçalho: curso selecionado tem prioridade; sem filtro → DIVISÃO ACADÊMICA.
+  const escolaHeader = cursoSelecionado?.school ?? school ?? null;
 
   // Contagem por faixa para o resumo
   const faixaCount: Record<string, number> = { Excelente: 0, Bom: 0, Regular: 0, Atenção: 0, Reprovado: 0 };
   for (const a of ranking) faixaCount[faixaNota(a.nota).label]++;
 
   return (
-    <PrintLayout title={`Ranking de Conduta — ${escopo}`}>
+    <PrintLayout title={`Ranking de Conduta — ${escopo}`} escola={escolaHeaderLabel(escolaHeader)}>
       <div className="print-section">
         <h2>Ranking de Conduta</h2>
         <p style={{ fontSize: "9pt", color: "#555", marginBottom: "10px" }}>

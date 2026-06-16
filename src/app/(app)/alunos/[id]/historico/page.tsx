@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import PrintLayout from "@/components/PrintLayout";
 import { calcularNotaPublicada } from "@/lib/score";
-import { formatCourseNumber } from "@/lib/utils";
+import { formatCourseNumber, escolaHeaderLabel } from "@/lib/utils";
 
 export default async function HistoricoAlunoPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await verifySession();
@@ -103,7 +103,7 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
   };
 
   return (
-    <PrintLayout title={`Histórico — ${aluno.warName}`}>
+    <PrintLayout title={`Histórico — ${aluno.warName}`} escola={escolaHeaderLabel(aluno.course.school)}>
       <div className="print-section">
         <h2>Histórico do Aluno — Conduta Profissional</h2>
         <div className="print-grid">

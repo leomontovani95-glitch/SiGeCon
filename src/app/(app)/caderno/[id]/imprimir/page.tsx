@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
 import { usuarioAtivoNaFuncao } from "@/lib/signatarios";
-import { platoonOrder, abreviarPelotao } from "@/lib/utils";
+import { platoonOrder, abreviarPelotao, escolaHeaderLabel } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -61,6 +61,25 @@ function fmtOrigEnq(art: string | null, inc: string | null, al: string | null): 
 function fmtBGPM(num: string | null | undefined, year: string | null | undefined): string | null {
   if (!num || !year) return null;
   return `BGPM Nº ${num.padStart(3, "0")}/${year}`;
+}
+
+// Título do curso por extenso + identificação curta (ex.: "CFO 2", "CFSd 2025", "CHS 2026").
+function cursoTitulo(name: string | null | undefined, year: number | null | undefined): string | null {
+  if (!name) return null;
+  const up = name.toUpperCase().trim();
+  if (up.startsWith("CFO")) {
+    const m = up.match(/\d/);
+    const ano = m ? ` ${m[0]}º ANO` : "";
+    return `CURSO DE FORMAÇÃO DE OFICIAIS${ano} - ${name}`;
+  }
+  if (up.startsWith("CFSD")) {
+    return `CURSO DE FORMAÇÃO DE SOLDADOS - ${name}`;
+  }
+  if (up.startsWith("CHS")) {
+    const curto = /\d{4}/.test(name) ? name : year ? `${name} ${year}` : name;
+    return `CURSO DE HABILITAÇÃO DE SARGENTOS - ${curto}`;
+  }
+  return name;
 }
 
 function normalizarPeriodo(p: string): string {
@@ -246,6 +265,7 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
           <p className="linha1">Governo do Estado do Espírito Santo</p>
           <p className="linha2">Polícia Militar</p>
           <p className="linha3">Academia de Polícia Militar</p>
+          <p className="linha4">{escolaHeaderLabel(escola)}</p>
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brasao-apm.png" alt="APM/ES" className="print-header-logo" width={68} height={68} />
@@ -375,6 +395,14 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
     ? `CD Nº ${String(caderno.number).padStart(2, "0")} — ${caderno.course.name}`
     : `CD-${String(caderno.number).padStart(4, "0")}`;
 
+  // Bloco de título: curso por extenso e nº do caderno / ano corrente.
+  // (A escola aparece no cabeçalho institucional, via prop do PrintLayout.)
+  const cursoLinha = caderno.course ? cursoTitulo(caderno.course.name, caderno.course.year) : null;
+  const anoCaderno = caderno.publicationDate
+    ? new Date(caderno.publicationDate).getFullYear()
+    : new Date().getFullYear();
+  const cadernoLinha = `CADERNO DISCIPLINAR Nº ${String(caderno.number).padStart(2, "0")}/${anoCaderno}`;
+
   const itens = caderno.items;
 
   // Conta total por grupo para o resumo
@@ -401,11 +429,20 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
     .aacp-table { width: 100%; border-collapse: collapse; font-size: 7.5pt; table-layout: fixed; }
     .aacp-table th { background: #1e3a5f; color: white; padding: 4px 5px; font-size: 7pt; text-align: left; border: 1px solid #000; }
     .aacp-table td { padding: 3.5px 5px; border: 1px solid #000; vertical-align: middle; }
+    .cd-title-block { text-align: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #ccc; }
+    .cd-title-block p { margin: 0 0 3px 0; color: #1e3a5f; font-weight: bold; letter-spacing: 0.5px; line-height: 1.3; }
+    .cd-title-block .cd-curso   { font-size: 11pt; }
+    .cd-title-block .cd-caderno { font-size: 12.5pt; margin-top: 5px; }
+    .cd-meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 16px; }
+    .cd-meta-grid .print-field { margin-bottom: 0; }
+    .cd-header-section { margin-bottom: 4px !important; }
+    .cd-header-section + .print-section { margin-top: 12px !important; }
   `;
 
   return (
     <PrintLayout
       title={`Caderno Disciplinar ${numero}`}
+      escola={escolaHeaderLabel(escolaEfetiva)}
       extraStyles={extraStyles}
       extraPages={caderno.aacp ? [
         <AACPAnexo key="aacp" aacp={caderno.aacp} caderno={caderno} chefe={chefeDivisao} />
@@ -413,20 +450,17 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
     >
 
       {/* Cabeçalho */}
-      <div className="print-section">
-        <h2>Caderno Disciplinar — {numero}</h2>
-        <div className="print-grid">
+      <div className="print-section cd-header-section">
+        <div className="cd-title-block">
+          {cursoLinha && <p className="cd-curso">{cursoLinha}</p>}
+          <p className="cd-caderno">{cadernoLinha}</p>
+        </div>
+        <div className="cd-meta-grid">
           <div className="print-field">
             <label>Data de publicação</label>
             <span>{caderno.publicationDate ? format(new Date(caderno.publicationDate), "dd/MM/yyyy", { locale: ptBR }) : "Não publicado"}</span>
           </div>
           <div className="print-field"><label>Situação</label><span>{caderno.status === "PUBLICADO" ? "Publicado" : "Rascunho"}</span></div>
-          {caderno.publishedBy && (
-            <div className="print-field">
-              <label>Publicado por</label>
-              <span>{caderno.publishedBy.rank} {caderno.publishedBy.warName}</span>
-            </div>
-          )}
           <div className="print-field"><label>Total de registros</label><span>{totalRegistros}</span></div>
         </div>
       </div>

@@ -6,9 +6,10 @@ type Props = {
   children: React.ReactNode;
   extraPages?: React.ReactNode[];
   extraStyles?: string;
+  escola?: string;
 };
 
-export default function PrintLayout({ title, children, extraPages, extraStyles }: Props) {
+export default function PrintLayout({ title, children, extraPages, extraStyles, escola }: Props) {
   useEffect(() => {
     document.title = title;
   }, [title]);
@@ -114,6 +115,13 @@ export default function PrintLayout({ title, children, extraPages, extraStyles }
           text-transform: uppercase;
           letter-spacing: 0.5px;
         }
+        .print-header-text .linha4 {
+          font-size: 8.5pt;
+          font-weight: bold;
+          color: #333;
+          margin: 2px 0 0 0;
+          letter-spacing: 0.5px;
+        }
 
         /* ── Seções e campos ── */
         .print-section { margin-bottom: 16px; }
@@ -153,6 +161,7 @@ export default function PrintLayout({ title, children, extraPages, extraStyles }
             <p className="linha1">Governo do Estado do Espírito Santo</p>
             <p className="linha2">Polícia Militar</p>
             <p className="linha3">Academia de Polícia Militar</p>
+            {escola && <p className="linha4">{escola}</p>}
           </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/brasao-apm.png" alt="APM/ES" className="print-header-logo" width={68} height={68} loading="eager" />

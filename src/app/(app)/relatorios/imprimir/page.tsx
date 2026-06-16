@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import PrintLayout from "@/components/PrintLayout";
+import { escolaHeaderLabel } from "@/lib/utils";
 
 function resolveStatusLabel(c: {
   status: string;
@@ -49,7 +50,7 @@ export default async function RelatoriosImprimirPage({
   const cursosDisponiveis = await prisma.course.findMany({
     where: { active: true, ...(school ? { school } : {}) },
     orderBy: { name: "asc" },
-    select: { id: true, name: true },
+    select: { id: true, name: true, school: true },
   });
 
   const cursoFilter = cursoId
@@ -107,6 +108,8 @@ export default async function RelatoriosImprimirPage({
   const cursoSelecionado = cursosDisponiveis.find((c) => c.id === cursoId);
   const labelEscopo = school === "ESFAP" ? "EsFAP" : school === "ESFO" ? "EsFO" : "Todos os cursos";
   const escopo = cursoSelecionado?.name ?? labelEscopo;
+  // Escola do cabeçalho: curso selecionado tem prioridade; sem filtro → DIVISÃO ACADÊMICA.
+  const escolaHeader = cursoSelecionado?.school ?? school ?? null;
 
   const filtros: string[] = [escopo];
   if (tipo)       filtros.push(`Tipo: ${tipo}`);
@@ -119,7 +122,7 @@ export default async function RelatoriosImprimirPage({
   const favoraveis    = comunicacoes.filter((c) => c.type.scoreNature === "FAVORAVEL").length;
 
   return (
-    <PrintLayout title={`Relatório de Comunicações — ${escopo}`}>
+    <PrintLayout title={`Relatório de Comunicações — ${escopo}`} escola={escolaHeaderLabel(escolaHeader)}>
       <div className="print-section">
         <h2>Relatório de Comunicações</h2>
         <p style={{ fontSize: "9pt", color: "#555", marginBottom: "12px" }}>{filtros.join("  ·  ")}</p>
