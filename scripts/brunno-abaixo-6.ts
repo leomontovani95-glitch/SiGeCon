@@ -91,12 +91,13 @@ async function main() {
   await prisma.communication.update({ where: { id: comm.id }, data: { status: "DECIDIDA", finalScore: 0.6 } });
 
   // Caderno e publicação
+  const anoCaderno = new Date().getFullYear();
   const ultimoCaderno = await prisma.disciplinaryBook.findFirst({
-    where: { courseId: brunno.courseId },
+    where: { courseId: brunno.courseId, year: anoCaderno },
     orderBy: { number: "desc" },
   });
   const caderno = await prisma.disciplinaryBook.create({
-    data: { number: (ultimoCaderno?.number ?? 0) + 1, courseId: brunno.courseId, createdById: admin.id, status: "RASCUNHO" },
+    data: { number: (ultimoCaderno?.number ?? 0) + 1, year: anoCaderno, courseId: brunno.courseId, createdById: admin.id, status: "RASCUNHO" },
   });
   await prisma.disciplinaryBookItem.create({
     data: {

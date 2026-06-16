@@ -58,7 +58,7 @@ export default async function AlunoPage({
           include: { communication: { include: { type: { select: { scoreNature: true } } } } },
         },
       },
-      orderBy: { number: "asc" },
+      orderBy: [{ year: "asc" }, { number: "asc" }],
     }),
   ]);
   if (!aluno) notFound();
@@ -97,7 +97,7 @@ export default async function AlunoPage({
       else notaAcc += mag;
     }
     evolucaoNota.push({
-      label: `CD ${String(livro.number).padStart(2, "0")}`,
+      label: `CD ${String(livro.number).padStart(2, "0")}/${String(livro.year).slice(2)}`,
       nota: Math.round(notaAcc * 100) / 100,
     });
   }

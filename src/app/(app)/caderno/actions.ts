@@ -36,15 +36,17 @@ export async function criarCaderno() {
     // Reaproveita rascunho existente para este curso ou cria novo
     let caderno = await prisma.disciplinaryBook.findFirst({
       where: { status: "RASCUNHO", courseId: courseId ?? undefined },
-      orderBy: { number: "desc" },
+      orderBy: [{ year: "desc" }, { number: "desc" }],
     });
     if (!caderno) {
+      // Numeração reinicia a cada ano: próximo nº = maior do curso NO ANO + 1.
+      const ano = new Date().getFullYear();
       const ultimo = await prisma.disciplinaryBook.findFirst({
-        where: { courseId: courseId ?? undefined },
+        where: { courseId: courseId ?? undefined, year: ano },
         orderBy: { number: "desc" },
       });
       caderno = await prisma.disciplinaryBook.create({
-        data: { number: (ultimo?.number ?? 0) + 1, courseId, createdById: session.userId },
+        data: { number: (ultimo?.number ?? 0) + 1, year: ano, courseId, createdById: session.userId },
       });
     }
     if (!primeiroCaderno) primeiroCaderno = caderno;

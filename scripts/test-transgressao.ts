@@ -49,12 +49,13 @@ async function main() {
     console.log("Caderno rascunho:", caderno?.id ?? "nenhum");
 
     if (!caderno) {
+      const anoCaderno = new Date().getFullYear();
       const ultimo = await prisma.disciplinaryBook.findFirst({
-        where: { courseId: aluno.courseId },
+        where: { courseId: aluno.courseId, year: anoCaderno },
         orderBy: { number: "desc" },
       });
       caderno = await prisma.disciplinaryBook.create({
-        data: { number: (ultimo?.number ?? 0) + 1, courseId: aluno.courseId, createdById: staff.id },
+        data: { number: (ultimo?.number ?? 0) + 1, year: anoCaderno, courseId: aluno.courseId, createdById: staff.id },
       });
       console.log("Caderno criado:", caderno.id);
     }

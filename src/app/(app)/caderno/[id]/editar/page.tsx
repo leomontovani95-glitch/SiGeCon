@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { abreviarPelotao, platoonOrder } from "@/lib/utils";
+import { abreviarPelotao, platoonOrder, formatCadernoNumero } from "@/lib/utils";
 import { verifyRole, getSchoolFilter } from "@/lib/dal";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
@@ -69,9 +69,7 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
   const pendentesDisponiveis = pendentes.filter((c) => !itemIds.has(c.id));
 
   const canPublish = caderno.status !== "PUBLICADO";
-  const numero = caderno.course
-    ? `CD Nº ${String(caderno.number).padStart(2, "0")} — ${caderno.course.name}`
-    : `CD-${String(caderno.number).padStart(4, "0")}`;
+  const numero = formatCadernoNumero(caderno);
 
   function fmtEnq(art: string | null, inc: string | null, al: string | null) {
     if (!art) return "—";

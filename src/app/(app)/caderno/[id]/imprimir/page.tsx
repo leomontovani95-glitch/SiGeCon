@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
 import { usuarioAtivoNaFuncao } from "@/lib/signatarios";
-import { platoonOrder, abreviarPelotao, escolaHeaderLabel } from "@/lib/utils";
+import { platoonOrder, abreviarPelotao, escolaHeaderLabel, formatCadernoNumero } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -197,13 +197,13 @@ function TabelaTipo({ items, label, note, isTdTac }: { items: Item[]; label: str
 }
 
 type AacpData = NonNullable<Awaited<ReturnType<typeof fetchCaderno>>["aacp"]>;
-type CadernoMeta = { number: number; course?: { name: string; school?: string | null } | null; school?: string | null };
+type CadernoMeta = { number: number; year: number; course?: { name: string; school?: string | null } | null; school?: string | null };
 type ChefeUser = { rank: string; fullName: string } | null;
 
 function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoMeta; chefe: ChefeUser }) {
   const sat = new Date(aacp.saturdayDate);
   const sun = new Date(aacp.sundayDate);
-  const numero = `${String(caderno.number).padStart(2, "0")}/${sat.getFullYear()}`;
+  const numero = `${String(caderno.number).padStart(2, "0")}/${caderno.year}`;
   const cursosNome = caderno.course?.name ?? "—";
   const escola = (caderno.course?.school ?? caderno.school) as string | null | undefined;
   const efetivoDicente = escola === "ESFAP" ? "Conforme Caderno Disciplinar EsFAP"
@@ -391,17 +391,12 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
     : escolaEfetiva === "ESFO" ? "EsFO"
     : "Escola";
 
-  const numero = caderno.course
-    ? `CD Nº ${String(caderno.number).padStart(2, "0")} — ${caderno.course.name}`
-    : `CD-${String(caderno.number).padStart(4, "0")}`;
+  const numero = formatCadernoNumero(caderno);
 
-  // Bloco de título: curso por extenso e nº do caderno / ano corrente.
+  // Bloco de título: curso por extenso e nº do caderno / ano de criação.
   // (A escola aparece no cabeçalho institucional, via prop do PrintLayout.)
   const cursoLinha = caderno.course ? cursoTitulo(caderno.course.name, caderno.course.year) : null;
-  const anoCaderno = caderno.publicationDate
-    ? new Date(caderno.publicationDate).getFullYear()
-    : new Date().getFullYear();
-  const cadernoLinha = `CADERNO DISCIPLINAR Nº ${String(caderno.number).padStart(2, "0")}/${anoCaderno}`;
+  const cadernoLinha = `CADERNO DISCIPLINAR Nº ${String(caderno.number).padStart(2, "0")}/${caderno.year}`;
 
   const itens = caderno.items;
 

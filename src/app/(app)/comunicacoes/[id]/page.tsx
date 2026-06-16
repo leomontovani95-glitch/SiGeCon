@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { verifySession, canEmitOpinion, getSchoolFilter } from "@/lib/dal";
+import { formatCadernoNumero } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -136,9 +137,7 @@ export default async function ComunicacaoPage({
             )}
             {cadernoPublicado && (
               <span className="inline-block text-xs px-3 py-1 rounded-full bg-teal-100 text-teal-700 font-medium font-mono">
-                {cadernoPublicado.course
-                  ? `CD Nº ${String(cadernoPublicado.number).padStart(2, "0")} — ${cadernoPublicado.course.name}`
-                  : `CD-${String(cadernoPublicado.number).padStart(4, "0")}`}
+                {formatCadernoNumero(cadernoPublicado)}
               </span>
             )}
           </div>

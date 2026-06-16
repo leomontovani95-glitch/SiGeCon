@@ -175,14 +175,15 @@ async function main() {
   // ── Criar e publicar caderno ─────────────────────────────────────────────
   console.log(`\n📒 Criando caderno para ${curso.name}...`);
 
+  const anoCaderno = new Date().getFullYear();
   const ultimoCaderno = await prisma.disciplinaryBook.findFirst({
-    where: { courseId: curso.id },
+    where: { courseId: curso.id, year: anoCaderno },
     orderBy: { number: "desc" },
   });
   const numeroCaderno = (ultimoCaderno?.number ?? 0) + 1;
 
   const caderno = await prisma.disciplinaryBook.create({
-    data: { number: numeroCaderno, courseId: curso.id, createdById: admin.id, status: "RASCUNHO" },
+    data: { number: numeroCaderno, year: anoCaderno, courseId: curso.id, createdById: admin.id, status: "RASCUNHO" },
   });
 
   const todasComms = [...commsA1, ...commsA2];

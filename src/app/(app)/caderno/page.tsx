@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { verifySession, getSchoolFilter } from "@/lib/dal";
+import { formatCadernoNumero } from "@/lib/utils";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -43,7 +44,7 @@ export default async function CadernoPage({
   const [cadernos, pendentesPublicacao, naoIncluidos] = await Promise.all([
     prisma.disciplinaryBook.findMany({
       where: cadernoWhere,
-      orderBy: [{ courseId: "asc" }, { number: "asc" }],
+      orderBy: [{ courseId: "asc" }, { year: "asc" }, { number: "asc" }],
       include: { createdBy: true, publishedBy: true, course: true, _count: { select: { items: true } } },
     }),
     prisma.communication.count({
@@ -136,9 +137,7 @@ export default async function CadernoPage({
             {cadernos.map((c) => (
               <tr key={c.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 font-mono font-bold text-gray-900">
-                  {c.course
-                    ? `CD Nº ${String(c.number).padStart(2, "0")} — ${c.course.name}`
-                    : `CD-${String(c.number).padStart(4, "0")}`}
+                  {formatCadernoNumero(c)}
                 </td>
                 <td className="px-4 py-3 text-xs text-gray-500">{c.course?.name ?? c.school ?? "—"}</td>
                 <td className="px-4 py-3 text-gray-600">{c._count.items}</td>

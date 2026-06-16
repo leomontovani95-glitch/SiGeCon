@@ -18,6 +18,17 @@ export function formatCourseNumber(n: string | null | undefined): string {
   return m[1].padStart(2, "0") + m[2];
 }
 
+// Rótulo do caderno disciplinar: "CD Nº 01/2026 — CURSO". A numeração reinicia
+// a cada ano, por isso o ano (de criação) faz parte da identificação.
+export function formatCadernoNumero(
+  book: { number: number; year: number; course?: { name: string } | null },
+): string {
+  const n = String(book.number).padStart(2, "0");
+  return book.course
+    ? `CD Nº ${n}/${book.year} — ${book.course.name}`
+    : `CD-${n}/${book.year}`;
+}
+
 // Linha da escola para o cabeçalho dos PDFs. Quando não há escola definida
 // (ex.: relatório/ranking de todos os cursos), usa "DIVISÃO ACADÊMICA".
 export function escolaHeaderLabel(school: string | null | undefined): string {

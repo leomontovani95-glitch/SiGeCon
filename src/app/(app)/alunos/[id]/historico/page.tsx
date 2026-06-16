@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import PrintLayout from "@/components/PrintLayout";
 import { calcularNotaPublicada } from "@/lib/score";
-import { formatCourseNumber, escolaHeaderLabel } from "@/lib/utils";
+import { formatCourseNumber, escolaHeaderLabel, formatCadernoNumero } from "@/lib/utils";
 
 export default async function HistoricoAlunoPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await verifySession();
@@ -27,7 +27,7 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
       where: { studentId: id, disciplinaryBook: { status: "PUBLICADO" } },
       include: {
         communication: { include: { type: { select: { scoreNature: true } } } },
-        disciplinaryBook: { select: { id: true, number: true, publicationDate: true, course: { select: { name: true } } } },
+        disciplinaryBook: { select: { id: true, number: true, year: true, publicationDate: true, course: { select: { name: true } } } },
       },
       orderBy: { disciplinaryBook: { publicationDate: "asc" } },
     }),
@@ -87,7 +87,7 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
     const itensAteCaderno = pubItems.filter((i) => idsAteAqui.has(i.disciplinaryBook.id));
     const notaApos = calcularNotaPublicada(itensAteCaderno);
     evolucao.push({
-      label: `CD Nº ${String(caderno.number).padStart(2, "0")}${caderno.course ? ` — ${caderno.course.name}` : ""}`,
+      label: formatCadernoNumero(caderno),
       date: new Date(caderno.publicationDate!),
       nota: notaApos,
     });

@@ -51,15 +51,17 @@ export async function adicionarAoCaderno(
 ): Promise<void> {
   let caderno = await tx.disciplinaryBook.findFirst({
     where: { status: "RASCUNHO", courseId },
-    orderBy: { number: "desc" },
+    orderBy: [{ year: "desc" }, { number: "desc" }],
   });
   if (!caderno) {
+    // Numeração reinicia a cada ano: próximo nº = maior do curso NO ANO + 1.
+    const ano = new Date().getFullYear();
     const ultimo = await tx.disciplinaryBook.findFirst({
-      where: { courseId },
+      where: { courseId, year: ano },
       orderBy: { number: "desc" },
     });
     caderno = await tx.disciplinaryBook.create({
-      data: { number: (ultimo?.number ?? 0) + 1, courseId, createdById },
+      data: { number: (ultimo?.number ?? 0) + 1, year: ano, courseId, createdById },
     });
   }
 

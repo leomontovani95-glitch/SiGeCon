@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { abreviarPelotao, platoonOrder } from "@/lib/utils";
+import { abreviarPelotao, platoonOrder, formatCadernoNumero } from "@/lib/utils";
 import { verifySession } from "@/lib/dal";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
@@ -131,9 +131,7 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
   });
   if (!caderno) notFound();
 
-  const numero = caderno.course
-    ? `CD Nº ${String(caderno.number).padStart(2, "0")} — ${caderno.course.name}`
-    : `CD-${String(caderno.number).padStart(4, "0")}`;
+  const numero = formatCadernoNumero(caderno);
 
   const canEdit = [
     "ADMINISTRADOR", "PROTOCOLO",

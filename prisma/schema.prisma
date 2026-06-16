@@ -280,6 +280,7 @@ model Decision {
 model DisciplinaryBook {
   id              String    @id @default(cuid())
   number          Int
+  year            Int
   courseId        String?
   school          String?
   publicationDate DateTime?
@@ -295,8 +296,8 @@ model DisciplinaryBook {
   items       DisciplinaryBookItem[]
   aacp        Aacp?
 
-  // Numeração do caderno é única por curso (não mais global).
-  @@unique([courseId, number])
+  // Numeração do caderno é única por curso e ano (reinicia a cada ano).
+  @@unique([courseId, year, number])
   @@index([status])
 }
 

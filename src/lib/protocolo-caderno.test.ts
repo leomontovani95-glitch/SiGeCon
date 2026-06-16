@@ -114,7 +114,7 @@ describe("adicionarAoCaderno", () => {
 
   it("o índice único rejeita a mesma comunicação no mesmo caderno", async () => {
     const comm = await novaComm("CPI - 0001 - CFO 1");
-    const book = await prisma.disciplinaryBook.create({ data: { number: 1, courseId, createdById: reporterId } });
+    const book = await prisma.disciplinaryBook.create({ data: { number: 1, year: 2026, courseId, createdById: reporterId } });
     await prisma.disciplinaryBookItem.create({ data: { disciplinaryBookId: book.id, ...itemBase(comm.id, 0.2) } });
     await expect(
       prisma.disciplinaryBookItem.create({ data: { disciplinaryBookId: book.id, ...itemBase(comm.id, 0.2) } }),
@@ -126,7 +126,7 @@ describe("calcularNotaPublicada sobre itens reais publicados", () => {
   it("desconta desfavorável e soma favorável a partir do banco", async () => {
     const c1 = await novaComm("CPI - 0001 - CFO 1", typeCpiId);
     const c2 = await novaComm("RE - 0001 - CFO 1", typeReId);
-    const book = await prisma.disciplinaryBook.create({ data: { number: 1, courseId, status: "PUBLICADO", createdById: reporterId } });
+    const book = await prisma.disciplinaryBook.create({ data: { number: 1, year: 2026, courseId, status: "PUBLICADO", createdById: reporterId } });
     await prisma.disciplinaryBookItem.create({ data: { disciplinaryBookId: book.id, ...itemBase(c1.id, 0.2) } });
     await prisma.disciplinaryBookItem.create({ data: { disciplinaryBookId: book.id, ...itemBase(c2.id, 0.2), recordType: "Referência Elogiosa" } });
 
