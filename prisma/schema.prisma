@@ -36,7 +36,9 @@ model User {
 
 model Course {
   id          String   @id @default(cuid())
-  name        String   @unique
+  // Unicidade do nome (sigla) é garantida no app apenas entre cursos ATIVOS,
+  // permitindo reaproveitar o nome quando o curso anterior está inativo.
+  name        String
   acronym     String
   year        Int?
   description String?

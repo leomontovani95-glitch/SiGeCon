@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
 import Link from "next/link";
 import ExcluirCursoBtn from "./_components/ExcluirCursoBtn";
+import { nomeExtensoCurso } from "@/lib/cursos";
 
 export default async function CursosPage({
   searchParams,
@@ -66,8 +67,8 @@ export default async function CursosPage({
           <div key={c.id} className="bg-white rounded-xl border border-gray-200 p-5">
             <div className="flex items-start justify-between mb-3">
               <div>
-                <h3 className="font-semibold text-gray-900">{c.name}</h3>
-                <p className="text-xs text-gray-500">{c.acronym}</p>
+                <h3 className="font-semibold text-base text-gray-900">{c.name}</h3>
+                <p className="text-xs text-gray-500">{nomeExtensoCurso(c.name)}</p>
               </div>
               <span className={`text-xs px-2 py-0.5 rounded-full ${c.active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
                 {c.active ? "Ativo" : "Inativo"}

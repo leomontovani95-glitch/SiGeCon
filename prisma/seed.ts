@@ -173,11 +173,10 @@ async function main() {
 
   const cursos: Record<string, string> = {};
   for (const c of cursosData) {
-    const curso = await prisma.course.upsert({
-      where: { name: c.name },
-      update: { school: c.school },
-      create: { ...c, active: true },
-    });
+    const existente = await prisma.course.findFirst({ where: { name: c.name } });
+    const curso = existente
+      ? await prisma.course.update({ where: { id: existente.id }, data: { school: c.school } })
+      : await prisma.course.create({ data: { ...c, active: true } });
     cursos[c.name] = curso.id;
   }
   console.log("✅ Cursos criados/atualizados:", Object.keys(cursos).join(", "));

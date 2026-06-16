@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { verifyRole } from "@/lib/dal";
 import { platoonOrder } from "@/lib/utils";
+import { parseCursoParaForm } from "@/lib/cursos";
 import { notFound } from "next/navigation";
 import CursoForm from "../../_components/CursoForm";
 import GerenciarPelotoes from "../../_components/GerenciarPelotoes";
@@ -26,9 +27,7 @@ export default async function EditarCursoPage({ params }: { params: Promise<{ id
         id={curso.id}
         defaultValues={{
           name: curso.name,
-          acronym: curso.acronym,
-          school: curso.school ?? "",
-          year: String(curso.year ?? ""),
+          ...parseCursoParaForm(curso),
           description: curso.description ?? "",
           active: String(curso.active),
         }}

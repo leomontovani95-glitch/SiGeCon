@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
 import { usuarioAtivoNaFuncao } from "@/lib/signatarios";
 import { platoonOrder, abreviarPelotao, escolaHeaderLabel, formatCadernoNumero } from "@/lib/utils";
+import { nomeExtensoCurso } from "@/lib/cursos";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -63,23 +64,11 @@ function fmtBGPM(num: string | null | undefined, year: string | null | undefined
   return `BGPM Nº ${num.padStart(3, "0")}/${year}`;
 }
 
-// Título do curso por extenso + identificação curta (ex.: "CFO 2", "CFSd 2025", "CHS 2026").
-function cursoTitulo(name: string | null | undefined, year: number | null | undefined): string | null {
+// Título do curso para o caderno: nome por extenso (maiúsculas) + sigla.
+// Ex.: "CFO 2" -> "CURSO DE FORMAÇÃO DE OFICIAIS 2º ANO - CFO 2".
+function cursoTitulo(name: string | null | undefined): string | null {
   if (!name) return null;
-  const up = name.toUpperCase().trim();
-  if (up.startsWith("CFO")) {
-    const m = up.match(/\d/);
-    const ano = m ? ` ${m[0]}º ANO` : "";
-    return `CURSO DE FORMAÇÃO DE OFICIAIS${ano} - ${name}`;
-  }
-  if (up.startsWith("CFSD")) {
-    return `CURSO DE FORMAÇÃO DE SOLDADOS - ${name}`;
-  }
-  if (up.startsWith("CHS")) {
-    const curto = /\d{4}/.test(name) ? name : year ? `${name} ${year}` : name;
-    return `CURSO DE HABILITAÇÃO DE SARGENTOS - ${curto}`;
-  }
-  return name;
+  return `${nomeExtensoCurso(name).toUpperCase()} - ${name}`;
 }
 
 function normalizarPeriodo(p: string): string {
@@ -395,7 +384,7 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
 
   // Bloco de título: curso por extenso e nº do caderno / ano de criação.
   // (A escola aparece no cabeçalho institucional, via prop do PrintLayout.)
-  const cursoLinha = caderno.course ? cursoTitulo(caderno.course.name, caderno.course.year) : null;
+  const cursoLinha = caderno.course ? cursoTitulo(caderno.course.name) : null;
   const cadernoLinha = `CADERNO DISCIPLINAR Nº ${String(caderno.number).padStart(2, "0")}/${caderno.year}`;
 
   const itens = caderno.items;
