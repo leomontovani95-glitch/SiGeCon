@@ -4,35 +4,16 @@ import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import PrintLayout from "@/components/PrintLayout";
-import { calcularNotaPublicada } from "@/lib/score";
-import { formatCourseNumber, escolaHeaderLabel, formatCadernoNumero } from "@/lib/utils";
+import { getHistoricoAluno, STATUS_COMUNICACAO_LABELS as STATUS_LABELS } from "@/lib/historico";
+import { formatCourseNumber, escolaHeaderLabel } from "@/lib/utils";
 
 export default async function HistoricoAlunoPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await verifySession();
   const { id } = await params;
 
-  const [aluno, pubItemsRaw] = await Promise.all([
-    prisma.student.findUnique({
-      where: { id },
-      include: {
-        course: true,
-        platoon: true,
-        communications: {
-          include: { type: true, decisions: { include: { authority: true } } },
-          orderBy: { factDate: "asc" },
-        },
-      },
-    }),
-    prisma.disciplinaryBookItem.findMany({
-      where: { studentId: id, disciplinaryBook: { status: "PUBLICADO" } },
-      include: {
-        communication: { include: { type: { select: { scoreNature: true } } } },
-        disciplinaryBook: { select: { id: true, number: true, year: true, publicationDate: true, course: { select: { name: true } } } },
-      },
-      orderBy: { disciplinaryBook: { publicationDate: "asc" } },
-    }),
-  ]);
-  if (!aluno) notFound();
+  const historico = await getHistoricoAluno(id);
+  if (!historico) notFound();
+  const { aluno, nota, desfavoravel, favoravel, resumo, evolucao } = historico;
 
   // Aluno só vê o próprio histórico — inclusive cadastros anteriores da mesma
   // pessoa (mesmo RG), cujo vínculo de login foi transferido para a matrícula atual.
@@ -40,67 +21,6 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
     const atual = await prisma.student.findFirst({ where: { userId: session.userId }, select: { rg: true } });
     if (!atual || atual.rg !== aluno.rg) notFound();
   }
-
-  const pubItems = pubItemsRaw;
-  const nota  = calcularNotaPublicada(pubItems);
-
-  const desfavoravel = pubItems.filter((i) => i.communication.type.scoreNature === "DESFAVORAVEL").reduce((s, i) => s + Math.abs(i.score ?? 0), 0);
-  const favoravel    = pubItems.filter((i) => i.communication.type.scoreNature === "FAVORAVEL").reduce((s, i) => s + Math.abs(i.score ?? 0), 0);
-
-  // Contagens por tipo
-  const ct = aluno.communications.reduce((acc, c) => { acc[c.type.name] = (acc[c.type.name] ?? 0) + 1; return acc; }, {} as Record<string, number>);
-  const resumo = [
-    { label: "Total",        value: aluno.communications.length,                              color: "#1e3a5f" },
-    { label: "Publicados",   value: pubItems.length,                                           color: "#374151" },
-    { label: "CPI 0/1",      value: (ct["CPI 0"] ?? 0) + (ct["CPI 1"] ?? 0),                color: "#b45309" },
-    { label: "CPI 2",        value: ct["CPI 2"] ?? 0,                                         color: "#b91c1c" },
-    { label: "CPI 3",        value: ct["CPI 3"] ?? 0,                                         color: "#7f1d1d" },
-    { label: "TD Leve",      value: ct["TD Leve"] ?? 0,                                       color: "#b45309" },
-    { label: "TD Média",     value: ct["TD Média"] ?? 0,                                      color: "#b91c1c" },
-    { label: "TD Grave",     value: ct["TD Grave"] ?? 0,                                      color: "#7f1d1d" },
-    { label: "TAC",          value: ct["TAC"] ?? 0,                                            color: "#7f1d1d" },
-    { label: "Arq.",         value: ct["Arquivamento"] ?? 0,                                   color: "#6b7280" },
-    { label: "Ref. Elogiosa",value: ct["Referência Elogiosa"] ?? 0,                           color: "#15803d" },
-    { label: "Elogio BI",    value: ct["Elogio publicado em BI"] ?? 0,                        color: "#15803d" },
-  ];
-
-  // Evolução da nota por caderno publicado
-  // Ordena por (data de publicação, número) para desempate estável quando
-  // cadernos de cursos diferentes são publicados na mesma data.
-  const cadernosOrdenados = Array.from(
-    new Map(
-      pubItems
-        .filter((i) => i.disciplinaryBook.publicationDate)
-        .map((i) => [i.disciplinaryBook.id, i.disciplinaryBook])
-    ).values()
-  ).sort((a, b) => {
-    const dt = new Date(a.publicationDate!).getTime() - new Date(b.publicationDate!).getTime();
-    return dt !== 0 ? dt : a.number - b.number;
-  });
-
-  // Acumula por pertencimento ao caderno (e não por comparação de data), para
-  // que cadernos publicados no mesmo dia não somem os itens um do outro.
-  const evolucao: { label: string; date: Date; nota: number }[] = [];
-  const idsAteAqui = new Set<string>();
-  for (const caderno of cadernosOrdenados) {
-    idsAteAqui.add(caderno.id);
-    const itensAteCaderno = pubItems.filter((i) => idsAteAqui.has(i.disciplinaryBook.id));
-    const notaApos = calcularNotaPublicada(itensAteCaderno);
-    evolucao.push({
-      label: formatCadernoNumero(caderno),
-      date: new Date(caderno.publicationDate!),
-      nota: notaApos,
-    });
-  }
-
-  const STATUS_LABELS: Record<string, string> = {
-    REGISTRADA: "Registrada",
-    AGUARDANDO_CIENCIA: "Ag. Ciência/Defesa",
-    AGUARDANDO_DEFESA: "Ag. Ciência/Defesa",
-    JUSTIFICATIVA_APRESENTADA: "Defesa Apresentada", PRAZO_EXPIRADO: "Prazo Expirado",
-    AGUARDANDO_PARECER: "Ag. Parecer", AGUARDANDO_DECISAO: "Ag. Decisão",
-    DECIDIDA: "Decidida", ARQUIVADA: "Arquivada", PUBLICADA_CADERNO: "Pub. Caderno", FINALIZADA: "Finalizada",
-  };
 
   return (
     <PrintLayout title={`Histórico — ${aluno.warName}`} escola={escolaHeaderLabel(aluno.course.school)}>

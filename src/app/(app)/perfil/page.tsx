@@ -1,8 +1,10 @@
 import { prisma } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
 import Link from "next/link";
-import { formatCourseNumber } from "@/lib/utils";
+import { getHistoricoAluno, getMatriculas } from "@/lib/historico";
+import HistoricosBox, { type MatriculaEntry } from "@/components/HistoricosBox";
 import TrocarSenhaForm from "./_components/TrocarSenhaForm";
+import HistoricoView from "./_components/HistoricoView";
 
 const ROLE_LABELS: Record<string, string> = {
   ADMINISTRADOR:           "Administrador",
@@ -29,16 +31,35 @@ export default async function PerfilPage({ searchParams }: { searchParams: Promi
   });
   if (!user) return null;
 
-  // Cadastros anteriores da mesma pessoa (mesmo RG) — ex.: ascensão de curso.
-  const cadastrosAnteriores = user.role === "ALUNO"
-    ? await prisma.student.findMany({
-        where: { rg: user.rg, ...(user.student ? { id: { not: user.student.id } } : {}) },
-        include: { course: true },
-        orderBy: { createdAt: "desc" },
-      })
-    : [];
-
+  const isAluno = user.role === "ALUNO" && !!user.student;
   const mustChange = sp.mustChange === "1" || user.mustChangePassword;
+  // Troca de senha obrigatória prende o aluno na aba Informações até resolver.
+  const aba = isAluno && !mustChange && sp.aba === "historico" ? "historico" : "informacoes";
+
+  // Matrículas da mesma pessoa (mesmo RG) — atual + cursos anteriores (ascensão).
+  // A matrícula atual é, por definição, a vinculada ao login (user.student).
+  const matriculas = isAluno ? (await getMatriculas(user.rg)).records : [];
+  const currentId = user.student?.id ?? null;
+
+  // Histórico selecionado via ?hist=; valida que pertence à mesma pessoa (mesmo
+  // RG) para um aluno não conseguir abrir histórico de outro pelo parâmetro.
+  const selectedId =
+    aba === "historico" && matriculas.some((m) => m.id === sp.hist)
+      ? sp.hist
+      : currentId;
+
+  const historico = aba === "historico" && selectedId ? await getHistoricoAluno(selectedId) : null;
+
+  const matriculaEntries: MatriculaEntry[] = matriculas.map((m) => ({
+    id: m.id,
+    courseName: m.course.name,
+    courseNumber: m.courseNumber,
+    courseActive: m.course.active,
+    isCurrent: m.id === currentId,
+    selected: m.id === selectedId,
+    viewHref: `/perfil?aba=historico&hist=${m.id}`,
+    pdfHref: `/alunos/${m.id}/historico`,
+  }));
 
   const campos = [
     { label: "Nome completo",   value: user.fullName },
@@ -59,8 +80,13 @@ export default async function PerfilPage({ searchParams }: { searchParams: Promi
     { label: "Situação",        value: user.active ? "Ativo" : "Inativo" },
   ];
 
+  const tabs = [
+    { key: "informacoes", label: "Informações" },
+    { key: "historico", label: "Histórico" },
+  ] as const;
+
   return (
-    <div className="p-6 max-w-2xl">
+    <div className={`p-6 ${aba === "historico" ? "max-w-5xl" : "max-w-2xl"}`}>
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Meu Perfil</h1>
 
       {mustChange && (
@@ -76,43 +102,56 @@ export default async function PerfilPage({ searchParams }: { searchParams: Promi
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Dados cadastrais</h2>
-        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-          {campos.map(({ label, value }) => (
-            <div key={label}>
-              <dt className="text-xs font-medium text-gray-500">{label}</dt>
-              <dd className="mt-0.5 text-sm font-medium text-gray-900">{value ?? "—"}</dd>
-            </div>
+      {/* Abas (apenas para alunos, que possuem histórico de conduta) */}
+      {isAluno && !mustChange && (
+        <div className="flex gap-1 mb-6 border-b border-gray-200">
+          {tabs.map((t) => (
+            <Link
+              key={t.key}
+              href={`/perfil?aba=${t.key}`}
+              className={`px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors ${
+                aba === t.key
+                  ? "border-[#1e3a5f] text-[#1e3a5f]"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {t.label}
+            </Link>
           ))}
-        </dl>
-      </div>
-
-      {cadastrosAnteriores.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Cadastros anteriores</h2>
-          <p className="text-xs text-gray-500 mb-3">
-            Histórico de conduta em cursos anteriores. Cada curso possui histórico próprio.
-          </p>
-          <ul className="divide-y divide-gray-100">
-            {cadastrosAnteriores.map((c) => (
-              <li key={c.id} className="py-2 flex items-center justify-between gap-3">
-                <span className="text-sm text-gray-900">
-                  {c.course.name} <span className="text-gray-500">— Nº {formatCourseNumber(c.courseNumber)}</span>
-                </span>
-                <Link href={`/alunos/${c.id}/historico`} className="text-xs text-[#1e3a5f] hover:underline">
-                  Ver histórico
-                </Link>
-              </li>
-            ))}
-          </ul>
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Alterar senha</h2>
-        <TrocarSenhaForm />
-      </div>
+      {aba === "historico" && historico ? (
+        <>
+          <HistoricoView
+            historico={historico}
+            studentId={selectedId!}
+            isCurrent={selectedId === currentId}
+            adaptacao={sp.adaptacao === "sim" || sp.adaptacao === "nao" ? sp.adaptacao : ""}
+          />
+          {/* Seleção de históricos (atual + anteriores) no rodapé */}
+          <HistoricosBox entries={matriculaEntries} />
+        </>
+      ) : (
+        <>
+          <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Dados cadastrais</h2>
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
+              {campos.map(({ label, value }) => (
+                <div key={label}>
+                  <dt className="text-xs font-medium text-gray-500">{label}</dt>
+                  <dd className="mt-0.5 text-sm font-medium text-gray-900">{value ?? "—"}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Alterar senha</h2>
+            <TrocarSenhaForm />
+          </div>
+        </>
+      )}
     </div>
   );
 }
