@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import Link from "next/link";
+import { coresTipo } from "@/lib/coresComunicacao";
 
 function fmtEnq(art: string | null, inc: string | null, al: string | null) {
   if (!art) return "—";
@@ -64,11 +65,12 @@ type GrupoItem = {
   communication: { protocolNumber: string; article: string | null; item: string | null; letter: string | null; adaptationPeriod: boolean };
 };
 
-function TabelaGrupo({ items, thBase, tdBase }: { items: GrupoItem[]; thBase: string; tdBase: string }) {
+function TabelaGrupo({ items, thBase, tdBase, tipo }: { items: GrupoItem[]; thBase: string; tdBase: string; tipo: string }) {
+  const cor = coresTipo(tipo);
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
       <table className="w-full text-sm">
-        <thead className="bg-[#1e3a5f] text-white">
+        <thead style={{ background: cor.bar, color: cor.barText }}>
           <tr>
             <th className={thBase}>Protocolo</th>
             <th className={thBase}>Enquadramento</th>
@@ -233,69 +235,17 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
         {/* CPIs */}
         {gruposCPI.map(({ tipo, items }) => (
           <div key={tipo}>
-            <h2 className="text-base font-bold text-gray-800 mb-1 flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-[#1e3a5f]" />
+            <h2 className="text-base font-bold mb-1 flex items-center gap-2" style={{ color: coresTipo(tipo).title }}>
+              <span className="inline-block w-2 h-2 rounded-full" style={{ background: coresTipo(tipo).title }} />
               {tipo}
               <span className="text-xs font-normal text-gray-400">({items.length} registro{items.length !== 1 ? "s" : ""})</span>
             </h2>
             {TIPO_NOTE[tipo] && (
               <p className="text-xs text-gray-500 mb-2 ml-4 italic">{TIPO_NOTE[tipo]}</p>
             )}
-            <TabelaGrupo items={items} thBase={thBase} tdBase={tdBase} />
+            <TabelaGrupo items={items} thBase={thBase} tdBase={tdBase} tipo={tipo} />
           </div>
         ))}
-
-        {/* TD / TAC */}
-        {tdTacItems.length > 0 && (
-          <div>
-            <h2 className="text-base font-bold text-orange-800 mb-2 flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-orange-600" />
-              TD / TAC — Transgressões Disciplinares e Termos de Ajuste de Conduta
-              <span className="text-xs font-normal text-gray-400">({tdTacItems.length} registro{tdTacItems.length !== 1 ? "s" : ""})</span>
-            </h2>
-            <div className="bg-white rounded-xl border border-orange-200 overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-orange-700 text-white">
-                  <tr>
-                    <th className={thBase}>Protocolo</th>
-                    <th className={thBase}>Enquadramento</th>
-                    <th className={thBase}>Pelotão</th>
-                    <th className={thBase}>Nº</th>
-                    <th className={thBase}>Nome de Guerra</th>
-                    <th className={thBase}>Data</th>
-                    <th className={thBase}>Decisão</th>
-                    <th className={`${thBase} text-right`}>Pont.</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-orange-100">
-                  {tdTacItems.map((item, idx) => (
-                    <tr key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-orange-50"}>
-                      <td className={`${tdBase} font-mono whitespace-nowrap`}>
-                        <a href={`/comunicacoes/${item.communicationId}`} className="text-blue-700 hover:underline">
-                          {item.communication.protocolNumber}
-                        </a>
-                      </td>
-                      <td className={`${tdBase} text-gray-700 whitespace-nowrap font-medium`}>{item.decisionSummary}</td>
-                      <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{abreviarPelotao(item.student.platoon?.name)}</td>
-                      <td className={`${tdBase} font-mono text-gray-700 whitespace-nowrap`}>{item.studentCourseNumber}</td>
-                      <td className={`${tdBase} font-semibold text-gray-900 whitespace-nowrap`}>{item.studentWarName}</td>
-                      <td className={`${tdBase} text-gray-500 whitespace-nowrap`}>{new Date(item.factDate).toLocaleDateString("pt-BR")}</td>
-                      <td className={`${tdBase} text-orange-800 whitespace-nowrap font-medium`}>Sanção</td>
-                      <td className={`${tdBase} text-right font-bold`}>
-                        {item.score != null && item.score > 0
-                          ? <span className="text-red-600">−{item.score.toFixed(1)}</span>
-                          : item.communication.adaptationPeriod
-                            ? <span className="text-orange-600 font-normal text-xs">P. adapt.</span>
-                            : <span className="text-gray-400">—</span>
-                        }
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
 
         {/* Reenquadramentos */}
         {reenquadrados.length > 0 && (
@@ -353,15 +303,67 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
           </div>
         )}
 
+        {/* TD / TAC */}
+        {tdTacItems.length > 0 && (
+          <div>
+            <h2 className="text-base font-bold text-orange-800 mb-2 flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-orange-600" />
+              TD / TAC — Transgressões Disciplinares e Termos de Ajuste de Conduta
+              <span className="text-xs font-normal text-gray-400">({tdTacItems.length} registro{tdTacItems.length !== 1 ? "s" : ""})</span>
+            </h2>
+            <div className="bg-white rounded-xl border border-orange-200 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-orange-700 text-white">
+                  <tr>
+                    <th className={thBase}>Protocolo</th>
+                    <th className={thBase}>Enquadramento</th>
+                    <th className={thBase}>Pelotão</th>
+                    <th className={thBase}>Nº</th>
+                    <th className={thBase}>Nome de Guerra</th>
+                    <th className={thBase}>Data</th>
+                    <th className={thBase}>Decisão</th>
+                    <th className={`${thBase} text-right`}>Pont.</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-orange-100">
+                  {tdTacItems.map((item, idx) => (
+                    <tr key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-orange-50"}>
+                      <td className={`${tdBase} font-mono whitespace-nowrap`}>
+                        <a href={`/comunicacoes/${item.communicationId}`} className="text-blue-700 hover:underline">
+                          {item.communication.protocolNumber}
+                        </a>
+                      </td>
+                      <td className={`${tdBase} text-gray-700 whitespace-nowrap font-medium`}>{item.decisionSummary}</td>
+                      <td className={`${tdBase} text-gray-600 whitespace-nowrap`}>{abreviarPelotao(item.student.platoon?.name)}</td>
+                      <td className={`${tdBase} font-mono text-gray-700 whitespace-nowrap`}>{item.studentCourseNumber}</td>
+                      <td className={`${tdBase} font-semibold text-gray-900 whitespace-nowrap`}>{item.studentWarName}</td>
+                      <td className={`${tdBase} text-gray-500 whitespace-nowrap`}>{new Date(item.factDate).toLocaleDateString("pt-BR")}</td>
+                      <td className={`${tdBase} text-orange-800 whitespace-nowrap font-medium`}>Sanção</td>
+                      <td className={`${tdBase} text-right font-bold`}>
+                        {item.score != null && item.score > 0
+                          ? <span className="text-red-600">−{item.score.toFixed(1)}</span>
+                          : item.communication.adaptationPeriod
+                            ? <span className="text-orange-600 font-normal text-xs">P. adapt.</span>
+                            : <span className="text-gray-400">—</span>
+                        }
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* Referências Elogiosas e Elogios em BI */}
         {gruposElogio.map(({ tipo, items }) => (
           <div key={tipo}>
-            <h2 className="text-base font-bold text-gray-800 mb-1 flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-[#1e3a5f]" />
+            <h2 className="text-base font-bold mb-1 flex items-center gap-2" style={{ color: coresTipo(tipo).title }}>
+              <span className="inline-block w-2 h-2 rounded-full" style={{ background: coresTipo(tipo).title }} />
               {tipo}
               <span className="text-xs font-normal text-gray-400">({items.length} registro{items.length !== 1 ? "s" : ""})</span>
             </h2>
-            <TabelaGrupo items={items} thBase={thBase} tdBase={tdBase} />
+            <TabelaGrupo items={items} thBase={thBase} tdBase={tdBase} tipo={tipo} />
           </div>
         ))}
 

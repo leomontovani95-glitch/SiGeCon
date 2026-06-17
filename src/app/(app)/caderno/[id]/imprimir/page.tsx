@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
 import { usuarioAtivoNaFuncao } from "@/lib/signatarios";
 import { platoonOrder, abreviarPelotao, escolaHeaderLabel, formatCadernoNumero } from "@/lib/utils";
+import { coresTipo } from "@/lib/coresComunicacao";
 import { nomeExtensoCurso } from "@/lib/cursos";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
@@ -99,28 +100,32 @@ const isArquivadoPDF = (i: Item) =>
 
 const TD_TAC_SET = new Set(["TD Leve", "TD Média", "TD Grave", "TAC"]);
 
-const GRUPOS: { label: string; note?: string; isTdTac?: boolean; filter: (i: Item) => boolean }[] = [
-  { label: "CPI 0", note: "Equivale a 50% dos pontos da CPI 1 (−0,1 pt por ocorrência)",
+// Cor identificadora de cada tipo (fonte única em coresComunicacao):
+// - título da seção usa a cor só na fonte (sem barra preenchida);
+// - o cabeçalho da tabela (Protocolo, Enquad...) é a barra colorida.
+const GRUPOS: { label: string; note?: string; isTdTac?: boolean; bar: string; barText: string; title: string; filter: (i: Item) => boolean }[] = [
+  { label: "CPI 0", note: "Equivale a 50% dos pontos da CPI 1 (−0,1 pt por ocorrência)", ...coresTipo("CPI 0"),
                          filter: (i) => i.recordType === "CPI 0"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
-  { label: "CPI 1",     filter: (i) => i.recordType === "CPI 1"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
-  { label: "CPI 2",     filter: (i) => i.recordType === "CPI 2"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
-  { label: "CPI 3",     filter: (i) => i.recordType === "CPI 3"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
+  { label: "CPI 1",     ...coresTipo("CPI 1"), filter: (i) => i.recordType === "CPI 1"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
+  { label: "CPI 2",     ...coresTipo("CPI 2"), filter: (i) => i.recordType === "CPI 2"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
+  { label: "CPI 3",     ...coresTipo("CPI 3"), filter: (i) => i.recordType === "CPI 3"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
+  { label: "Reenquadramentos",          ...coresTipo("Reenquadramento"), filter: (i) => i.decisionSummary === "Reenquadrar artigo" },
   { label: "TD / TAC — Transgressões Disciplinares e Termos de Ajuste de Conduta",
-    isTdTac: true,       filter: (i) => TD_TAC_SET.has(i.recordType)             && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
-  { label: "Referências Elogiosas",     filter: (i) => i.recordType === "Referência Elogiosa"   && !isArquivadoPDF(i) },
-  { label: "Elogios publicados em BI",  filter: (i) => i.recordType === "Elogio publicado em BI" && !isArquivadoPDF(i) },
-  { label: "Reenquadramentos",          filter: (i) => i.decisionSummary === "Reenquadrar artigo" },
-  { label: "Arquivamentos",             filter: (i) => isArquivadoPDF(i) },
+    isTdTac: true,       ...coresTipo("TD / TAC"), filter: (i) => TD_TAC_SET.has(i.recordType)             && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
+  { label: "Referências Elogiosas",     ...coresTipo("Referência Elogiosa"), filter: (i) => i.recordType === "Referência Elogiosa"   && !isArquivadoPDF(i) },
+  { label: "Elogios publicados em BI",  ...coresTipo("Elogio publicado em BI"), filter: (i) => i.recordType === "Elogio publicado em BI" && !isArquivadoPDF(i) },
+  { label: "Arquivamentos",             ...coresTipo("Arquivamento"), filter: (i) => isArquivadoPDF(i) },
 ];
 
-function TabelaTipo({ items, label, note, isTdTac }: { items: Item[]; label: string; note?: string; isTdTac?: boolean }) {
+function TabelaTipo({ items, label, note, isTdTac, bar, barText, title }: { items: Item[]; label: string; note?: string; isTdTac?: boolean; bar: string; barText: string; title: string }) {
   if (items.length === 0) return null;
   return (
     <div className="print-section" style={{ marginTop: 24, pageBreakInside: "avoid" }}>
+      {/* Título: apenas a fonte recebe a cor do tipo; o resto da linha fica branco. */}
       <h3 style={{
-        fontSize: "8.5pt", fontWeight: "bold", color: "#1e3a5f",
+        fontSize: "8.5pt", fontWeight: "bold", color: title,
         textTransform: "uppercase", letterSpacing: "0.05em",
-        borderBottom: "1.5px solid #1e3a5f", paddingBottom: 3, marginBottom: note ? 2 : 6,
+        marginBottom: note ? 2 : 6,
       }}>
         {label} <span style={{ fontWeight: "normal", color: "#6b7280" }}>({items.length})</span>
       </h3>
@@ -140,7 +145,7 @@ function TabelaTipo({ items, label, note, isTdTac }: { items: Item[]; label: str
           <col className="cd-col-obs" />
           <col className="cd-col-pont" />
         </colgroup>
-        <thead>
+        <thead style={{ background: bar, color: barText }}>
           <tr>
             <th className="cd-col-proto">Protocolo</th>
             <th className="cd-col-enq">Enquad.</th>
@@ -399,7 +404,7 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
       .print-page, .extra-page { padding: 2mm 3mm 12mm 3mm !important; }
     }
     .cd-table { width: 100%; border-collapse: collapse; font-size: 7pt; table-layout: fixed; }
-    .cd-table th { background: #1e3a5f; color: white; padding: 4px 5px; font-size: 6.5pt; text-align: left; overflow: hidden; white-space: nowrap; }
+    .cd-table th { padding: 4px 5px; font-size: 6.5pt; text-align: left; overflow: hidden; white-space: nowrap; }
     .cd-table td { padding: 3px 4px; border-bottom: 1px solid #e5e7eb; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
     .cd-table tr:nth-child(even) td { background: #f9fafb; }
     .cd-col-proto { width: 19%; }
@@ -451,7 +456,7 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
 
       {/* Tabelas separadas por tipo */}
       {grupos.map((g) => (
-        <TabelaTipo key={g.label} label={g.label} note={g.note} isTdTac={g.isTdTac} items={g.itens} />
+        <TabelaTipo key={g.label} label={g.label} note={g.note} isTdTac={g.isTdTac} bar={g.bar} barText={g.barText} title={g.title} items={g.itens} />
       ))}
 
       {totalRegistros === 0 && (

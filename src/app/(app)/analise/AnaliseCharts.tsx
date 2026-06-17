@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { abreviarPelotao, platoonOrder } from "@/lib/utils";
+import { CPI_FILL } from "@/lib/coresComunicacao";
 import {
   BarChart,
   Bar,
@@ -34,11 +35,12 @@ export type ArtigoEntry      = { dispositivo: string; count: number };
 export type AlunoEntry       = { studentId: string; warName: string; courseName: string; platoonName: string; total: number };
 
 const PRIMARY     = "#1e3a5f";
-// Escala de gravidade crescente: rosa claro (CPI 0) → vermelho escuro (CPI 3).
-const CPI_COLORS  = ["#fecdd3", "#fb7185", "#ef4444", "#b91c1c"];
-const REF_COLOR   = "#22c55e"; // verde — Referência Elogiosa
-const REF_BI_COLOR = "#15803d"; // verde escuro — Elogio publicado em BI
-const NEUTRO      = "#9ca3af"; // cinza — demais tipos (ex.: Arquivamento)
+// Escala de gravidade crescente: amarelo claro (CPI 0) → vermelho vivo (CPI 3).
+// Fonte única compartilhada com o Caderno Disciplinar (tela e PDF).
+const CPI_COLORS  = CPI_FILL;
+const REF_COLOR   = "#15803d"; // verde — Referência Elogiosa
+const REF_BI_COLOR = "#166534"; // verde escuro — Elogio publicado em BI
+const NEUTRO      = "#6b7280"; // cinza — demais tipos (ex.: Arquivamento)
 
 // Cor de cada fatia do gráfico de pizza conforme o tipo de comunicação,
 // seguindo o mesmo padrão das CPIs (0→3) e das referências favoráveis.
@@ -235,7 +237,7 @@ export default function AnaliseCharts({
                 <Line
                   type="monotone"
                   dataKey="Ref. Elogiosa"
-                  stroke="#22c55e"
+                  stroke="#15803d"
                   strokeWidth={2}
                   dot={{ r: 3 }}
                 />
@@ -253,7 +255,7 @@ export default function AnaliseCharts({
                     <Line
                       type="monotone"
                       dataKey="Ref. Elogiosa (ano ant.)"
-                      stroke="#22c55e"
+                      stroke="#15803d"
                       strokeWidth={1.5}
                       strokeDasharray="5 5"
                       dot={false}
