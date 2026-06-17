@@ -71,3 +71,61 @@ export function parseCursoParaForm(course: {
     remnant: /remanescente/i.test(course.name) ? "true" : "false",
   };
 }
+
+// ── Filtro de situação do curso (ativos/inativos) ────────────────────────────
+// Usado pelas abas de busca para que o staff possa, opcionalmente, ver os dados
+// de cursos inativados. Padrão: somente ativos (espelha a contagem do painel).
+export type SituacaoCurso = "ativos" | "inativos" | "todos";
+
+export const SITUACAO_CURSO_OPTS: { key: SituacaoCurso; label: string }[] = [
+  { key: "ativos", label: "Ativos" },
+  { key: "inativos", label: "Inativos" },
+  { key: "todos", label: "Todos" },
+];
+
+export function normalizeSituacaoCurso(v?: string): SituacaoCurso {
+  return v === "inativos" || v === "todos" ? v : "ativos";
+}
+
+// Fragmento Prisma para filtrar `course.active` conforme a situação escolhida.
+// "todos" não filtra; "ativos"/"inativos" travam o booleano.
+export function activeWhereCurso(s: SituacaoCurso): { active?: boolean } {
+  if (s === "ativos") return { active: true };
+  if (s === "inativos") return { active: false };
+  return {};
+}
+
+// Fragmento de escopo de curso para queries de Communication/DisciplinaryBook.
+// Curso específico (cursoId) tem precedência; senão filtra pela relação `course`
+// combinando escola do usuário + situação. "todos" sem escola → sem filtro.
+export function courseScopeWhere(
+  s: SituacaoCurso,
+  school: string | null,
+  cursoId?: string,
+): Record<string, unknown> {
+  if (cursoId) return { courseId: cursoId };
+  const scope = { ...(school ? { school } : {}), ...activeWhereCurso(s) };
+  return Object.keys(scope).length ? { course: scope } : {};
+}
+
+// Fragmento de status do aluno conforme a situação do curso: alunos de cursos
+// inativos ficam INATIVO. "todos" não filtra por status.
+export function studentStatusWhere(s: SituacaoCurso): { status?: "ATIVO" | "INATIVO" } {
+  if (s === "ativos") return { status: "ATIVO" };
+  if (s === "inativos") return { status: "INATIVO" };
+  return {};
+}
+
+// Monta as opções do seletor de situação (SituacaoCursoFilter). `hrefFor` é
+// fornecido por cada página, que sabe quais filtros preservar no link.
+export function buildSituacaoOptions(
+  situacao: SituacaoCurso,
+  hrefFor: (key: SituacaoCurso) => string,
+): { key: SituacaoCurso; label: string; href: string; active: boolean }[] {
+  return SITUACAO_CURSO_OPTS.map((o) => ({
+    key: o.key,
+    label: o.label,
+    href: hrefFor(o.key),
+    active: situacao === o.key,
+  }));
+}

@@ -170,8 +170,10 @@ export default function CursoForm({ defaultValues, id }: Props) {
           <option value="false">Inativo</option>
         </select>
         <p className="text-xs text-gray-400 mt-1">
-          Ao inativar o curso, os alunos ainda ativos são automaticamente inativados (deixam de receber
-          comunicações), mas continuam cadastrados e podem ser transferidos ou ter ascensão de curso.
+          Só é possível inativar um curso após <strong>todas as comunicações</strong> estarem publicadas no
+          caderno disciplinar. Ao inativar, os alunos ainda ativos são automaticamente inativados (deixam de
+          receber comunicações), mas continuam cadastrados e podem ser transferidos ou ter ascensão de curso.
+          Ao <strong>reativar</strong> o curso, esses alunos voltam a ativo e tudo volta a ser exibido e contado.
         </p>
       </div>
 

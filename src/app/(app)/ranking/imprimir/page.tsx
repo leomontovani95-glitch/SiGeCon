@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { verifySession, getSchoolFilter } from "@/lib/dal";
+import { normalizeSituacaoCurso, activeWhereCurso, studentStatusWhere } from "@/lib/cursos";
 import { redirect } from "next/navigation";
 import { calcularNotaPublicada, faixaNota } from "@/lib/score";
 import { abreviarPelotao, escolaHeaderLabel } from "@/lib/utils";
@@ -35,11 +36,12 @@ export default async function RankingImprimirPage({
   const sp = await searchParams;
   const cursoId = sp.cursoId ?? "";
   const ordem: Ordem = ORDENS_VALIDAS.includes(sp.ordem as Ordem) ? (sp.ordem as Ordem) : "desc";
+  const situacao = normalizeSituacaoCurso(sp.situacao);
 
   const school = getSchoolFilter(session.role, session.escola);
 
   const cursosDisponiveis = await prisma.course.findMany({
-    where: { active: true, ...(school ? { school } : {}) },
+    where: { ...activeWhereCurso(situacao), ...(school ? { school } : {}) },
     orderBy: { name: "asc" },
     select: { id: true, name: true, school: true },
   });
@@ -49,7 +51,7 @@ export default async function RankingImprimirPage({
     : cursosDisponiveis.map((c) => c.id);
 
   const rankingStudents = await prisma.student.findMany({
-    where: { status: "ATIVO", courseId: { in: scopeIds } },
+    where: { ...studentStatusWhere(situacao), courseId: { in: scopeIds } },
     include: { course: true, platoon: true },
   });
   // Notas agregadas por aluno (studentId): o histórico acompanha o remanescente.

@@ -2,6 +2,8 @@ import { prisma } from "@/lib/db";
 import { verifySession, getSchoolFilter } from "@/lib/dal";
 import { calcularNotaPublicada, faixaNota, zonaDeRisco } from "@/lib/score";
 import { abreviarPelotao, platoonOrder } from "@/lib/utils";
+import { normalizeSituacaoCurso, activeWhereCurso, courseScopeWhere, studentStatusWhere, buildSituacaoOptions, type SituacaoCurso } from "@/lib/cursos";
+import SituacaoCursoFilter from "@/components/SituacaoCursoFilter";
 import Link from "next/link";
 import { format, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -70,9 +72,12 @@ async function getDashboardAluno(userId: string) {
 }
 
 // ── Dashboard geral ────────────────────────────────────────────────────────
-async function getDashboardGeral(role: string, userId: string, scopeCourseIds: string[], adaptationFilter: object = {}) {
+// `cf` é o escopo de curso (courseScopeWhere): {courseId} | {course:{...}} | {}.
+async function getDashboardGeral(role: string, userId: string, cf: Record<string, unknown>, adaptationFilter: object = {}, situacao: SituacaoCurso = "ativos") {
   const filtroReporter = role === "COMUNICANTE" ? { reporterId: userId } : {};
-  const cf = scopeCourseIds.length > 0 ? { courseId: { in: scopeCourseIds } } : {};
+  // Alunos de cursos inativos ficam INATIVO; na visão de inativos/todos eles
+  // precisam aparecer na tabela de risco para "demais informações" ficarem visíveis.
+  const studentStatusFilter = studentStatusWhere(situacao);
 
   const agora = new Date();
   // Limite: prazos vencidos há mais de 2 dias
@@ -96,6 +101,8 @@ async function getDashboardGeral(role: string, userId: string, scopeCourseIds: s
     prisma.communication.count({ where: {
       ...filtroReporter, ...cf, ...adaptationFilter, status: "DECIDIDA",
       type: { name: { in: ["CPI 0","CPI 1","CPI 2","CPI 3"] } },
+      // Toda CPI decidida ainda não publicada aguarda caderno — inclusive as
+      // arquivadas (criarCaderno também as inclui). Não filtra por arquivamento.
       disciplinaryBookItems: { none: { disciplinaryBook: { status: "PUBLICADO" } } },
     } }),
     prisma.communication.count({ where: {
@@ -103,7 +110,8 @@ async function getDashboardGeral(role: string, userId: string, scopeCourseIds: s
       type: { name: { in: ["Referência Elogiosa", "Elogio publicado em BI"] } },
       disciplinaryBookItems: { none: { disciplinaryBook: { status: "PUBLICADO" } } },
     } }),
-    prisma.disciplinaryBook.count({ where: { status: "PUBLICADO", ...(scopeCourseIds.length ? { courseId: { in: scopeCourseIds } } : {}) } }),
+    // Cadernos publicados seguem o mesmo escopo de curso (ativos/inativos/todos).
+    prisma.disciplinaryBook.count({ where: { status: "PUBLICADO", ...cf } }),
     // Prazos vencidos há mais de 2 dias e ainda não publicados em caderno
     prisma.communication.findMany({
       where: {
@@ -125,7 +133,7 @@ async function getDashboardGeral(role: string, userId: string, scopeCourseIds: s
   const pubCaderno      = { disciplinaryBookItems: { some: { disciplinaryBook: { status: "PUBLICADO" } } } };
 
   const students = await prisma.student.findMany({
-    where: { status: "ATIVO", ...cf },
+    where: { ...studentStatusFilter, ...cf },
     include: { course: true, platoon: true },
   });
 
@@ -331,23 +339,24 @@ export default async function DashboardPage({
   const cursoId     = sp.cursoId    ?? "";
   const plataoFiltro = sp.plataoId  ?? "";
   const adaptacao   = sp.adaptacao  ?? "";
+  const situacao    = normalizeSituacaoCurso(sp.situacao);
 
   const schoolFilter = getSchoolFilter(session.role, session.escola);
 
   const cursosDisponiveis = await prisma.course.findMany({
-    where: { active: true, ...(schoolFilter ? { school: schoolFilter } : {}) },
+    where: { ...activeWhereCurso(situacao), ...(schoolFilter ? { school: schoolFilter } : {}) },
     orderBy: { name: "asc" },
     select: { id: true, name: true, school: true },
   });
 
-  const scopeCourseIds = cursoId ? [cursoId] : cursosDisponiveis.map((c) => c.id);
   const cursoSelecionado = cursosDisponiveis.find((c) => c.id === cursoId);
   const labelEscopo = schoolFilter === "ESFAP" ? "EsFAP"
     : schoolFilter === "ESFO" ? "EsFO"
     : "Todos os cursos";
 
   const adaptationFilter = adaptacao === "sim" ? { adaptationPeriod: true } : adaptacao === "nao" ? { adaptationPeriod: false } : {};
-  const data = await getDashboardGeral(session.role, session.userId, scopeCourseIds, adaptationFilter);
+  const cf = courseScopeWhere(situacao, schoolFilter, cursoId);
+  const data = await getDashboardGeral(session.role, session.userId, cf, adaptationFilter, situacao);
   const canCreate = session.role !== "ALUNO";
 
   const zonaRiscoFiltrada = plataoFiltro
@@ -364,6 +373,8 @@ export default async function DashboardPage({
     if (status)    p.set("status",    status);
     if (nat)       p.set("nat",       nat);
     if (adaptacao) p.set("adaptacao", adaptacao);
+    // Propaga a situação do curso para a lista refletir o mesmo escopo do painel.
+    if (situacao !== "ativos") p.set("situacao", situacao);
     const qs = p.toString();
     return `/comunicacoes${qs ? `?${qs}` : ""}`;
   }
@@ -372,6 +383,7 @@ export default async function DashboardPage({
     const p = new URLSearchParams();
     if (cursoId)   p.set("cursoId",   cursoId);
     if (adaptacao) p.set("adaptacao", adaptacao);
+    if (situacao !== "ativos") p.set("situacao", situacao);
     for (const [k, v] of Object.entries(params)) {
       if (v) p.set(k, v); else p.delete(k);
     }
@@ -379,20 +391,30 @@ export default async function DashboardPage({
     return `/dashboard${qs ? `?${qs}` : ""}`;
   }
 
+  // Trocar a situação reinicia curso/pelotão (um curso ativo selecionado não
+  // existe na lista de inativos, e vice-versa).
+  const situacaoOptions = buildSituacaoOptions(situacao, (k) => {
+    const p = new URLSearchParams();
+    if (adaptacao) p.set("adaptacao", adaptacao);
+    if (k !== "ativos") p.set("situacao", k);
+    const qs = p.toString();
+    return `/dashboard${qs ? `?${qs}` : ""}`;
+  });
+
   const cardsEmTramite = [
     { label: "CPIs Registradas",              value: data.cards.totalCPIs,                 color: "bg-blue-600",   href: commUrl(undefined, "CPI") },
     { label: "Ag. Ciência/Defesa do Aluno",   value: data.cards.aguardandoCienciaDefesa,   color: "bg-yellow-500", href: commUrl("AGUARDANDO_CIENCIA") },
     { label: "Prazo Vencido",                 value: data.cards.prazoVencido,              color: "bg-red-600",    href: commUrl("PRAZO_EXPIRADO") },
     { label: "Aguardando Parecer",            value: data.cards.aguardandoParecer,         color: "bg-purple-600", href: commUrl("AGUARDANDO_PARECER") },
     { label: "Aguardando Decisão",            value: data.cards.aguardandoDecisao,         color: "bg-indigo-600", href: commUrl("AGUARDANDO_DECISAO") },
-    { label: "CPIs decididas ag. publicação", value: data.cards.cpisDecididasAgPublicacao, color: "bg-green-600",  href: commUrl("DECIDIDA_NAO_PUBLICADA", "CPI") },
+    { label: "CPIs decididas ag. publicação", value: data.cards.cpisDecididasAgPublicacao, color: "bg-green-600",  href: commUrl("DECIDIDA_NAO_PUBLICADA_TODAS", "CPI") },
     { label: "Ref. elogiosa/Elogio",          value: data.cards.referencias,               color: "bg-teal-600",   href: commUrl(undefined, "FAVORAVEL") },
   ];
 
   const cardsTramitadas = [
     { label: "CPIs c/ sanção publicadas",                       value: data.cards.cpisPublicadas,      color: "bg-slate-700",   href: commUrl("DECIDIDA_PUBLICADA",      "CPI") },
     { label: "Ref. elogiosa/Elogio homologados publicados",      value: data.cards.elogiososPublicados, color: "bg-emerald-700", href: commUrl("DECIDIDA_PUBLICADA",      "FAVORAVEL") },
-    { label: "Cadernos publicados",                             value: data.cards.cadernosPublicados,  color: "bg-cyan-700",    href: "/caderno" },
+    { label: "Cadernos publicados",                             value: data.cards.cadernosPublicados,  color: "bg-cyan-700",    href: situacao !== "ativos" ? `/caderno?situacao=${situacao}` : "/caderno" },
     { label: "CPIs arquivadas (sem desconto)",                  value: data.cards.cpisArquivadas,      color: "bg-slate-500",   href: commUrl("ARQUIVADA_PUBLICADA",     "CPI") },
     { label: "Ref. elogiosa/Elogio arquivados (sem acréscimo)", value: data.cards.elogiososArquivados, color: "bg-emerald-500", href: commUrl("ARQUIVADA_PUBLICADA",     "FAVORAVEL") },
   ];
@@ -408,7 +430,7 @@ export default async function DashboardPage({
         </p>
       </div>
 
-      {/* ── Seletor de cursos + Período de Adaptação ──────────────────────── */}
+      {/* ── Seletor de cursos + (Situação acima do Período de Adaptação) ──── */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6 flex flex-wrap gap-4 items-start">
         {cursosDisponiveis.length > 1 && (
           <div className="flex-1 min-w-0">
@@ -427,15 +449,18 @@ export default async function DashboardPage({
             </div>
           </div>
         )}
-        <div className="flex-shrink-0">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Período de Adaptação</p>
-          <div className="flex gap-2">
-            {[{ v: "", label: "Todos" }, { v: "sim", label: "Sim" }, { v: "nao", label: "Não" }].map(({ v, label }) => (
-              <Link key={v} href={dashUrl({ adaptacao: v })}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${adaptacao === v ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
-                {label}
-              </Link>
-            ))}
+        <div className="flex-shrink-0 space-y-4">
+          <SituacaoCursoFilter options={situacaoOptions} />
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Período de Adaptação</p>
+            <div className="flex gap-2">
+              {[{ v: "", label: "Todos" }, { v: "sim", label: "Sim" }, { v: "nao", label: "Não" }].map(({ v, label }) => (
+                <Link key={v} href={dashUrl({ adaptacao: v })}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${adaptacao === v ? "bg-orange-500 text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+                  {label}
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       </div>

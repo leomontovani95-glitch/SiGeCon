@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySession, getSchoolFilter } from "@/lib/dal";
+import { normalizeSituacaoCurso, courseScopeWhere } from "@/lib/cursos";
 import { prisma } from "@/lib/db";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -40,8 +41,9 @@ export async function GET(req: NextRequest) {
   const inciso     = searchParams.get("inciso")     ?? "";
   const alinea     = searchParams.get("alinea")     ?? "";
 
+  const situacao = normalizeSituacaoCurso(searchParams.get("situacao") ?? undefined);
   const school = getSchoolFilter(session.role, session.escola);
-  const cursoFilter = cursoId ? { courseId: cursoId } : school ? { course: { school } } : {};
+  const cursoFilter = courseScopeWhere(situacao, school, cursoId);
   const where: Record<string, unknown> = { ...cursoFilter };
 
   if (tipo)   where.type = { name: tipo };

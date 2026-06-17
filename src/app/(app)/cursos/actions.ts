@@ -67,9 +67,26 @@ export async function salvarCurso(id: string | null, _prev: State, formData: For
 
   // ── Edição: identidade travada, altera apenas descrição/situação. ──
   if (id) {
+    const atual = await prisma.course.findUnique({ where: { id }, select: { active: true, name: true } });
+    if (!atual) return { error: "Curso não encontrado." };
+
+    // Inativação só é permitida se TODAS as comunicações já estiverem publicadas
+    // no caderno disciplinar — evita que registros pendentes "se percam" num curso
+    // inativo. Pendente = ainda não publicada em caderno publicado.
+    if (atual.active && !active) {
+      const pendentes = await prisma.communication.count({
+        where: {
+          courseId: id,
+          status: { not: "PUBLICADA_CADERNO" },
+          disciplinaryBookItems: { none: { disciplinaryBook: { status: "PUBLICADO" } } },
+        },
+      });
+      if (pendentes > 0) {
+        return { error: `Não é possível inativar: ${pendentes} comunicação(ões) ainda não publicada(s) no caderno disciplinar. Conclua a tramitação e publique todas antes de inativar o curso.` };
+      }
+    }
+
     try {
-      const atual = await prisma.course.findUnique({ where: { id }, select: { active: true, name: true } });
-      if (!atual) return { error: "Curso não encontrado." };
       await prisma.course.update({ where: { id }, data: { description, active } });
       // Ao inativar o curso, os alunos ainda ATIVOS são automaticamente inativados.
       // Eles permanecem cadastrados e podem ser transferidos/ascender de curso.
@@ -80,6 +97,17 @@ export async function salvarCurso(id: string | null, _prev: State, formData: For
         });
         if (r.count > 0) {
           await auditLog(session.userId, "UPDATE", "Course", id, `${atual.name} — ${r.count} aluno(s) inativado(s) ao inativar o curso`);
+        }
+      }
+      // Ao reativar o curso, os alunos inativados voltam a ATIVO — tudo volta a
+      // ser exibido e contado normalmente.
+      if (!atual.active && active) {
+        const r = await prisma.student.updateMany({
+          where: { courseId: id, status: "INATIVO" },
+          data: { status: "ATIVO" },
+        });
+        if (r.count > 0) {
+          await auditLog(session.userId, "UPDATE", "Course", id, `${atual.name} — ${r.count} aluno(s) reativado(s) ao reativar o curso`);
         }
       }
       await auditLog(session.userId, "UPDATE", "Course", id, atual.name);

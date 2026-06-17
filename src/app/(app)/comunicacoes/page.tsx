@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { verifySession, getSchoolFilter, ESFO_CFO_RANK } from "@/lib/dal";
+import { normalizeSituacaoCurso, activeWhereCurso, courseScopeWhere, buildSituacaoOptions } from "@/lib/cursos";
+import SituacaoCursoFilter from "@/components/SituacaoCursoFilter";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import Link from "next/link";
@@ -68,6 +70,7 @@ const FILTER_OPTIONS = [
   { value: "AGUARDANDO_DECISAO",      label: "Ag. Decisão" },
   { value: "DECIDIDA_PUBLICADA",      label: "Decidida/Publicada" },
   { value: "DECIDIDA_NAO_PUBLICADA",  label: "Decidida/Não publicada" },
+  { value: "DECIDIDA_NAO_PUBLICADA_TODAS", label: "Decididas ag. publicação (c/ arquivadas)" },
   { value: "ARQUIVADA_NAO_PUBLICADA", label: "Arquivada/Não publicada" },
   { value: "ARQUIVADA_PUBLICADA",     label: "Arquivada/Publicada" },
 ];
@@ -89,6 +92,13 @@ function buildStatusWhere(status: string): Record<string, unknown> | null {
         status: "DECIDIDA",
         disciplinaryBookItems: { none: { disciplinaryBook: { status: "PUBLICADO" } } },
         ...naoArquivada,
+      };
+    case "DECIDIDA_NAO_PUBLICADA_TODAS":
+      // Toda decidida ainda não publicada (com sanção + arquivada). Espelha o
+      // card "CPIs decididas ag. publicação" e o conjunto que vai ao caderno.
+      return {
+        status: "DECIDIDA",
+        disciplinaryBookItems: { none: { disciplinaryBook: { status: "PUBLICADO" } } },
       };
     case "ARQUIVADA_NAO_PUBLICADA":
       return {
@@ -140,6 +150,8 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
   const nat     = sp.nat     ?? "";   // CPI | REFERENCIA | ELOGIO | TD_TAC | FAVORAVEL
   const subtipo = sp.subtipo ?? "";   // CPI 0 | CPI 1 | CPI 2 | CPI 3 (só quando nat=CPI)
   const adaptacao = sp.adaptacao ?? "";  // "" | "sim" | "nao"
+  const situacao  = normalizeSituacaoCurso(sp.situacao);  // ativos | inativos | todos
+  const isStaff   = session.role !== "ALUNO";
   const col     = sp.col in COLS ? sp.col : "";
   const dir: Dir = sp.dir === "asc" ? "asc" : "desc";
   const pageRaw  = parseInt(sp.page ?? "1", 10);
@@ -147,9 +159,9 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
 
   const school = getSchoolFilter(session.role, session.escola);
 
-  const cursosDisponiveis = session.role !== "ALUNO"
+  const cursosDisponiveis = isStaff
     ? await prisma.course.findMany({
-        where: { active: true, ...(school ? { school } : {}) },
+        where: { ...activeWhereCurso(situacao), ...(school ? { school } : {}) },
         orderBy: { name: "asc" },
         select: { id: true, name: true },
       })
@@ -180,8 +192,14 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
       { student: { fullName: { contains: busca } } },
     ];
   }
-  if (cursoId)      where.courseId = cursoId;
-  else if (school)  where.course   = { school };
+  // Escopo de curso (somente staff; aluno vê apenas o próprio histórico, abaixo).
+  if (cursoId) {
+    where.courseId = cursoId;
+  } else if (isStaff) {
+    Object.assign(where, courseScopeWhere(situacao, school));
+  } else if (school) {
+    where.course = { school };
+  }
   let isEsfoCFO = false;
   if (session.role === "ALUNO") {
     const aluno = await prisma.student.findFirst({
@@ -242,6 +260,7 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
     if (nat)       p.set("nat",       nat);
     if (subtipo)   p.set("subtipo",   subtipo);
     if (adaptacao) p.set("adaptacao", adaptacao);
+    if (situacao !== "ativos") p.set("situacao", situacao);
     if (col)       p.set("col",       col);
     if (dir)       p.set("dir",       dir);
     for (const [k, v] of Object.entries(overrides)) {
@@ -254,6 +273,11 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
   function pillHref(novoCursoId: string) {
     return buildUrl({ cursoId: novoCursoId, col: "", dir: "" });
   }
+
+  // Situação do curso: trocar reinicia curso selecionado e paginação.
+  const situacaoOptions = buildSituacaoOptions(situacao, (k) =>
+    buildUrl({ situacao: k === "ativos" ? "" : k, cursoId: "", page: "1" }),
+  );
 
   // Gera href para ordenação de coluna (toggle asc/desc)
   function sortHref(newCol: string) {
@@ -291,20 +315,25 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
         )}
       </div>
 
-      {/* Seletor de cursos */}
-      {cursosDisponiveis.length > 1 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-5">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Filtrar por curso</p>
-          <div className="flex flex-wrap gap-2">
-            <Link href={pillHref("")} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${!cursoId ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
-              {labelEscopo}
-            </Link>
-            {cursosDisponiveis.map((curso) => (
-              <Link key={curso.id} href={pillHref(curso.id)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${cursoId === curso.id ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
-                {curso.name}
-              </Link>
-            ))}
-          </div>
+      {/* Situação do curso + Seletor de cursos (mesma barra de filtros) */}
+      {isStaff && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-5 space-y-4">
+          <SituacaoCursoFilter options={situacaoOptions} />
+          {cursosDisponiveis.length > 1 && (
+            <div className="border-t border-gray-100 pt-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Filtrar por curso</p>
+              <div className="flex flex-wrap gap-2">
+                <Link href={pillHref("")} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${!cursoId ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+                  {labelEscopo}
+                </Link>
+                {cursosDisponiveis.map((curso) => (
+                  <Link key={curso.id} href={pillHref(curso.id)} className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${cursoId === curso.id ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+                    {curso.name}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -365,6 +394,7 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
         {cursoId && <input type="hidden" name="cursoId" value={cursoId} />}
         {nat     && <input type="hidden" name="nat"     value={nat} />}
         {subtipo && <input type="hidden" name="subtipo" value={subtipo} />}
+        {situacao !== "ativos" && <input type="hidden" name="situacao" value={situacao} />}
         {col     && <input type="hidden" name="col"     value={col} />}
         {dir     && <input type="hidden" name="dir"     value={dir} />}
         <div>

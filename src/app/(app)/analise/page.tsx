@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { verifySession, getSchoolFilter } from "@/lib/dal";
+import { normalizeSituacaoCurso, activeWhereCurso, courseScopeWhere, buildSituacaoOptions } from "@/lib/cursos";
+import SituacaoCursoFilter from "@/components/SituacaoCursoFilter";
 import { platoonOrder } from "@/lib/utils";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -19,12 +21,13 @@ export default async function AnalisePage({
   const dataInicio = sp.dataInicio ?? "";
   const dataFim    = sp.dataFim    ?? "";
   const adaptacao  = sp.adaptacao  ?? "";
+  const situacao   = normalizeSituacaoCurso(sp.situacao);
 
   const school = getSchoolFilter(session.role, session.escola);
 
   const [cursosDisponiveis, platoesDisponiveis] = await Promise.all([
     prisma.course.findMany({
-      where: { active: true, ...(school ? { school } : {}) },
+      where: { ...activeWhereCurso(situacao), ...(school ? { school } : {}) },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),
@@ -40,11 +43,7 @@ export default async function AnalisePage({
   // SQLite ordena por texto ("10º" antes de "2º"); reordena numericamente.
   platoesDisponiveis.sort((a, b) => platoonOrder(a.name) - platoonOrder(b.name));
 
-  const courseFilter = cursoId
-    ? { courseId: cursoId }
-    : school
-      ? { course: { school } }
-      : {};
+  const courseFilter = courseScopeWhere(situacao, school, cursoId);
 
   const platoonFilter = platoonId ? { platoonId } : {};
 
@@ -223,12 +222,15 @@ export default async function AnalisePage({
   const cursoSelecionado  = cursosDisponiveis.find((c) => c.id === cursoId);
   const plataoSelecionado = platoesDisponiveis.find((p) => p.id === platoonId);
 
+  const sitParam = situacao !== "ativos" ? situacao : "";
+
   function pillHref(id: string) {
     const p = new URLSearchParams();
     if (id)         p.set("cursoId",    id);
     if (dataInicio) p.set("dataInicio", dataInicio);
     if (dataFim)    p.set("dataFim",    dataFim);
     if (adaptacao)  p.set("adaptacao",  adaptacao);
+    if (sitParam)   p.set("situacao",   sitParam);
     // platoonId é intencionalmente descartado ao trocar o curso
     const qs = p.toString();
     return `/analise${qs ? `?${qs}` : ""}`;
@@ -241,6 +243,7 @@ export default async function AnalisePage({
     if (dataInicio) p.set("dataInicio", dataInicio);
     if (dataFim)    p.set("dataFim",    dataFim);
     if (adaptacao)  p.set("adaptacao",  adaptacao);
+    if (sitParam)   p.set("situacao",   sitParam);
     const qs = p.toString();
     return `/analise${qs ? `?${qs}` : ""}`;
   }
@@ -250,6 +253,7 @@ export default async function AnalisePage({
     if (cursoId)   p.set("cursoId",   cursoId);
     if (platoonId) p.set("platoonId", platoonId);
     if (adaptacao) p.set("adaptacao", adaptacao);
+    if (sitParam)  p.set("situacao",  sitParam);
     const qs = p.toString();
     return `/analise${qs ? `?${qs}` : ""}`;
   }
@@ -261,6 +265,7 @@ export default async function AnalisePage({
     if (dataInicio) p.set("dataInicio", dataInicio);
     if (dataFim)    p.set("dataFim",    dataFim);
     if (adaptacao)  p.set("adaptacao",  adaptacao);
+    if (sitParam)   p.set("situacao",   sitParam);
     const qs = p.toString();
     return `/analise/imprimir${qs ? `?${qs}` : ""}`;
   }
@@ -272,9 +277,21 @@ export default async function AnalisePage({
     if (dataInicio) p.set("dataInicio", dataInicio);
     if (dataFim)    p.set("dataFim",    dataFim);
     if (adaptacao)  p.set("adaptacao",  adaptacao);
+    if (sitParam)   p.set("situacao",   sitParam);
     const qs = p.toString();
     return `/api/export/analise${qs ? `?${qs}` : ""}`;
   }
+
+  // Trocar a situação reinicia curso/pelotão (curso pode não existir na outra lista).
+  const situacaoOptions = buildSituacaoOptions(situacao, (k) => {
+    const p = new URLSearchParams();
+    if (dataInicio) p.set("dataInicio", dataInicio);
+    if (dataFim)    p.set("dataFim",    dataFim);
+    if (adaptacao)  p.set("adaptacao",  adaptacao);
+    if (k !== "ativos") p.set("situacao", k);
+    const qs = p.toString();
+    return `/analise${qs ? `?${qs}` : ""}`;
+  });
 
   return (
     <div className="p-6">
@@ -305,39 +322,42 @@ export default async function AnalisePage({
         </div>
       </div>
 
-      {/* Seletor de cursos */}
-      {cursosDisponiveis.length > 1 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-5">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-            Filtrar por curso
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={pillHref("")}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                !cursoId
-                  ? "bg-[#1e3a5f] text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              {labelEscopo}
-            </Link>
-            {cursosDisponiveis.map((curso) => (
+      {/* Situação do curso + Seletor de cursos (mesma barra de filtros) */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-5 space-y-4">
+        <SituacaoCursoFilter options={situacaoOptions} />
+        {cursosDisponiveis.length > 1 && (
+          <div className="border-t border-gray-100 pt-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              Filtrar por curso
+            </p>
+            <div className="flex flex-wrap gap-2">
               <Link
-                key={curso.id}
-                href={pillHref(curso.id)}
+                href={pillHref("")}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  cursoId === curso.id
+                  !cursoId
                     ? "bg-[#1e3a5f] text-white"
                     : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                {curso.name}
+                {labelEscopo}
               </Link>
-            ))}
+              {cursosDisponiveis.map((curso) => (
+                <Link
+                  key={curso.id}
+                  href={pillHref(curso.id)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    cursoId === curso.id
+                      ? "bg-[#1e3a5f] text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  {curso.name}
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Seletor de pelotões */}
       {cursoId && platoesDisponiveis.length > 0 && (
@@ -377,6 +397,7 @@ export default async function AnalisePage({
       <form method="GET" className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
         {cursoId   && <input type="hidden" name="cursoId"   value={cursoId} />}
         {platoonId && <input type="hidden" name="platoonId" value={platoonId} />}
+        {sitParam  && <input type="hidden" name="situacao"  value={sitParam} />}
         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
           Filtrar por período
           {dataInicio && dataFim && (

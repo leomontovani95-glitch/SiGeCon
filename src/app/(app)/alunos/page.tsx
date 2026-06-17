@@ -13,21 +13,35 @@ function rankAluno(courseName: string): string {
 
 const SCHOOL_LABEL: Record<string, string> = { ESFAP: "EsFAP", ESFO: "EsFO" };
 
-export default async function AlunosPage() {
+export default async function AlunosPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>;
+}) {
   const session = await verifySession();
   if (session.role === "ALUNO") redirect("/acesso-negado");
 
   const school = getSchoolFilter(session.role, session.escola);
 
-  // Cursos inativos continuam exibindo seus alunos (apenas não recebem novas comunicações).
+  const sp = await searchParams;
+  const situacao = sp.situacao === "inativos" ? "inativos" : "ativos";
+  const ativo = situacao === "ativos";
+
+  // Aba "Inativos" reúne os cursos inativados; ao clicar no card chega-se a todos
+  // os alunos do curso. Reativar o curso traz tudo de volta à aba "Ativos".
   const courses = await prisma.course.findMany({
-    where: { ...(school ? { school } : {}) },
-    orderBy: [{ active: "desc" }, { name: "asc" }],
+    where: { active: ativo, ...(school ? { school } : {}) },
+    orderBy: [{ name: "asc" }],
     include: { _count: { select: { students: true } } },
   });
 
   const total = courses.reduce((s, c) => s + c._count.students, 0);
   const canManage = session.role !== "ALUNO" && !(VIEWERS_APM as string[]).includes(session.role);
+
+  const tabs = [
+    { key: "ativos", label: "Cursos ativos" },
+    { key: "inativos", label: "Cursos inativos" },
+  ] as const;
 
   return (
     <div className="p-6">
@@ -35,7 +49,7 @@ export default async function AlunosPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Alunos</h1>
           <p className="text-sm text-gray-500">
-            {total} aluno{total !== 1 ? "s" : ""} em {courses.length} curso{courses.length !== 1 ? "s" : ""}
+            {total} aluno{total !== 1 ? "s" : ""} em {courses.length} curso{courses.length !== 1 ? "s" : ""} {ativo ? "ativo" : "inativo"}{courses.length !== 1 ? "s" : ""}
           </p>
         </div>
         {canManage && (
@@ -45,9 +59,27 @@ export default async function AlunosPage() {
         )}
       </div>
 
+      <div className="flex gap-1 mb-6 border-b border-gray-200">
+        {tabs.map((t) => (
+          <Link
+            key={t.key}
+            href={`/alunos?situacao=${t.key}`}
+            className={`px-4 py-2 text-sm font-medium -mb-px border-b-2 transition-colors ${
+              situacao === t.key
+                ? "border-[#1e3a5f] text-[#1e3a5f]"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {t.label}
+          </Link>
+        ))}
+      </div>
+
       {courses.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
-          Nenhum curso encontrado. Crie um curso na aba <strong>Cursos</strong>.
+          {ativo
+            ? <>Nenhum curso ativo encontrado. Crie um curso na aba <strong>Cursos</strong>.</>
+            : "Nenhum curso inativo."}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

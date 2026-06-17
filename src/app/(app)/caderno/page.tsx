@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { verifySession, getSchoolFilter } from "@/lib/dal";
+import { normalizeSituacaoCurso, activeWhereCurso, courseScopeWhere, buildSituacaoOptions } from "@/lib/cursos";
+import SituacaoCursoFilter from "@/components/SituacaoCursoFilter";
 import { formatCadernoNumero } from "@/lib/utils";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
@@ -23,27 +25,24 @@ export default async function CadernoPage({
 
   const sp = await searchParams;
   const cursoId = sp.cursoId ?? "";
+  const situacao = normalizeSituacaoCurso(sp.situacao);
 
   const canManage = CADERNO_MANAGERS.includes(session.role);
   const school = getSchoolFilter(session.role, session.escola);
 
-  // Cursos disponíveis para este usuário (filtra por escola)
+  // Cursos disponíveis para este usuário (filtra por escola e situação)
   const cursosDisponiveis = await prisma.course.findMany({
-    where: { active: true, ...(school ? { school } : {}) },
+    where: { ...activeWhereCurso(situacao), ...(school ? { school } : {}) },
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   });
 
-  // Filtro de cadernos: por curso selecionado OU por escola
-  const cadernoWhere = cursoId
-    ? { courseId: cursoId }
-    : school
-      ? { course: { school } }
-      : {};
+  // Escopo de curso: cursoId específico, ou escola + situação (ativos/inativos/todos).
+  const escopoCurso = courseScopeWhere(situacao, school, cursoId);
 
   const [cadernos, pendentesPublicacao, naoIncluidos] = await Promise.all([
     prisma.disciplinaryBook.findMany({
-      where: cadernoWhere,
+      where: escopoCurso,
       orderBy: [{ courseId: "asc" }, { year: "asc" }, { number: "asc" }],
       include: { createdBy: true, publishedBy: true, course: true, _count: { select: { items: true } } },
     }),
@@ -51,7 +50,7 @@ export default async function CadernoPage({
       where: {
         status: "DECIDIDA",
         disciplinaryBookItems: { none: {} },
-        ...(cursoId ? { courseId: cursoId } : school ? { course: { school } } : {}),
+        ...escopoCurso,
       },
     }),
     // Registros com decisão fora de qualquer caderno rascunho (removidos manualmente)
@@ -59,7 +58,7 @@ export default async function CadernoPage({
       where: {
         status: "DECIDIDA",
         disciplinaryBookItems: { none: { disciplinaryBook: { status: "RASCUNHO" } } },
-        ...(cursoId ? { courseId: cursoId } : school ? { course: { school } } : {}),
+        ...escopoCurso,
       },
       include: { student: { include: { course: true } }, type: true, decisions: true },
       orderBy: { updatedAt: "desc" },
@@ -70,6 +69,19 @@ export default async function CadernoPage({
   const labelEscopo = school === "ESFAP" ? "Todos da EsFAP"
     : school === "ESFO" ? "Todos da EsFO"
     : "Todos os cursos";
+
+  function cadernoUrl(over: { cursoId?: string; situacao?: string }) {
+    const p = new URLSearchParams();
+    const cid = over.cursoId !== undefined ? over.cursoId : cursoId;
+    const sit = over.situacao !== undefined ? over.situacao : situacao;
+    if (cid) p.set("cursoId", cid);
+    if (sit && sit !== "ativos") p.set("situacao", sit);
+    const qs = p.toString();
+    return `/caderno${qs ? `?${qs}` : ""}`;
+  }
+
+  // Trocar a situação reinicia o curso selecionado (pode não existir na outra lista).
+  const situacaoOptions = buildSituacaoOptions(situacao, (k) => cadernoUrl({ situacao: k, cursoId: "" }));
 
   return (
     <div className="p-6">
@@ -84,33 +96,36 @@ export default async function CadernoPage({
         {canManage && <CriarCadernoBtn pendentesCount={pendentesPublicacao} />}
       </div>
 
-      {/* Seletor de cursos */}
-      {cursosDisponiveis.length > 1 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-5">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Filtrar por curso</p>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/caderno"
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                !cursoId ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              {labelEscopo}
-            </Link>
-            {cursosDisponiveis.map((curso) => (
+      {/* Situação do curso + Seletor de cursos (mesma barra de filtros) */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-5 space-y-4">
+        <SituacaoCursoFilter options={situacaoOptions} />
+        {cursosDisponiveis.length > 1 && (
+          <div className="border-t border-gray-100 pt-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Filtrar por curso</p>
+            <div className="flex flex-wrap gap-2">
               <Link
-                key={curso.id}
-                href={`/caderno?cursoId=${curso.id}`}
+                href={cadernoUrl({ cursoId: "" })}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  cursoId === curso.id ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  !cursoId ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                {curso.name}
+                {labelEscopo}
               </Link>
-            ))}
+              {cursosDisponiveis.map((curso) => (
+                <Link
+                  key={curso.id}
+                  href={cadernoUrl({ cursoId: curso.id })}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    cursoId === curso.id ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  {curso.name}
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {pendentesPublicacao > 0 && canManage && (
         <div className="mb-5 bg-yellow-50 border border-yellow-200 rounded-xl px-5 py-3 flex items-center gap-3">

@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { verifySession, getSchoolFilter } from "@/lib/dal";
+import { normalizeSituacaoCurso, activeWhereCurso, studentStatusWhere, buildSituacaoOptions } from "@/lib/cursos";
+import SituacaoCursoFilter from "@/components/SituacaoCursoFilter";
 import { redirect } from "next/navigation";
 import { calcularNotaPublicada, faixaNota } from "@/lib/score";
 import { abreviarPelotao } from "@/lib/utils";
@@ -23,12 +25,13 @@ export default async function RankingPage({
   const ordem: Ordem = ORDENS_VALIDAS.includes(sp.ordem as Ordem) ? (sp.ordem as Ordem) : "desc";
   const pagina = Math.max(1, parseInt(sp.pagina ?? "1") || 1);
   const busca = (sp.busca ?? "").trim().toLowerCase();
+  const situacao = normalizeSituacaoCurso(sp.situacao);
 
   const school = getSchoolFilter(session.role, session.escola);
 
-  // Cursos disponíveis para o seletor
+  // Cursos disponíveis para o seletor (filtra por situação: ativos/inativos/todos)
   const cursosDisponiveis = await prisma.course.findMany({
-    where: { active: true, ...(school ? { school } : {}) },
+    where: { ...activeWhereCurso(situacao), ...(school ? { school } : {}) },
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   });
@@ -38,8 +41,9 @@ export default async function RankingPage({
     ? [cursoId]
     : cursosDisponiveis.map((c) => c.id);
 
+  // Alunos de cursos inativos ficam INATIVO; o status acompanha a situação do curso.
   const rankingStudents = await prisma.student.findMany({
-    where: { status: "ATIVO", courseId: { in: scopeIds } },
+    where: { ...studentStatusWhere(situacao), courseId: { in: scopeIds } },
     include: { course: true, platoon: true },
   });
   // Notas agregadas por aluno (studentId), não por curso: assim o histórico de
@@ -120,9 +124,17 @@ export default async function RankingPage({
     p.set("ordem", ordem);
     p.set("pagina", String(paginaAtual));
     if (busca) p.set("busca", busca);
-    for (const [k, v] of Object.entries(overrides)) p.set(k, String(v));
+    if (situacao !== "ativos") p.set("situacao", situacao);
+    for (const [k, v] of Object.entries(overrides)) {
+      if (v === "") p.delete(k); else p.set(k, String(v));
+    }
     return `/ranking?${p.toString()}`;
   }
+
+  // Trocar a situação reinicia curso/página (curso pode não existir na outra lista).
+  const situacaoOptions = buildSituacaoOptions(situacao, (k) =>
+    mkUrl({ situacao: k === "ativos" ? "" : k, cursoId: "", pagina: 1 }),
+  );
 
   // Janela de páginas: sempre mostra até 7 botões centrados na página atual
   function buildPageWindow() {
@@ -147,14 +159,14 @@ export default async function RankingPage({
         </div>
         <div className="flex gap-2">
           <Link
-            href={`/ranking/imprimir?ordem=${ordem}${cursoId ? `&cursoId=${cursoId}` : ""}`}
+            href={`/ranking/imprimir?ordem=${ordem}${cursoId ? `&cursoId=${cursoId}` : ""}${situacao !== "ativos" ? `&situacao=${situacao}` : ""}`}
             target="_blank"
             className="bg-[#1e3a5f] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#16304f] transition-colors flex items-center gap-2"
           >
             <span>📄</span> Gerar PDF
           </Link>
           <a
-            href={`/api/export/ranking${cursoId ? `?cursoId=${cursoId}` : ""}`}
+            href={`/api/export/ranking?${new URLSearchParams({ ...(cursoId ? { cursoId } : {}), ...(situacao !== "ativos" ? { situacao } : {}) }).toString()}`}
             className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
           >
             <span>⬇</span> Exportar CSV
@@ -166,6 +178,7 @@ export default async function RankingPage({
       <form method="GET" action="/ranking" className="mb-5">
         {cursoId && <input type="hidden" name="cursoId" value={cursoId} />}
         <input type="hidden" name="ordem" value={ordem} />
+        {situacao !== "ativos" && <input type="hidden" name="situacao" value={situacao} />}
         <div className="flex gap-2">
           <input
             name="busca"
@@ -188,32 +201,42 @@ export default async function RankingPage({
         )}
       </form>
 
-      {/* Seletor de cursos */}
-      {cursosDisponiveis.length > 1 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-5">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Filtrar por curso</p>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={mkUrl({ cursoId: "", pagina: 1 })}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                !cursoId ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              {labelEscopo}
-            </Link>
-            {cursosDisponiveis.map((curso) => (
+      {/* Situação do curso + Seletor de cursos (mesma barra de filtros) */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-5 space-y-4">
+        <SituacaoCursoFilter options={situacaoOptions} />
+        {cursosDisponiveis.length > 1 && (
+          <div className="border-t border-gray-100 pt-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Filtrar por curso</p>
+            <div className="flex flex-wrap gap-2">
               <Link
-                key={curso.id}
-                href={mkUrl({ cursoId: curso.id, pagina: 1 })}
+                href={mkUrl({ cursoId: "", pagina: 1 })}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  cursoId === curso.id ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  !cursoId ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                 }`}
               >
-                {curso.name}
+                {labelEscopo}
               </Link>
-            ))}
+              {cursosDisponiveis.map((curso) => (
+                <Link
+                  key={curso.id}
+                  href={mkUrl({ cursoId: curso.id, pagina: 1 })}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    cursoId === curso.id ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  {curso.name}
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
+      </div>
+
+      {situacao === "todos" && (
+        <p className="text-xs text-gray-500 mb-4 -mt-1">
+          Em <strong>Todos</strong>, um aluno que mudou de curso pode aparecer mais de uma vez — uma linha por
+          matrícula (ativa e anteriores), cada uma com seu próprio histórico de conduta.
+        </p>
       )}
 
       {/* Distribuição por faixa de nota */}
@@ -277,7 +300,7 @@ export default async function RankingPage({
             {paginaItems.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
-                  Nenhum aluno ativo encontrado.
+                  Nenhum aluno encontrado.
                 </td>
               </tr>
             )}

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { verifySession, getSchoolFilter } from "@/lib/dal";
+import { normalizeSituacaoCurso, activeWhereCurso, courseScopeWhere } from "@/lib/cursos";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -37,12 +38,13 @@ export default async function AnaliseImprimirPage({
   const platoonId  = sp.platoonId  ?? "";
   const dataInicio = sp.dataInicio ?? "";
   const dataFim    = sp.dataFim    ?? "";
+  const situacao   = normalizeSituacaoCurso(sp.situacao);
 
   const school = getSchoolFilter(session.role, session.escola);
 
   const [cursosDisponiveis, plataoSelecionado] = await Promise.all([
     prisma.course.findMany({
-      where: { active: true, ...(school ? { school } : {}) },
+      where: { ...activeWhereCurso(situacao), ...(school ? { school } : {}) },
       orderBy: { name: "asc" },
       select: { id: true, name: true, school: true },
     }),
@@ -51,11 +53,7 @@ export default async function AnaliseImprimirPage({
       : Promise.resolve(null),
   ]);
 
-  const courseFilter = cursoId
-    ? { courseId: cursoId }
-    : school
-      ? { course: { school } }
-      : {};
+  const courseFilter = courseScopeWhere(situacao, school, cursoId);
 
   const platoonFilter = platoonId ? { platoonId } : {};
 

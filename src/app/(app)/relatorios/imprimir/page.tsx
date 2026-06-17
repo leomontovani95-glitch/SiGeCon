@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { verifySession, getSchoolFilter } from "@/lib/dal";
+import { normalizeSituacaoCurso, activeWhereCurso, courseScopeWhere } from "@/lib/cursos";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -45,19 +46,16 @@ export default async function RelatoriosImprimirPage({
   const dataInicio = sp.dataInicio ?? "";
   const dataFim    = sp.dataFim    ?? "";
 
+  const situacao = normalizeSituacaoCurso(sp.situacao);
   const school = getSchoolFilter(session.role, session.escola);
 
   const cursosDisponiveis = await prisma.course.findMany({
-    where: { active: true, ...(school ? { school } : {}) },
+    where: { ...activeWhereCurso(situacao), ...(school ? { school } : {}) },
     orderBy: { name: "asc" },
     select: { id: true, name: true, school: true },
   });
 
-  const cursoFilter = cursoId
-    ? { courseId: cursoId }
-    : school
-      ? { course: { school } }
-      : {};
+  const cursoFilter = courseScopeWhere(situacao, school, cursoId);
 
   const where: Record<string, unknown> = { ...cursoFilter };
   if (tipo) where.type = { name: tipo };

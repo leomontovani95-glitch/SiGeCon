@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySession, getSchoolFilter } from "@/lib/dal";
+import { normalizeSituacaoCurso, courseScopeWhere } from "@/lib/cursos";
 import { prisma } from "@/lib/db";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -15,9 +16,10 @@ export async function GET(req: NextRequest) {
   const platoonId  = searchParams.get("platoonId")  ?? "";
   const dataInicio = searchParams.get("dataInicio") ?? "";
   const dataFim    = searchParams.get("dataFim")    ?? "";
+  const situacao   = normalizeSituacaoCurso(searchParams.get("situacao") ?? undefined);
 
   const school = getSchoolFilter(session.role, session.escola);
-  const courseFilter = cursoId ? { courseId: cursoId } : school ? { course: { school } } : {};
+  const courseFilter = courseScopeWhere(situacao, school, cursoId);
   const platoonFilter = platoonId ? { platoonId } : {};
   const dateFilter =
     dataInicio || dataFim

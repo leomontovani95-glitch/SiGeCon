@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySession, getSchoolFilter } from "@/lib/dal";
+import { normalizeSituacaoCurso, activeWhereCurso, studentStatusWhere } from "@/lib/cursos";
 import { prisma } from "@/lib/db";
 import { calcularNotaPublicada } from "@/lib/score";
 
@@ -11,10 +12,11 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const cursoId = searchParams.get("cursoId") ?? "";
+  const situacao = normalizeSituacaoCurso(searchParams.get("situacao") ?? undefined);
   const school = getSchoolFilter(session.role, session.escola);
 
   const cursosDisponiveis = await prisma.course.findMany({
-    where: { active: true, ...(school ? { school } : {}) },
+    where: { ...activeWhereCurso(situacao), ...(school ? { school } : {}) },
     select: { id: true, name: true },
   });
   const scopeIds = cursoId
@@ -22,7 +24,7 @@ export async function GET(req: NextRequest) {
     : cursosDisponiveis.map((c) => c.id);
 
   const students = await prisma.student.findMany({
-    where: { status: "ATIVO", courseId: { in: scopeIds } },
+    where: { ...studentStatusWhere(situacao), courseId: { in: scopeIds } },
     include: { course: true, platoon: true },
   });
   // Notas agregadas por aluno (studentId): o histórico acompanha o remanescente.

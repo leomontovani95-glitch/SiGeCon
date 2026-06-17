@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { verifySession, getSchoolFilter } from "@/lib/dal";
+import { normalizeSituacaoCurso, activeWhereCurso, courseScopeWhere, buildSituacaoOptions } from "@/lib/cursos";
+import SituacaoCursoFilter from "@/components/SituacaoCursoFilter";
 import { redirect } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -54,20 +56,17 @@ export default async function RelatoriosPage({
   const col        = sp.col  ?? "";
   const dir        = (sp.dir === "asc" ? "asc" : "desc") as "asc" | "desc";
   const adaptacao  = sp.adaptacao ?? "";
+  const situacao   = normalizeSituacaoCurso(sp.situacao);  // ativos | inativos | todos
 
   const school = getSchoolFilter(session.role, session.escola);
 
   const cursosDisponiveis = await prisma.course.findMany({
-    where: { active: true, ...(school ? { school } : {}) },
+    where: { ...activeWhereCurso(situacao), ...(school ? { school } : {}) },
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   });
 
-  const cursoFilter = cursoId
-    ? { courseId: cursoId }
-    : school
-      ? { course: { school } }
-      : {};
+  const cursoFilter = courseScopeWhere(situacao, school, cursoId);
 
   const where: Record<string, unknown> = { ...cursoFilter };
   if (tipo)   where.type = { name: tipo };
@@ -195,6 +194,7 @@ export default async function RelatoriosPage({
     if (inciso)     p.set("inciso",     inciso);
     if (alinea)     p.set("alinea",     alinea);
     if (adaptacao)  p.set("adaptacao",  adaptacao);
+    if (situacao !== "ativos") p.set("situacao", situacao);
     if (col)        p.set("col",        col);
     if (dir)        p.set("dir",        dir);
     p.set("pagina",    String(paginaAtual));
@@ -220,6 +220,12 @@ export default async function RelatoriosPage({
     return `/relatorios${qs ? `?${qs}` : ""}`;
   }
 
+  // Situação do curso: trocar reinicia curso selecionado e paginação.
+  const situacaoOptions = buildSituacaoOptions(situacao, (k) => {
+    const qs = buildQS({ situacao: k === "ativos" ? "" : k, cursoId: "", pagina: 1, paginaArt: 1 });
+    return `/relatorios${qs ? `?${qs}` : ""}`;
+  });
+
   function pdfHref() {
     const qs = buildQS();
     return `/relatorios/imprimir${qs ? `?${qs}` : ""}`;
@@ -235,6 +241,7 @@ export default async function RelatoriosPage({
     if (artigo)     p.set("artigo",     artigo);
     if (inciso)     p.set("inciso",     inciso);
     if (alinea)     p.set("alinea",     alinea);
+    if (situacao !== "ativos") p.set("situacao", situacao);
     const qs = p.toString();
     return `/api/export/relatorios${qs ? `?${qs}` : ""}`;
   }
@@ -264,28 +271,32 @@ export default async function RelatoriosPage({
         </div>
       </div>
 
-      {/* Seletor de cursos */}
-      {cursosDisponiveis.length > 1 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-5">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Filtrar por curso</p>
-          <div className="flex flex-wrap gap-2">
-            <Link href={pillHref("")}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${!cursoId ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
-              {labelEscopo}
-            </Link>
-            {cursosDisponiveis.map((curso) => (
-              <Link key={curso.id} href={pillHref(curso.id)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${cursoId === curso.id ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
-                {curso.name}
+      {/* Situação do curso + Seletor de cursos (mesma barra de filtros) */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 mb-5 space-y-4">
+        <SituacaoCursoFilter options={situacaoOptions} />
+        {cursosDisponiveis.length > 1 && (
+          <div className="border-t border-gray-100 pt-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Filtrar por curso</p>
+            <div className="flex flex-wrap gap-2">
+              <Link href={pillHref("")}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${!cursoId ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+                {labelEscopo}
               </Link>
-            ))}
+              {cursosDisponiveis.map((curso) => (
+                <Link key={curso.id} href={pillHref(curso.id)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${cursoId === curso.id ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}>
+                  {curso.name}
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Filtros */}
       <form method="GET" className="bg-white rounded-xl border border-gray-200 p-5 mb-6 space-y-4">
         {cursoId && <input type="hidden" name="cursoId" value={cursoId} />}
+        {situacao !== "ativos" && <input type="hidden" name="situacao" value={situacao} />}
         <input type="hidden" name="pagina" value="1" />
         <input type="hidden" name="paginaArt" value="1" />
 
