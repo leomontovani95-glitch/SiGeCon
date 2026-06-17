@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { verifySession, getSchoolFilter, ESFO_CFO_RANK } from "@/lib/dal";
+import { getMatriculas } from "@/lib/historico";
 import { normalizeSituacaoCurso, activeWhereCurso, courseScopeWhere, buildSituacaoOptions } from "@/lib/cursos";
 import SituacaoCursoFilter from "@/components/SituacaoCursoFilter";
 import { format } from "date-fns";
@@ -201,14 +202,31 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
     where.course = { school };
   }
   let isEsfoCFO = false;
+  // Aluno: comunicações do PRÓPRIO histórico. Quem teve ascensão de curso pode
+  // alternar entre matrículas (?hist=) para ver as comunicações como comunicado
+  // em cursos anteriores. As comunicações como comunicante (seção abaixo) já
+  // abrangem todos os cursos, pois a chave é o usuário, que persiste na ascensão.
+  let matriculasAluno: { id: string; courseName: string; isCurrent: boolean }[] = [];
+  let matriculaAtualId = "";
+  let histSelecionado = "";
+  let cursoAlunoNome = "";
   if (session.role === "ALUNO") {
-    const aluno = await prisma.student.findFirst({
+    const alunoAtual = await prisma.student.findFirst({
       where: { userId: session.userId },
       include: { course: true },
     });
-    if (aluno) {
-      where.studentId = aluno.id;
-      isEsfoCFO = aluno.course.name in ESFO_CFO_RANK;
+    if (alunoAtual) {
+      const { records, currentId } = await getMatriculas(alunoAtual.rg);
+      matriculaAtualId = currentId ?? alunoAtual.id;
+      // Valida ?hist contra as matrículas da própria pessoa (mesmo RG).
+      histSelecionado = records.some((m) => m.id === sp.hist) ? sp.hist : matriculaAtualId;
+      where.studentId = histSelecionado;
+      // studentId já restringe ao registro do aluno; remove eventual filtro de
+      // escola para não excluir matrículas de outra escola (ascensão EsFAP→EsFO).
+      delete where.course;
+      isEsfoCFO = alunoAtual.course.name in ESFO_CFO_RANK;
+      matriculasAluno = records.map((m) => ({ id: m.id, courseName: m.course.name, isCurrent: m.id === matriculaAtualId }));
+      cursoAlunoNome = records.find((m) => m.id === histSelecionado)?.course.name ?? alunoAtual.course.name;
     }
   }
 
@@ -254,6 +272,8 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
   // Constrói URL preservando todos os filtros
   function buildUrl(overrides: Record<string, string>) {
     const p = new URLSearchParams();
+    // Preserva a matrícula selecionada (aluno com ascensão) ao filtrar/paginar.
+    if (histSelecionado && histSelecionado !== matriculaAtualId) p.set("hist", histSelecionado);
     if (cursoId)   p.set("cursoId",   cursoId);
     if (busca)     p.set("busca",     busca);
     if (status)    p.set("status",    status);
@@ -301,7 +321,7 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Comunicações</h1>
           <p className="text-sm text-gray-500">
-            {cursoSelecionado ? cursoSelecionado.name : labelEscopo}
+            {isStaff ? (cursoSelecionado ? cursoSelecionado.name : labelEscopo) : cursoAlunoNome}
             {" · "}{totalComms} resultado(s)
           </p>
         </div>
@@ -314,6 +334,33 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
           </div>
         )}
       </div>
+
+      {/* Seletor de matrícula (aluno com ascensão de curso) — discreto */}
+      {!isStaff && matriculasAluno.length > 1 && (
+        <div className="bg-white rounded-xl border border-gray-200 px-4 py-3 mb-5 flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Curso</span>
+          {matriculasAluno.map((m) => {
+            const sel = m.id === histSelecionado;
+            return (
+              <Link
+                key={m.id}
+                href={m.isCurrent ? "/comunicacoes" : `/comunicacoes?hist=${m.id}`}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors inline-flex items-center gap-1 ${
+                  sel ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+              >
+                {m.courseName}
+                {m.isCurrent && <span className="opacity-60">· atual</span>}
+              </Link>
+            );
+          })}
+          {histSelecionado !== matriculaAtualId && (
+            <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-0.5">
+              Vendo comunicações de um curso anterior
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Situação do curso + Seletor de cursos (mesma barra de filtros) */}
       {isStaff && (
