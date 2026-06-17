@@ -153,8 +153,8 @@ function TabelaTipo({ items, label, note, isTdTac, bar, barText, title }: { item
             <th className="cd-col-num">Nº</th>
             <th className="cd-col-nome">Nome</th>
             <th className="cd-col-data">Data</th>
-            <th className="cd-col-obs">Obs.</th>
-            <th className="cd-col-pont" style={{ textAlign: "right" }}>Pont.</th>
+            <th className="cd-col-obs">Observação</th>
+            <th className="cd-col-pont">Pont.</th>
           </tr>
         </thead>
         <tbody>
@@ -175,7 +175,7 @@ function TabelaTipo({ items, label, note, isTdTac, bar, barText, title }: { item
               <td className="cd-col-nome" style={{ fontWeight: "bold" }}>{item.studentWarName}</td>
               <td className="cd-col-data">{format(new Date(item.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
               <td className="cd-col-obs" style={{ color: "#666" }}>{obsCell(item)}</td>
-              <td className="cd-col-pont" style={{ textAlign: "right", fontWeight: "bold" }}>
+              <td className="cd-col-pont" style={{ fontWeight: "bold" }}>
                 {item.score != null
                   ? (["Referência Elogiosa", "Elogio publicado em BI"].includes(item.recordType)
                       ? `+${Math.abs(item.score).toFixed(1)}`
@@ -403,9 +403,9 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
       @page { size: A4 portrait; margin: 8mm 5mm 12mm 5mm; }
       .print-page, .extra-page { padding: 2mm 3mm 12mm 3mm !important; }
     }
-    .cd-table { width: 100%; border-collapse: collapse; font-size: 7pt; table-layout: fixed; }
-    .cd-table th { padding: 4px 5px; font-size: 6.5pt; text-align: left; overflow: hidden; white-space: nowrap; }
-    .cd-table td { padding: 3px 4px; border-bottom: 1px solid #e5e7eb; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+    .cd-table { width: 100%; border-collapse: collapse; font-size: 7pt; table-layout: fixed; border: 1px solid #d1d5db; }
+    .cd-table th { padding: 4px 5px; font-size: 6.5pt; text-align: center; color: #000; overflow: hidden; white-space: nowrap; border: 1px solid #d1d5db; }
+    .cd-table td { padding: 3px 4px; border: 1px solid #d1d5db; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; text-align: center; }
     .cd-table tr:nth-child(even) td { background: #f9fafb; }
     .cd-col-proto { width: 19%; }
     .cd-col-enq   { width: 11%; }
@@ -414,7 +414,7 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
     .cd-col-nome  { width: 18%; }
     .cd-col-data  { width: 15%; }
     .cd-col-obs   { width: 20%; white-space: normal !important; }
-    .cd-col-pont  { width: 5%; text-align: right; }
+    .cd-col-pont  { width: 5%; text-align: center; }
     .aacp-table { width: 100%; border-collapse: collapse; font-size: 7.5pt; table-layout: fixed; }
     .aacp-table th { background: #1e3a5f; color: white; padding: 4px 5px; font-size: 7pt; text-align: left; border: 1px solid #000; }
     .aacp-table td { padding: 3.5px 5px; border: 1px solid #000; vertical-align: middle; }

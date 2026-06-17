@@ -6,21 +6,25 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import PrintLayout from "@/components/PrintLayout";
 import { escolaHeaderLabel } from "@/lib/utils";
+import { coresTipo } from "@/lib/coresComunicacao";
 
 const PRINT_COLORS = [
   "#1e3a5f", "#2563eb", "#0891b2", "#0d9488",
   "#7c3aed", "#db2777", "#d97706", "#16a34a",
 ];
 
+// Cabeçalhos das CPIs usam a barra da paleta (coresTipo); as células usam tons
+// claros do mesmo matiz (amarelo → amarelo → laranja → vermelho), alinhados.
+const CPI_HEADER = [coresTipo("CPI 0"), coresTipo("CPI 1"), coresTipo("CPI 2"), coresTipo("CPI 3")];
 const CPI_COLORS_BG: Record<number, string> = {
-  0: "#dcfce7",
-  1: "#fef9c3",
+  0: "#fef9c3",
+  1: "#fef08a",
   2: "#ffedd5",
   3: "#fee2e2",
 };
 const CPI_COLORS_TEXT: Record<number, string> = {
-  0: "#166534",
-  1: "#854d0e",
+  0: "#854d0e",
+  1: "#6e7400",
   2: "#9a3412",
   3: "#991b1b",
 };
@@ -339,10 +343,10 @@ export default async function AnaliseImprimirPage({
             <thead>
               <tr>
                 <th>Pelotão</th>
-                <th style={{ background: "#166534" }}>CPI 0</th>
-                <th style={{ background: "#854d0e" }}>CPI 1</th>
-                <th style={{ background: "#9a3412" }}>CPI 2</th>
-                <th style={{ background: "#991b1b" }}>CPI 3</th>
+                <th style={{ background: CPI_HEADER[0].bar, color: CPI_HEADER[0].barText }}>CPI 0</th>
+                <th style={{ background: CPI_HEADER[1].bar, color: CPI_HEADER[1].barText }}>CPI 1</th>
+                <th style={{ background: CPI_HEADER[2].bar, color: CPI_HEADER[2].barText }}>CPI 2</th>
+                <th style={{ background: CPI_HEADER[3].bar, color: CPI_HEADER[3].barText }}>CPI 3</th>
                 <th>Total</th>
               </tr>
             </thead>
