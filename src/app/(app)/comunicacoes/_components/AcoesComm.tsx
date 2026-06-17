@@ -56,11 +56,11 @@ const SUGESTOES_DECISAO: Record<string, Sugestao[]> = {
 function nomeCpiDoInciso(typeName: string, item: string | null): string {
   const name = typeName.toLowerCase();
   if (name.includes("referência elogiosa") || name.includes("referencia elogiosa")) return "Referência Elogiosa";
-  if (!item) return "CPI 0";
+  if (!item) return "CPI 1";
   if (item === "I") return "CPI 1";
   if (item === "II") return "CPI 2";
   if (item === "III") return "CPI 3";
-  return "CPI 0";
+  return "CPI 1";
 }
 
 type ManualRule = { id: string; article: string; item: string | null; letter: string | null; description: string };

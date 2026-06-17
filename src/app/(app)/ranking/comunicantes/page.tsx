@@ -12,7 +12,7 @@ const ALLOWED: UserRole[] = [
   "OFICIAL_ESFAP", "OFICIAL_ESFO",
 ];
 
-const TIPOS_FILTRO = ["CPI 0", "CPI 1", "CPI 2", "CPI 3", "Referência Elogiosa"];
+const TIPOS_FILTRO = ["CPI 1", "CPI 2", "CPI 3", "Referência Elogiosa"];
 const PER_PAGE = 20;
 const TEXT_COLS = new Set(["posto", "nome", "rg", "nf", "curso", "pelotao", "numcurso"]);
 
@@ -43,7 +43,6 @@ function getSortValue(e: CommEntry, sortBy: string): string | number {
     case "curso":    return u?.student?.course.name ?? "";
     case "pelotao":  return u?.student?.platoon?.name ?? "";
     case "numcurso": return u?.student?.courseNumber ?? "";
-    case "cpi0":     return e.counts["CPI 0"] ?? 0;
     case "cpi1":     return e.counts["CPI 1"] ?? 0;
     case "cpi2":     return e.counts["CPI 2"] ?? 0;
     case "cpi3":     return e.counts["CPI 3"] ?? 0;
@@ -250,7 +249,6 @@ export default async function RankingComunicantesPage({
                 {thCell({ col: "pelotao",  label: "Pel." })}
                 {thCell({ col: "numcurso", label: "Nº Curso", center: true })}
                 {thCell({ col: "total",    label: "Total",    center: true })}
-                {thCell({ col: "cpi0",     label: "CPI 0",    center: true })}
                 {thCell({ col: "cpi1",     label: "CPI 1",    center: true })}
                 {thCell({ col: "cpi2",     label: "CPI 2",    center: true })}
                 {thCell({ col: "cpi3",     label: "CPI 3",    center: true })}
@@ -302,9 +300,6 @@ export default async function RankingComunicantesPage({
                     <td className="px-3 py-2.5 text-gray-600 text-xs text-center">{numCurso}</td>
                     <td className="px-3 py-2.5 text-center">
                       <span className="font-bold text-gray-900">{e.total}</span>
-                    </td>
-                    <td className="px-3 py-2.5 text-center font-semibold text-red-700">
-                      {e.counts["CPI 0"] ?? 0}
                     </td>
                     <td className="px-3 py-2.5 text-center font-semibold text-red-700">
                       {e.counts["CPI 1"] ?? 0}

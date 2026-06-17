@@ -104,8 +104,6 @@ const TD_TAC_SET = new Set(["TD Leve", "TD Média", "TD Grave", "TAC"]);
 // - título da seção usa a cor só na fonte (sem barra preenchida);
 // - o cabeçalho da tabela (Protocolo, Enquad...) é a barra colorida.
 const GRUPOS: { label: string; short: string; note?: string; isTdTac?: boolean; bar: string; barText: string; title: string; filter: (i: Item) => boolean }[] = [
-  { label: "CPI 0", short: "CPI 0", note: "Equivale a 50% dos pontos da CPI 1 (−0,1 pt por ocorrência)", ...coresTipo("CPI 0"),
-                         filter: (i) => i.recordType === "CPI 0"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
   { label: "CPI 1",     short: "CPI 1", ...coresTipo("CPI 1"), filter: (i) => i.recordType === "CPI 1"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
   { label: "CPI 2",     short: "CPI 2", ...coresTipo("CPI 2"), filter: (i) => i.recordType === "CPI 2"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
   { label: "CPI 3",     short: "CPI 3", ...coresTipo("CPI 3"), filter: (i) => i.recordType === "CPI 3"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
@@ -428,7 +426,7 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
     .cd-title-block p { margin: 0 0 3px 0; color: #1e3a5f; font-weight: bold; letter-spacing: 0.5px; line-height: 1.3; }
     .cd-title-block .cd-curso   { font-size: 11pt; }
     .cd-title-block .cd-caderno { font-size: 12.5pt; margin-top: 5px; }
-    .cd-meta-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
+    .cd-meta-row { display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: flex-end; gap: 16px; }
     .cd-meta-row .print-field { margin-bottom: 0; }
     .cd-counts { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 2px 16px; margin-top: 7px; padding-top: 5px; border-top: 1px solid #e5e7eb; }
     .cd-count { font-size: 8pt; color: #6b7280; white-space: nowrap; }

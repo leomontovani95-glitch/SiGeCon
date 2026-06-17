@@ -39,7 +39,7 @@ export async function getHistoricoAluno(id: string) {
   const resumo = [
     { label: "Total",         value: aluno.communications.length,                color: "#1e3a5f" },
     { label: "Publicados",    value: pubItems.length,                             color: "#374151" },
-    { label: "CPI 0/1",       value: (ct["CPI 0"] ?? 0) + (ct["CPI 1"] ?? 0),     color: "#b45309" },
+    { label: "CPI 1",       value: ct["CPI 1"] ?? 0,     color: "#b45309" },
     { label: "CPI 2",         value: ct["CPI 2"] ?? 0,                            color: "#b91c1c" },
     { label: "CPI 3",         value: ct["CPI 3"] ?? 0,                            color: "#7f1d1d" },
     { label: "TD Leve",       value: ct["TD Leve"] ?? 0,                          color: "#b45309" },

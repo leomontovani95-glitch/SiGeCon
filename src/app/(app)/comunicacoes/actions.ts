@@ -62,7 +62,7 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
 
   if (isAluno) {
     // Apenas CPI e Referência Elogiosa são permitidos para alunos
-    const TIPOS_ALUNO = ["CPI 0", "CPI 1", "CPI 2", "CPI 3", "Referência Elogiosa"];
+    const TIPOS_ALUNO = ["CPI 1", "CPI 2", "CPI 3", "Referência Elogiosa"];
     if (!TIPOS_ALUNO.includes(tipo.name)) return { error: "Tipo de comunicação não permitido." };
 
     // Verificar se o aluno comunicante é do CFO (EsFO) e obter seu curso

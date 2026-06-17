@@ -59,7 +59,7 @@ function derivedStatus(c: CommItem): { label: string; color: string } {
 
 // CPI 0 é nome não-oficial da CPI 1 (Art. 146, I, a) — agrupados no mesmo card
 function categorizarTipo(nome: string): "cpi1" | "cpi2" | "cpi3" | "elogio" | null {
-  if (nome === "CPI 0" || nome === "CPI 1") return "cpi1";
+  if (nome === "CPI 1") return "cpi1";
   if (nome === "CPI 2") return "cpi2";
   if (nome === "CPI 3") return "cpi3";
   if (nome === "Referência Elogiosa" || nome === "Elogio publicado em BI") return "elogio";
@@ -67,7 +67,7 @@ function categorizarTipo(nome: string): "cpi1" | "cpi2" | "cpi3" | "elogio" | nu
 }
 
 const CARDS = [
-  { key: "cpi1",  label: "CPI 1",          sub: "(incl. CPI 0)", cor: "bg-orange-50 border-orange-200 text-orange-700" },
+  { key: "cpi1",  label: "CPI 1",          sub: null, cor: "bg-orange-50 border-orange-200 text-orange-700" },
   { key: "cpi2",  label: "CPI 2",          sub: null,            cor: "bg-red-50 border-red-200 text-red-700" },
   { key: "cpi3",  label: "CPI 3",          sub: null,            cor: "bg-red-100 border-red-300 text-red-800" },
   { key: "elogio",label: "Ref. Elogiosa",  sub: null,            cor: "bg-green-50 border-green-200 text-green-700" },

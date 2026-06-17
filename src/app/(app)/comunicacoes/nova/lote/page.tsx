@@ -7,7 +7,7 @@ export default async function NovaComunicacaoLotePage() {
 
   const [tipos, regras, cursos] = await Promise.all([
     prisma.communicationType.findMany({
-      where: { active: true, name: { in: ["CPI 0", "CPI 1", "CPI 2", "CPI 3", "Referência Elogiosa"] } },
+      where: { active: true, name: { in: ["CPI 1", "CPI 2", "CPI 3", "Referência Elogiosa"] } },
       orderBy: { name: "asc" },
     }),
     prisma.manualRule.findMany({

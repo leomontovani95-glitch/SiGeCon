@@ -90,7 +90,7 @@ async function getDashboardGeral(role: string, userId: string, cf: Record<string
   ] = await Promise.all([
     prisma.communication.count({ where: {
       ...filtroReporter, ...cf, ...adaptationFilter,
-      type: { name: { in: ["CPI 0","CPI 1","CPI 2","CPI 3"] } },
+      type: { name: { in: ["CPI 1","CPI 2","CPI 3"] } },
       disciplinaryBookItems: { none: { disciplinaryBook: { status: "PUBLICADO" } } },
     } }),
     prisma.communication.count({ where: { ...filtroReporter, ...cf, ...adaptationFilter, status: "AGUARDANDO_CIENCIA" } }),
@@ -100,7 +100,7 @@ async function getDashboardGeral(role: string, userId: string, cf: Record<string
     prisma.communication.count({ where: { ...filtroReporter, ...cf, ...adaptationFilter, status: "AGUARDANDO_DECISAO" } }),
     prisma.communication.count({ where: {
       ...filtroReporter, ...cf, ...adaptationFilter, status: "DECIDIDA",
-      type: { name: { in: ["CPI 0","CPI 1","CPI 2","CPI 3"] } },
+      type: { name: { in: ["CPI 1","CPI 2","CPI 3"] } },
       // Toda CPI decidida ainda não publicada aguarda caderno — inclusive as
       // arquivadas (criarCaderno também as inclui). Não filtra por arquivamento.
       disciplinaryBookItems: { none: { disciplinaryBook: { status: "PUBLICADO" } } },
@@ -126,7 +126,7 @@ async function getDashboardGeral(role: string, userId: string, cf: Record<string
   ]);
 
   // Mesma lógica dos filtros de comunicações: usa CommunicationDecision.decisionType
-  const CPI_TYPES = ["CPI 0", "CPI 1", "CPI 2", "CPI 3"] as const;
+  const CPI_TYPES = ["CPI 1", "CPI 2", "CPI 3"] as const;
   const FAV_TYPES = ["Referência Elogiosa", "Elogio publicado em BI"] as const;
   const arquivadaDec    = { decisions: { some: { decisionType: { contains: "rquiv" } } } };
   const naoArquivadaDec = { decisions: { none: { decisionType: { contains: "rquiv" } } } };

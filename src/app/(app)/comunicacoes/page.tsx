@@ -168,7 +168,7 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
       })
     : [];
 
-  const CPI_TYPES = ["CPI 0", "CPI 1", "CPI 2", "CPI 3"] as const;
+  const CPI_TYPES = ["CPI 1", "CPI 2", "CPI 3"] as const;
   const FAV_TYPES = ["Referência Elogiosa", "Elogio publicado em BI"] as const;
   const OTHER_TYPES = [...CPI_TYPES, ...FAV_TYPES] as string[];
 
@@ -414,9 +414,7 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
           <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
             <span className="text-xs font-medium text-gray-500 self-center">Nível:</span>
             {([
-              { value: "",      label: "Todos" },
-              { value: "CPI 0", label: "CPI 0" },
-              { value: "CPI 1", label: "CPI 1" },
+              { value: "",      label: "Todos" },              { value: "CPI 1", label: "CPI 1" },
               { value: "CPI 2", label: "CPI 2" },
               { value: "CPI 3", label: "CPI 3" },
             ] as const).map((opt) => (

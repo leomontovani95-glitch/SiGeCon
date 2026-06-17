@@ -147,20 +147,19 @@ export default async function AnalisePage({
   // Conta CPIs (por grau, derivado do nome "CPI 0".."CPI 3") e Referências
   // Elogiosas (qualquer tipo FAVORAVEL) por pelotão; o filtro do gráfico é
   // aplicado no cliente sobre esses contadores.
-  const pelotaoMap = new Map<string, { cpi0: number; cpi1: number; cpi2: number; cpi3: number; refElogiosa: number }>();
+  const pelotaoMap = new Map<string, { cpi1: number; cpi2: number; cpi3: number; refElogiosa: number }>();
   for (const c of allComms) {
     const isCpi = c.type.name.toLowerCase().includes("cpi");
     const isRef = c.type.scoreNature === "FAVORAVEL";
     if (!isCpi && !isRef) continue;
     const pelotao = c.platoon?.name ?? c.student.platoon?.name ?? "Sem pelotão";
-    const prev    = pelotaoMap.get(pelotao) ?? { cpi0: 0, cpi1: 0, cpi2: 0, cpi3: 0, refElogiosa: 0 };
+    const prev    = pelotaoMap.get(pelotao) ?? { cpi1: 0, cpi2: 0, cpi3: 0, refElogiosa: 0 };
     if (isCpi) {
       const m    = c.type.name.match(/(\d)/);
-      const grau = m ? Math.min(3, Math.max(0, parseInt(m[1], 10))) : 0;
-      if (grau === 0)      prev.cpi0++;
-      else if (grau === 1) prev.cpi1++;
-      else if (grau === 2) prev.cpi2++;
-      else                 prev.cpi3++;
+      const grau = m ? Math.min(3, Math.max(1, parseInt(m[1], 10))) : 1;
+      if (grau === 2)      prev.cpi2++;
+      else if (grau === 3) prev.cpi3++;
+      else                 prev.cpi1++;
     } else {
       prev.refElogiosa++;
     }
@@ -170,7 +169,7 @@ export default async function AnalisePage({
     .map(([pelotao, cnt]) => ({
       pelotao,
       ...cnt,
-      total: cnt.cpi0 + cnt.cpi1 + cnt.cpi2 + cnt.cpi3,
+      total: cnt.cpi1 + cnt.cpi2 + cnt.cpi3,
     }))
     .sort((a, b) => b.total - a.total);
 

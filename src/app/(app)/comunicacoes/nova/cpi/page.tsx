@@ -36,7 +36,7 @@ export default async function NovaCPIPage() {
 
   const [tipos, regras, cursos] = await Promise.all([
     prisma.communicationType.findMany({
-      where: { active: true, name: { in: ["CPI 0", "CPI 1", "CPI 2", "CPI 3"] } },
+      where: { active: true, name: { in: ["CPI 1", "CPI 2", "CPI 3"] } },
       orderBy: { name: "asc" },
     }),
     prisma.manualRule.findMany({

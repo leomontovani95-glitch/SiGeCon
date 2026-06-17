@@ -128,7 +128,6 @@ async function main() {
 
   // ── Tipos de comunicação (NPCE 2025) ───────────────────────────────────────
   const tipos = [
-    { name: "CPI 0", score: 0.1, scoreNature: "DESFAVORAVEL", description: "CPI Art. 146, Inc. I — 50% da CPI 1" },
     { name: "CPI 1", score: 0.2, scoreNature: "DESFAVORAVEL", description: "CPI de primeiro grau" },
     { name: "CPI 2", score: 0.4, scoreNature: "DESFAVORAVEL", description: "CPI de segundo grau" },
     { name: "CPI 3", score: 0.6, scoreNature: "DESFAVORAVEL", description: "CPI de terceiro grau" },
@@ -151,7 +150,7 @@ async function main() {
       item: "I",
       letter: null,
       description: "Fardamento em desalinho",
-      defaultCommunicationType: "CPI 0",
+      defaultCommunicationType: "CPI 1",
       defaultScore: 0.1,
       active: true,
     },

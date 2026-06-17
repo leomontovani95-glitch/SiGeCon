@@ -18,8 +18,13 @@ export async function salvarRegra(id: string | null, _prev: State, formData: For
 
   if (!article || !description) return { error: "Artigo e descrição são obrigatórios." };
 
+  // Pontuação do dispositivo (editável, pré-preenchida pelo tipo no formulário).
+  const rawScore = String(formData.get("defaultScore") ?? "").trim();
+  const defaultScore = rawScore === "" ? null : Number(rawScore);
+  if (defaultScore !== null && !Number.isFinite(defaultScore)) return { error: "Pontuação inválida." };
+
   const theme = String(formData.get("theme") ?? "").trim() || null;
-  const data = { article, item, letter, description, theme, defaultCommunicationType, active };
+  const data = { article, item, letter, description, theme, defaultCommunicationType, defaultScore, active };
   try {
     if (id) {
       await prisma.manualRule.update({ where: { id }, data });

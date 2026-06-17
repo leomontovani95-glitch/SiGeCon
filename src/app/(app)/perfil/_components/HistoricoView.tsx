@@ -39,7 +39,7 @@ export default function HistoricoView({
   const resumo = [
     { label: "Total",         value: commsVisiveis.length,                    desfav: false, fav: false },
     { label: "Publicados",    value: pubItemsVisiveis.length,                 desfav: false, fav: false },
-    { label: "CPI 0/1",       value: (ct["CPI 0"] ?? 0) + (ct["CPI 1"] ?? 0), desfav: true,  fav: false },
+    { label: "CPI 1",       value: ct["CPI 1"] ?? 0, desfav: true,  fav: false },
     { label: "CPI 2",         value: ct["CPI 2"] ?? 0,                        desfav: true,  fav: false },
     { label: "CPI 3",         value: ct["CPI 3"] ?? 0,                        desfav: true,  fav: false },
     { label: "TD Leve",       value: ct["TD Leve"] ?? 0,                      desfav: true,  fav: false },

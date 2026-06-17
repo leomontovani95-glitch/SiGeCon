@@ -251,7 +251,8 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
     const t = regraAutoFill?.defaultCommunicationType
       ? tipos.find((x) => x.name === regraAutoFill.defaultCommunicationType)
       : undefined;
-    return t ? String(t.score) : "";
+    // Prefere a pontuação do dispositivo (defaultScore); senão, a do tipo.
+    return t ? String(regraAutoFill?.defaultScore ?? t.score) : "";
   });
 
   // Período de Adaptação
@@ -282,11 +283,11 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
   // ── auto-fill ao selecionar alínea ───────────────────────────────────
   function selecionarRegra(r: Regra) {
     setRuleId(r.id);
-    // Pontuação sugerida vem do score do tipo (CommunicationType) — fonte única,
-    // editável em /tipos. Assim novas comunicações seguem a legislação vigente.
+    // Pontuação sugerida vem do dispositivo (defaultScore) quando definida —
+    // assim Art. 146, I, a/b valem 0,1 mesmo sendo CPI 1. Senão, usa o score do tipo.
     if (r.defaultCommunicationType) {
       const tipo = tipos.find((t) => t.name === r.defaultCommunicationType);
-      if (tipo) { setTypeId(tipo.id); setScore(String(tipo.score)); }
+      if (tipo) { setTypeId(tipo.id); setScore(String(r.defaultScore ?? tipo.score)); }
     }
   }
 

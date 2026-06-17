@@ -29,7 +29,7 @@ export type EvolucaoEntry    = {
   "CPI (ano ant.)"?: number;
   "Ref. Elogiosa (ano ant.)"?: number;
 };
-export type PelotaoEntry     = { pelotao: string; cpi0: number; cpi1: number; cpi2: number; cpi3: number; refElogiosa: number; total: number };
+export type PelotaoEntry     = { pelotao: string; cpi1: number; cpi2: number; cpi3: number; refElogiosa: number; total: number };
 export type TipoEntry        = { name: string; value: number };
 export type ArtigoEntry      = { dispositivo: string; count: number };
 export type AlunoEntry       = { studentId: string; warName: string; courseName: string; platoonName: string; total: number };
@@ -121,7 +121,7 @@ function PelotaoTooltip({
 }) {
   if (!active || !payload?.length) return null;
   const p = payload[0].payload;
-  const totalCpi = p.cpi0 + p.cpi1 + p.cpi2 + p.cpi3;
+  const totalCpi = p.cpi1 + p.cpi2 + p.cpi3;
   const linha = (cor: string, rotulo: string, n: number) => (
     <div className="flex items-center justify-between gap-4">
       <span className="flex items-center gap-1.5">
@@ -134,7 +134,6 @@ function PelotaoTooltip({
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-sm px-3 py-2 text-xs text-gray-700 space-y-1">
       <p className="font-semibold text-gray-900 mb-1">{p.pelotao}</p>
-      {linha(CPI_COLORS[0], "CPI 0", p.cpi0)}
       {linha(CPI_COLORS[1], "CPI 1", p.cpi1)}
       {linha(CPI_COLORS[2], "CPI 2", p.cpi2)}
       {linha(CPI_COLORS[3], "CPI 3", p.cpi3)}
@@ -168,17 +167,16 @@ export default function AnaliseCharts({
 
   // ── Filtro do comparativo entre pelotões ────────────────────────────────────
   const [categoria, setCategoria] = useState<"CPI" | "REF">("CPI");
-  const [grauCpi, setGrauCpi]     = useState<"todas" | "0" | "1" | "2" | "3">("todas");
+  const [grauCpi, setGrauCpi]     = useState<"todas" | "1" | "2" | "3">("todas");
 
   const pelotaoFiltrado = useMemo(() => {
     const valorDe = (p: PelotaoEntry) => {
       if (categoria === "REF") return p.refElogiosa;
       switch (grauCpi) {
-        case "0": return p.cpi0;
         case "1": return p.cpi1;
         case "2": return p.cpi2;
         case "3": return p.cpi3;
-        default:  return p.cpi0 + p.cpi1 + p.cpi2 + p.cpi3;
+        default:  return p.cpi1 + p.cpi2 + p.cpi3;
       }
     };
     return pelotaoData
@@ -289,7 +287,6 @@ export default function AnaliseCharts({
             <div className="flex items-center gap-1.5">
               <span className="text-xs text-gray-500">Grau:</span>
               <Chip ativo={grauCpi === "todas"} onClick={() => setGrauCpi("todas")}>Todas</Chip>
-              <Chip ativo={grauCpi === "0"} onClick={() => setGrauCpi("0")}>CPI 0</Chip>
               <Chip ativo={grauCpi === "1"} onClick={() => setGrauCpi("1")}>CPI 1</Chip>
               <Chip ativo={grauCpi === "2"} onClick={() => setGrauCpi("2")}>CPI 2</Chip>
               <Chip ativo={grauCpi === "3"} onClick={() => setGrauCpi("3")}>CPI 3</Chip>

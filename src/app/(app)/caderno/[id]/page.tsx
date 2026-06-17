@@ -15,23 +15,18 @@ function fmtEnq(art: string | null, inc: string | null, al: string | null) {
   return s;
 }
 
-const CPI_ORDER    = ["CPI 0", "CPI 1", "CPI 2", "CPI 3"];
+const CPI_ORDER    = ["CPI 1", "CPI 2", "CPI 3"];
 const ELOGIO_ORDER = ["Referência Elogiosa", "Elogio publicado em BI"];
 const TD_TAC_TIPOS = new Set(["TD Leve", "TD Média", "TD Grave", "TAC"]);
 const TIPO_ORDER   = [...CPI_ORDER, ...ELOGIO_ORDER, "Arquivamento", "TD Leve", "TD Média", "TD Grave", "TAC"];
 
 function cpiDoReenquadramento(article: string | null, inciso: string | null, fallback: string): string {
   if (!inciso) return fallback;
-  if (article === "146" && inciso === "I") return "CPI 0";
   const map: Record<string, string> = { I: "CPI 1", II: "CPI 2", III: "CPI 3" };
   return map[inciso] ?? fallback;
 }
 
-const CPI0_NOTE = "CPI de Grau 0 — sanção equivalente à metade da CPI 1 (−0,1 pt)";
-
-const TIPO_NOTE: Record<string, string> = {
-  "CPI 0": CPI0_NOTE,
-};
+const TIPO_NOTE: Record<string, string> = {};
 
 const TIPOS_FAVORAVEIS = new Set(["Referência Elogiosa", "Elogio publicado em BI"]);
 

@@ -15,18 +15,16 @@ const PRINT_COLORS = [
 
 // Cabeçalhos das CPIs usam a barra da paleta (coresTipo); as células usam tons
 // claros do mesmo matiz (amarelo → amarelo → laranja → vermelho), alinhados.
-const CPI_HEADER = [coresTipo("CPI 0"), coresTipo("CPI 1"), coresTipo("CPI 2"), coresTipo("CPI 3")];
+const CPI_HEADER = [coresTipo("CPI 1"), coresTipo("CPI 2"), coresTipo("CPI 3")];
 const CPI_COLORS_BG: Record<number, string> = {
-  0: "#fef9c3",
-  1: "#fef08a",
-  2: "#ffedd5",
-  3: "#fee2e2",
+  0: "#fef08a",
+  1: "#ffedd5",
+  2: "#fee2e2",
 };
 const CPI_COLORS_TEXT: Record<number, string> = {
-  0: "#854d0e",
-  1: "#6e7400",
-  2: "#9a3412",
-  3: "#991b1b",
+  0: "#6e7400",
+  1: "#9a3412",
+  2: "#991b1b",
 };
 
 export default async function AnaliseImprimirPage({
@@ -122,18 +120,18 @@ export default async function AnaliseImprimirPage({
     });
 
   // ── 3. Comparativo entre pelotões ─────────────────────────────────────────
-  const pelotaoMap = new Map<string, { cpi0: number; cpi1: number; cpi2: number; cpi3: number }>();
+  const pelotaoMap = new Map<string, { cpi1: number; cpi2: number; cpi3: number }>();
   for (const c of allComms) {
     if (!c.type.name.toLowerCase().includes("cpi")) continue;
     const pelotao = c.platoon?.name ?? c.student.platoon?.name ?? "Sem pelotão";
-    const prev    = pelotaoMap.get(pelotao) ?? { cpi0: 0, cpi1: 0, cpi2: 0, cpi3: 0 };
+    const prev    = pelotaoMap.get(pelotao) ?? { cpi1: 0, cpi2: 0, cpi3: 0 };
     const m       = c.type.name.match(/(\d)/);
-    const grau    = m ? Math.min(3, Math.max(0, parseInt(m[1], 10))) : 0;
-    if (grau === 0) prev.cpi0++; else if (grau === 1) prev.cpi1++; else if (grau === 2) prev.cpi2++; else prev.cpi3++;
+    const grau    = m ? Math.min(3, Math.max(1, parseInt(m[1], 10))) : 1;
+    if (grau === 2) prev.cpi2++; else if (grau === 3) prev.cpi3++; else prev.cpi1++;
     pelotaoMap.set(pelotao, prev);
   }
   const pelotaoData = Array.from(pelotaoMap.entries())
-    .map(([pelotao, cnt]) => ({ pelotao, ...cnt, total: cnt.cpi0 + cnt.cpi1 + cnt.cpi2 + cnt.cpi3 }))
+    .map(([pelotao, cnt]) => ({ pelotao, ...cnt, total: cnt.cpi1 + cnt.cpi2 + cnt.cpi3 }))
     .sort((a, b) => b.total - a.total);
 
   // ── 4. Distribuição por tipo ──────────────────────────────────────────────
@@ -343,10 +341,9 @@ export default async function AnaliseImprimirPage({
             <thead>
               <tr>
                 <th>Pelotão</th>
-                <th style={{ background: CPI_HEADER[0].bar, color: CPI_HEADER[0].barText }}>CPI 0</th>
-                <th style={{ background: CPI_HEADER[1].bar, color: CPI_HEADER[1].barText }}>CPI 1</th>
-                <th style={{ background: CPI_HEADER[2].bar, color: CPI_HEADER[2].barText }}>CPI 2</th>
-                <th style={{ background: CPI_HEADER[3].bar, color: CPI_HEADER[3].barText }}>CPI 3</th>
+                <th style={{ background: CPI_HEADER[0].bar, color: CPI_HEADER[0].barText }}>CPI 1</th>
+                <th style={{ background: CPI_HEADER[1].bar, color: CPI_HEADER[1].barText }}>CPI 2</th>
+                <th style={{ background: CPI_HEADER[2].bar, color: CPI_HEADER[2].barText }}>CPI 3</th>
                 <th>Total</th>
               </tr>
             </thead>
@@ -354,7 +351,7 @@ export default async function AnaliseImprimirPage({
               {pelotaoData.map((p) => (
                 <tr key={p.pelotao}>
                   <td style={{ fontWeight: "bold" }}>{p.pelotao}</td>
-                  {[p.cpi0, p.cpi1, p.cpi2, p.cpi3].map((v, gi) => (
+                  {[p.cpi1, p.cpi2, p.cpi3].map((v, gi) => (
                     <td
                       key={gi}
                       style={{
