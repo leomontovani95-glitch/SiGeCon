@@ -38,8 +38,8 @@ const PRIMARY     = "#1e3a5f";
 // Escala de gravidade crescente: amarelo claro (CPI 0) → vermelho vivo (CPI 3).
 // Fonte única compartilhada com o Caderno Disciplinar (tela e PDF).
 const CPI_COLORS  = CPI_FILL;
-const REF_COLOR   = "#15803d"; // verde — Referência Elogiosa
-const REF_BI_COLOR = "#166534"; // verde escuro — Elogio publicado em BI
+const REF_COLOR   = "#07e03a"; // verde — Referência Elogiosa
+const REF_BI_COLOR = "#10ad17"; // verde — Elogio publicado em BI
 const NEUTRO      = "#6b7280"; // cinza — demais tipos (ex.: Arquivamento)
 
 // Cor de cada fatia do gráfico de pizza conforme o tipo de comunicação,
@@ -237,7 +237,7 @@ export default function AnaliseCharts({
                 <Line
                   type="monotone"
                   dataKey="Ref. Elogiosa"
-                  stroke="#15803d"
+                  stroke="#07e03a"
                   strokeWidth={2}
                   dot={{ r: 3 }}
                 />
@@ -255,7 +255,7 @@ export default function AnaliseCharts({
                     <Line
                       type="monotone"
                       dataKey="Ref. Elogiosa (ano ant.)"
-                      stroke="#15803d"
+                      stroke="#07e03a"
                       strokeWidth={1.5}
                       strokeDasharray="5 5"
                       dot={false}

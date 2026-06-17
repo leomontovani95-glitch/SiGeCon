@@ -103,55 +103,55 @@ const TD_TAC_SET = new Set(["TD Leve", "TD Média", "TD Grave", "TAC"]);
 // Cor identificadora de cada tipo (fonte única em coresComunicacao):
 // - título da seção usa a cor só na fonte (sem barra preenchida);
 // - o cabeçalho da tabela (Protocolo, Enquad...) é a barra colorida.
-const GRUPOS: { label: string; note?: string; isTdTac?: boolean; bar: string; barText: string; title: string; filter: (i: Item) => boolean }[] = [
-  { label: "CPI 0", note: "Equivale a 50% dos pontos da CPI 1 (−0,1 pt por ocorrência)", ...coresTipo("CPI 0"),
+const GRUPOS: { label: string; short: string; note?: string; isTdTac?: boolean; bar: string; barText: string; title: string; filter: (i: Item) => boolean }[] = [
+  { label: "CPI 0", short: "CPI 0", note: "Equivale a 50% dos pontos da CPI 1 (−0,1 pt por ocorrência)", ...coresTipo("CPI 0"),
                          filter: (i) => i.recordType === "CPI 0"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
-  { label: "CPI 1",     ...coresTipo("CPI 1"), filter: (i) => i.recordType === "CPI 1"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
-  { label: "CPI 2",     ...coresTipo("CPI 2"), filter: (i) => i.recordType === "CPI 2"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
-  { label: "CPI 3",     ...coresTipo("CPI 3"), filter: (i) => i.recordType === "CPI 3"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
-  { label: "Reenquadramentos",          ...coresTipo("Reenquadramento"), filter: (i) => i.decisionSummary === "Reenquadrar artigo" },
+  { label: "CPI 1",     short: "CPI 1", ...coresTipo("CPI 1"), filter: (i) => i.recordType === "CPI 1"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
+  { label: "CPI 2",     short: "CPI 2", ...coresTipo("CPI 2"), filter: (i) => i.recordType === "CPI 2"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
+  { label: "CPI 3",     short: "CPI 3", ...coresTipo("CPI 3"), filter: (i) => i.recordType === "CPI 3"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
+  { label: "Reenquadramentos",          short: "Reenq.", ...coresTipo("Reenquadramento"), filter: (i) => i.decisionSummary === "Reenquadrar artigo" },
   { label: "TD / TAC — Transgressões Disciplinares e Termos de Ajuste de Conduta",
-    isTdTac: true,       ...coresTipo("TD / TAC"), filter: (i) => TD_TAC_SET.has(i.recordType)             && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
-  { label: "Referências Elogiosas",     ...coresTipo("Referência Elogiosa"), filter: (i) => i.recordType === "Referência Elogiosa"   && !isArquivadoPDF(i) },
-  { label: "Elogios publicados em BI",  ...coresTipo("Elogio publicado em BI"), filter: (i) => i.recordType === "Elogio publicado em BI" && !isArquivadoPDF(i) },
-  { label: "Arquivamentos",             ...coresTipo("Arquivamento"), filter: (i) => isArquivadoPDF(i) },
+    short: "TD/TAC", isTdTac: true,       ...coresTipo("TD / TAC"), filter: (i) => TD_TAC_SET.has(i.recordType)             && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
+  { label: "Referências Elogiosas",     short: "Ref. Elog.", ...coresTipo("Referência Elogiosa"), filter: (i) => i.recordType === "Referência Elogiosa"   && !isArquivadoPDF(i) },
+  { label: "Elogios publicados em BI",  short: "Elogio BI", ...coresTipo("Elogio publicado em BI"), filter: (i) => i.recordType === "Elogio publicado em BI" && !isArquivadoPDF(i) },
+  { label: "Arquivamentos",             short: "Arquiv.", ...coresTipo("Arquivamento"), filter: (i) => isArquivadoPDF(i) },
 ];
 
 function TabelaTipo({ items, label, note, isTdTac, bar, barText, title }: { items: Item[]; label: string; note?: string; isTdTac?: boolean; bar: string; barText: string; title: string }) {
   if (items.length === 0) return null;
   return (
     <div className="print-section" style={{ marginTop: 24, pageBreakInside: "avoid" }}>
-      {/* Título: apenas a fonte recebe a cor do tipo; o resto da linha fica branco. */}
+      {/* Título sem barra/borda: texto centralizado, maior, na cor do nível. */}
       <h3 style={{
-        fontSize: "8.5pt", fontWeight: "bold", color: title,
+        fontSize: "11pt", fontWeight: "bold", color: title,
         textTransform: "uppercase", letterSpacing: "0.05em",
-        marginBottom: note ? 2 : 6,
+        textAlign: "center", margin: "0 0 5px", padding: 0,
       }}>
-        {label} <span style={{ fontWeight: "normal", color: "#6b7280" }}>({items.length})</span>
+        {label}
       </h3>
       {note && (
-        <p style={{ fontSize: "7.5pt", color: "#6b7280", fontStyle: "italic", marginBottom: 6 }}>
+        <p style={{ fontSize: "7.5pt", color: "#6b7280", fontStyle: "italic", textAlign: "center", marginBottom: 6 }}>
           Obs.: {note}
         </p>
       )}
       <table className="cd-table">
         <colgroup>
-          <col className="cd-col-proto" />
-          <col className="cd-col-enq" />
           <col className="cd-col-pel" />
           <col className="cd-col-num" />
           <col className="cd-col-nome" />
+          <col className="cd-col-proto" />
+          <col className="cd-col-enq" />
           <col className="cd-col-data" />
           <col className="cd-col-obs" />
           <col className="cd-col-pont" />
         </colgroup>
         <thead style={{ background: bar, color: barText }}>
           <tr>
-            <th className="cd-col-proto">Protocolo</th>
-            <th className="cd-col-enq">Enquad.</th>
             <th className="cd-col-pel">Pel</th>
             <th className="cd-col-num">Nº</th>
             <th className="cd-col-nome">Nome</th>
+            <th className="cd-col-proto">Protocolo</th>
+            <th className="cd-col-enq">Enquad.</th>
             <th className="cd-col-data">Data</th>
             <th className="cd-col-obs">Observação</th>
             <th className="cd-col-pont">Pont.</th>
@@ -160,6 +160,11 @@ function TabelaTipo({ items, label, note, isTdTac, bar, barText, title }: { item
         <tbody>
           {items.map((item) => (
             <tr key={item.id}>
+              <td className="cd-col-pel">{abreviarPelotao(item.student.platoon?.name)}</td>
+              <td className="cd-col-num" style={{ fontFamily: "monospace", textAlign: "center" }}>
+                {item.studentCourseNumber}
+              </td>
+              <td className="cd-col-nome" style={{ fontWeight: "bold" }}>{item.studentWarName}</td>
               <td className="cd-col-proto" style={{ fontFamily: "monospace", fontSize: "6pt" }}>
                 {item.communication.protocolNumber}
               </td>
@@ -168,11 +173,6 @@ function TabelaTipo({ items, label, note, isTdTac, bar, barText, title }: { item
                   ? item.recordType
                   : fmtEnq(item.communication.article, item.communication.item, item.communication.letter)}
               </td>
-              <td className="cd-col-pel">{abreviarPelotao(item.student.platoon?.name)}</td>
-              <td className="cd-col-num" style={{ fontFamily: "monospace", textAlign: "center" }}>
-                {item.studentCourseNumber}
-              </td>
-              <td className="cd-col-nome" style={{ fontWeight: "bold" }}>{item.studentWarName}</td>
               <td className="cd-col-data">{format(new Date(item.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
               <td className="cd-col-obs" style={{ color: "#666" }}>{obsCell(item)}</td>
               <td className="cd-col-pont" style={{ fontWeight: "bold" }}>
@@ -403,9 +403,15 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
       @page { size: A4 portrait; margin: 8mm 5mm 12mm 5mm; }
       .print-page, .extra-page { padding: 2mm 3mm 12mm 3mm !important; }
     }
-    .cd-table { width: 100%; border-collapse: collapse; font-size: 7pt; table-layout: fixed; border: 1px solid #d1d5db; }
-    .cd-table th { padding: 4px 5px; font-size: 6.5pt; text-align: center; color: #000; overflow: hidden; white-space: nowrap; border: 1px solid #d1d5db; }
-    .cd-table td { padding: 3px 4px; border: 1px solid #d1d5db; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; text-align: center; }
+    .cd-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 7pt; table-layout: fixed; border: 1px solid #d1d5db; border-radius: 6px; }
+    .cd-table th { padding: 4px 5px; font-size: 6.5pt; text-align: center; text-transform: uppercase; font-weight: bold; overflow: hidden; white-space: nowrap; border-right: 1px solid #d1d5db; border-bottom: 1px solid #d1d5db; }
+    .cd-table td { padding: 3px 4px; border-right: 1px solid #d1d5db; border-bottom: 1px solid #d1d5db; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; text-align: center; }
+    .cd-table tr > *:last-child { border-right: none; }
+    .cd-table tbody tr:last-child td { border-bottom: none; }
+    .cd-table thead th:first-child { border-top-left-radius: 5px; }
+    .cd-table thead th:last-child { border-top-right-radius: 5px; }
+    .cd-table tbody tr:last-child td:first-child { border-bottom-left-radius: 5px; }
+    .cd-table tbody tr:last-child td:last-child { border-bottom-right-radius: 5px; }
     .cd-table tr:nth-child(even) td { background: #f9fafb; }
     .cd-col-proto { width: 19%; }
     .cd-col-enq   { width: 11%; }
@@ -422,8 +428,11 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
     .cd-title-block p { margin: 0 0 3px 0; color: #1e3a5f; font-weight: bold; letter-spacing: 0.5px; line-height: 1.3; }
     .cd-title-block .cd-curso   { font-size: 11pt; }
     .cd-title-block .cd-caderno { font-size: 12.5pt; margin-top: 5px; }
-    .cd-meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 16px; }
-    .cd-meta-grid .print-field { margin-bottom: 0; }
+    .cd-meta-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
+    .cd-meta-row .print-field { margin-bottom: 0; }
+    .cd-counts { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 2px 16px; margin-top: 7px; padding-top: 5px; border-top: 1px solid #e5e7eb; }
+    .cd-count { font-size: 8pt; color: #6b7280; white-space: nowrap; }
+    .cd-count strong { font-size: 9.5pt; color: #1e3a5f; margin-right: 2px; }
     .cd-header-section { margin-bottom: 4px !important; }
     .cd-header-section + .print-section { margin-top: 12px !important; }
   `;
@@ -444,14 +453,30 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
           {cursoLinha && <p className="cd-curso">{cursoLinha}</p>}
           <p className="cd-caderno">{cadernoLinha}</p>
         </div>
-        <div className="cd-meta-grid">
+        <div className="cd-meta-row">
           <div className="print-field">
             <label>Data de publicação</label>
             <span>{caderno.publicationDate ? format(new Date(caderno.publicationDate), "dd/MM/yyyy", { locale: ptBR }) : "Não publicado"}</span>
           </div>
-          <div className="print-field"><label>Situação</label><span>{caderno.status === "PUBLICADO" ? "Publicado" : "Rascunho"}</span></div>
-          <div className="print-field"><label>Total de registros</label><span>{totalRegistros}</span></div>
+          <div className="print-field" style={{ textAlign: "center" }}>
+            <label>Total de registros</label>
+            <span>{totalRegistros}</span>
+          </div>
+          <div className="print-field" style={{ textAlign: "right" }}>
+            <label>Situação</label>
+            <span>{caderno.status === "PUBLICADO" ? "Publicado" : "Rascunho"}</span>
+          </div>
         </div>
+        {/* Quantidade de cada tipo (omitindo os zerados), centralizado */}
+        {totalRegistros > 0 && (
+          <div className="cd-counts">
+            {grupos.filter((g) => g.itens.length > 0).map((g) => (
+              <span key={g.label} className="cd-count">
+                <strong style={{ color: g.title }}>{g.itens.length}</strong> {g.short}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Tabelas separadas por tipo */}
