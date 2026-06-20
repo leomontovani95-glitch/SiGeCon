@@ -212,9 +212,6 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
   const numero = `${String(caderno.number).padStart(2, "0")}/${caderno.year}`;
   const cursosNome = caderno.course?.name ?? "—";
   const escola = (caderno.course?.school ?? caderno.school) as string | null | undefined;
-  const efetivoDicente = escola === "ESFAP" ? "Conforme Caderno Disciplinar EsFAP"
-    : escola === "ESFO" ? "Conforme Caderno Disciplinar EsFO"
-    : "Conforme Caderno Disciplinar";
   const fmtDate = (d: Date) => format(d, "dd/MM/yyyy", { locale: ptBR });
   const dateStr = sat.toDateString() === sun.toDateString()
     ? fmtDate(sat)
@@ -300,9 +297,6 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
           <tr>
             <td colSpan={2} style={cell}><span style={hdr}>FISCALIZAÇÃO: </span>{aacp.fiscalizacao}</td>
           </tr>
-          <tr>
-            <td colSpan={2} style={cell}><span style={hdr}>EFETIVO DISCENTE: </span>{efetivoDicente}</td>
-          </tr>
         </tbody>
       </table>
 
@@ -348,15 +342,13 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
           <p style={{ margin: 0, fontWeight: "bold", textAlign: "center", textTransform: "uppercase", fontSize: "7pt", background: "#1e3a5f", color: "white", padding: "2px 0", borderBottom: "1px solid #000" }}>
             {sec.label}
           </p>
-          <div style={{ padding: "3px 8px" }}>
-            {sec.items.map((item, i) => {
-              const txt = item.text.trim();
-              const comPonto = txt.endsWith(".") ? txt : `${txt}.`;
-              return (
-                <p key={item.id} style={{ margin: "0 0 5px", fontSize: "7.5pt", textAlign: "justify" }}>{i + 1}. {comPonto}</p>
-              );
-            })}
-          </div>
+          {sec.items.map((item, i) => {
+            const txt = item.text.trim();
+            const comPonto = txt.endsWith(".") ? txt : `${txt}.`;
+            return (
+              <p key={item.id} style={{ margin: 0, padding: "3px 8px", fontSize: "7.5pt", textAlign: "justify", borderTop: i > 0 ? "1px solid #000" : "none" }}>{i + 1}. {comPonto}</p>
+            );
+          })}
         </div>
       ))}
 
