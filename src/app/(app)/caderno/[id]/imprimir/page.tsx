@@ -331,7 +331,7 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
                   {row.cpiLabel}
                 </td>
               )}
-              <td style={{ whiteSpace: "normal" }}>{row.acao}</td>
+              <td style={{ whiteSpace: "normal", textAlign: "justify" }}>{row.acao}</td>
               <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>{normalizarPeriodo(row.periodo)}</td>
             </tr>
           ))}
@@ -350,7 +350,7 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
           </p>
           <div style={{ padding: "3px 8px" }}>
             {sec.items.map((item) => (
-              <p key={item.id} style={{ margin: "1px 0", fontSize: "7.5pt" }}>— {item.text}</p>
+              <p key={item.id} style={{ margin: "1px 0", fontSize: "7.5pt", textAlign: "justify" }}>— {item.text}</p>
             ))}
           </div>
         </div>
