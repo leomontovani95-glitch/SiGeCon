@@ -18,12 +18,12 @@ const prefixos: Record<string, string> = {
 
 export async function gerarProtocolo(typeName: string, courseName: string, adaptacao = false): Promise<string> {
   const prefixo = prefixos[typeName] ?? "COM";
-  // Formato normal: "CPI - 0001 - CFO 1".
-  // Período de adaptação: sufixo " (A)" e NUMERAÇÃO PRÓPRIA (independente das
-  // comunicações normais), pois o endsWith filtra só as de adaptação.
-  // Ex.: "CPI - 0001 - CFSd 2026 (A)".
-  const base = `${prefixo} - `;
-  const sufixo = adaptacao ? ` - ${courseName} (A)` : ` - ${courseName}`;
+  // Formato normal: "CPI-0001-CFO 1" (sem espaços ao redor dos hífens).
+  // Período de adaptação: sufixo "(A)" colado ao curso e NUMERAÇÃO PRÓPRIA
+  // (independente das normais), pois o endsWith filtra só as de adaptação.
+  // Ex.: "CPI-0001-CFSd 2026(A)".
+  const base = `${prefixo}-`;
+  const sufixo = adaptacao ? `-${courseName}(A)` : `-${courseName}`;
 
   const ultimo = await prisma.communication.findFirst({
     where: { protocolNumber: { startsWith: base, endsWith: sufixo } },
@@ -32,11 +32,8 @@ export async function gerarProtocolo(typeName: string, courseName: string, adapt
 
   let seq = 1;
   if (ultimo) {
-    const partes = ultimo.protocolNumber.split(" - ");
-    // Novo formato: ["CPI", "0001", "CFO 1"] — seq em partes[1]
-    // Formato legado (pré-migração): ["CPI", "2026", "0001", "CFO 1"] — seq em partes[2]
-    const seqIndex = partes.length >= 4 ? 2 : 1;
-    const n = parseInt(partes[seqIndex], 10);
+    // Logo após o prefixo (ex.: "CPI-") vêm os dígitos da sequência.
+    const n = parseInt(ultimo.protocolNumber.slice(base.length), 10);
     if (!isNaN(n)) seq = n + 1;
   }
 

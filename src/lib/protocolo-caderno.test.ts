@@ -56,22 +56,23 @@ const itemBase = (communicationId: string, score: number | null) => ({
 
 describe("gerarProtocolo", () => {
   it("começa em 0001 quando não há comunicações", async () => {
-    expect(await gerarProtocolo("CPI 1", "CFO 1")).toBe("CPI - 0001 - CFO 1");
+    expect(await gerarProtocolo("CPI 1", "CFO 1")).toBe("CPI-0001-CFO 1");
   });
 
-  it("incrementa a partir do último (formato novo)", async () => {
-    await novaComm("CPI - 0007 - CFO 1");
-    expect(await gerarProtocolo("CPI 1", "CFO 1")).toBe("CPI - 0008 - CFO 1");
+  it("incrementa a partir do último", async () => {
+    await novaComm("CPI-0007-CFO 1");
+    expect(await gerarProtocolo("CPI 1", "CFO 1")).toBe("CPI-0008-CFO 1");
   });
 
-  it("interpreta o formato legado (4 partes) e segue a sequência", async () => {
-    await novaComm("CPI - 2026 - 0003 - CFO 1");
-    expect(await gerarProtocolo("CPI 1", "CFO 1")).toBe("CPI - 0004 - CFO 1");
+  it("usa sufixo (A) e numeração própria no período de adaptação", async () => {
+    await novaComm("CPI-0005-CFO 1");
+    expect(await gerarProtocolo("CPI 1", "CFO 1")).toBe("CPI-0006-CFO 1");
+    expect(await gerarProtocolo("CPI 1", "CFO 1", true)).toBe("CPI-0001-CFO 1(A)");
   });
 
   it("isola a sequência por curso (sufixo)", async () => {
-    await novaComm("CPI - 0009 - CFO 1");
-    expect(await gerarProtocolo("CPI 1", "CFO 2")).toBe("CPI - 0001 - CFO 2");
+    await novaComm("CPI-0009-CFO 1");
+    expect(await gerarProtocolo("CPI 1", "CFO 2")).toBe("CPI-0001-CFO 2");
   });
 });
 
@@ -86,14 +87,14 @@ describe("criarComProtocoloUnico", () => {
       return novaComm(pn);
     });
     expect(calls).toBe(2);
-    expect(comm.protocolNumber).toBe("CPI - 0001 - CFO 1");
+    expect(comm.protocolNumber).toBe("CPI-0001-CFO 1");
   });
 
   it("gera números sequenciais únicos em chamadas seguidas", async () => {
     const a = await criarComProtocoloUnico("CPI 1", "CFO 1", (pn) => novaComm(pn));
     const b = await criarComProtocoloUnico("CPI 1", "CFO 1", (pn) => novaComm(pn));
-    expect(a.protocolNumber).toBe("CPI - 0001 - CFO 1");
-    expect(b.protocolNumber).toBe("CPI - 0002 - CFO 1");
+    expect(a.protocolNumber).toBe("CPI-0001-CFO 1");
+    expect(b.protocolNumber).toBe("CPI-0002-CFO 1");
   });
 });
 
