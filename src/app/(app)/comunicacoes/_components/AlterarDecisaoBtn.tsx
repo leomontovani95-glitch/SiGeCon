@@ -1,8 +1,10 @@
 "use client";
 import { useActionState, useState } from "react";
 import { alterarDecisao } from "../actions";
+import { pontuacaoAutomatica } from "@/lib/pontuacao";
 
-type ManualRule = { id: string; article: string; item: string | null; letter: string | null; description: string };
+type ManualRule = { id: string; article: string; item: string | null; letter: string | null; description: string; defaultCommunicationType: string | null; halfCpi1: boolean };
+type Tipo = { name: string; score: number };
 
 type Props = {
   communicationId: string;
@@ -12,18 +14,51 @@ type Props = {
   currentDecision: string;
   currentText: string;
   currentObservation: string;
+  currentScore: number | null;
+  typeScore: number;
+  halfCpi1: boolean;
+  tipos: Tipo[];
   manualRules: ManualRule[];
 };
 
 export default function AlterarDecisaoBtn({
   communicationId, protocolo, recordType, isElogiosa,
-  currentDecision, currentText, currentObservation, manualRules,
+  currentDecision, currentText, currentObservation, currentScore, typeScore, halfCpi1, tipos, manualRules,
 }: Props) {
   const [aberto, setAberto] = useState(false);
   const [state, formAction, pending] = useActionState(alterarDecisao, undefined);
 
   const [decisao, setDecisao] = useState(currentDecision);
   const [novoRuleId, setNovoRuleId] = useState("");
+
+  // Pontuação padrão (Tipos de Comunicação), conforme a decisão/enquadramento.
+  const padraoPontuacao = (tipo: string, ruleId: string): number | null => {
+    if (tipo === "Arquivamento") return 0;
+    if (tipo === "Reenquadrar artigo") {
+      const r = manualRules.find((x) => x.id === ruleId);
+      if (!r) return null;
+      const ts = r.defaultCommunicationType
+        ? tipos.find((t) => t.name === r.defaultCommunicationType)?.score ?? typeScore
+        : typeScore;
+      return pontuacaoAutomatica(ts, r.halfCpi1);
+    }
+    return pontuacaoAutomatica(typeScore, halfCpi1); // Punição / Homologação
+  };
+
+  const padraoInicial = padraoPontuacao(currentDecision, "");
+  const [pontos, setPontos] = useState(currentScore != null ? String(currentScore) : "");
+  const [pontosManual, setPontosManual] = useState(
+    padraoInicial != null && currentScore != null && currentScore !== padraoInicial,
+  );
+
+  function aplicarPadrao(tipo: string, ruleId: string) {
+    const p = padraoPontuacao(tipo, ruleId);
+    setPontos(p != null ? String(p) : "");
+    setPontosManual(false);
+  }
+
+  const padraoAtual = padraoPontuacao(decisao, novoRuleId);
+  const mostrarPontos = !!decisao && decisao !== "Arquivamento" && padraoAtual != null;
 
   const opcoes = isElogiosa
     ? ["Homologação (Referência Elogiosa)", "Arquivamento"]
@@ -61,7 +96,12 @@ export default function AlterarDecisaoBtn({
               name="decisionType"
               required
               value={decisao}
-              onChange={(e) => { setDecisao(e.target.value); if (e.target.value !== "Reenquadrar artigo") setNovoRuleId(""); }}
+              onChange={(e) => {
+                const v = e.target.value;
+                setDecisao(v);
+                if (v !== "Reenquadrar artigo") { setNovoRuleId(""); aplicarPadrao(v, ""); }
+                else { setNovoRuleId(""); }
+              }}
               className="input"
             >
               <option value="">Selecione</option>
@@ -76,7 +116,7 @@ export default function AlterarDecisaoBtn({
                 name="newManualRuleId"
                 required
                 value={novoRuleId}
-                onChange={(e) => setNovoRuleId(e.target.value)}
+                onChange={(e) => { setNovoRuleId(e.target.value); aplicarPadrao("Reenquadrar artigo", e.target.value); }}
                 className="input"
               >
                 <option value="">Selecione o artigo</option>
@@ -107,9 +147,41 @@ export default function AlterarDecisaoBtn({
             />
           </div>
 
-          <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-            A pontuação é automática (conforme o tipo / novo enquadramento). A alteração reflete no caderno
-            rascunho e, após a publicação, na nota do aluno.
+          {/* Pontuação: padrão de Tipos de Comunicação, editável pelo Comandante. */}
+          {decisao === "Arquivamento" ? (
+            <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+              Arquivamento não desconta nem acresce a nota de conduta.
+            </p>
+          ) : mostrarPontos ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Pontuação final <span className="text-red-500">*</span></label>
+              <input
+                name="finalScore"
+                type="number"
+                step="0.1"
+                min="0"
+                value={pontos}
+                onChange={(e) => { setPontos(e.target.value); setPontosManual(padraoAtual != null && parseFloat(e.target.value) !== padraoAtual); }}
+                className="input max-w-xs"
+              />
+              {pontosManual ? (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-1">
+                  ⚠ Pontuação alterada do padrão ({padraoAtual?.toFixed(1)} pt, definido em Tipos de Comunicação) para {pontos || "—"} pt. Use quando o regulamento vigente para o curso exigir valor diferente.
+                </p>
+              ) : (
+                <p className="text-xs text-gray-400 mt-1">
+                  Padrão (Tipos de Comunicação): {padraoAtual?.toFixed(1)} pt — pode ser alterado conforme o regulamento vigente para o curso.
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+              Selecione o novo artigo para calcular a pontuação padrão.
+            </p>
+          )}
+
+          <p className="text-xs text-gray-500">
+            A alteração reflete no caderno rascunho e, após a publicação, na nota do aluno.
           </p>
 
           {state?.error && (

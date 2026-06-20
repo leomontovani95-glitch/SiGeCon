@@ -32,7 +32,7 @@ export default async function ComunicacaoPage({
   const sp = await searchParams;
   const mostraFormDefesa = sp.defesa === "1";
 
-  const [manualRules, comm] = await Promise.all([
+  const [manualRules, comm, tiposComunicacao] = await Promise.all([
     prisma.manualRule.findMany({ where: { active: true }, orderBy: [{ article: "asc" }, { item: "asc" }] }),
     prisma.communication.findUnique({
       where: { id },
@@ -47,6 +47,7 @@ export default async function ComunicacaoPage({
         communicantUser: { select: { id: true, role: true, student: { select: { id: true } } } },
       },
     }),
+    prisma.communicationType.findMany({ where: { active: true }, select: { name: true, score: true } }),
   ]);
   if (!comm) notFound();
 
@@ -424,12 +425,18 @@ export default async function ComunicacaoPage({
                   currentDecision={comm.decisions[0]?.decisionType ?? ""}
                   currentText={comm.decisions[0]?.text ?? ""}
                   currentObservation={comm.commanderObservation ?? ""}
+                  currentScore={comm.finalScore}
+                  typeScore={comm.type.score}
+                  halfCpi1={comm.halfCpi1}
+                  tipos={tiposComunicacao}
                   manualRules={manualRules.map((r) => ({
                     id: r.id,
                     article: r.article,
                     item: r.item ?? null,
                     letter: r.letter ?? null,
                     description: r.description,
+                    defaultCommunicationType: r.defaultCommunicationType ?? null,
+                    halfCpi1: r.halfCpi1,
                   }))}
                 />
               </div>
@@ -466,17 +473,22 @@ export default async function ComunicacaoPage({
           opinions: comm.opinions.map((o) => ({ id: o.id })),
           decisions: comm.decisions.map((d) => ({ id: d.id, finalScore: d.finalScore, decisionType: d.decisionType })),
           typeName: comm.type.name,
+          typeScore: comm.type.score,
+          halfCpi1: comm.halfCpi1,
           item: comm.item,
         }}
         session={{ role: session.role, userId: session.userId, email: session.email }}
         alunoEhEssePerfil={alunoEhEssePerfil}
         mostraFormDefesa={mostraFormDefesa}
+        tipos={tiposComunicacao}
         manualRules={manualRules.map((r) => ({
           id: r.id,
           article: r.article,
           item: r.item ?? null,
           letter: r.letter ?? null,
           description: r.description,
+          defaultCommunicationType: r.defaultCommunicationType ?? null,
+          halfCpi1: r.halfCpi1,
         }))}
       />}
     </div>

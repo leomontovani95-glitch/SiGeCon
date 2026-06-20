@@ -568,10 +568,16 @@ export async function proferirDecisao(_prev: State, formData: FormData): Promise
   const originalItem    = commOriginal?.item    ?? null;
   const originalLetter  = commOriginal?.letter  ?? null;
 
-  // Pontuação automática (módulo) conforme o tipo cadastrado, com metade nos
-  // dispositivos marcados como "50% da CPI 1". Arquivamento não pontua;
-  // reenquadramento usa o tipo e a flag do NOVO enquadramento. Não é informada
-  // manualmente na decisão.
+  // Pontuação: o padrão é automático (Tipos de Comunicação, com metade nos
+  // dispositivos "50% da CPI 1"), mas o Comandante PODE sobrescrever a pontuação
+  // final — o regulamento/curso pode ter pontuação diferente da vigente no
+  // cadastro. Arquivamento sempre 0. Reenquadramento usa o tipo/flag do NOVO
+  // enquadramento como padrão.
+  const scoreRaw = String(formData.get("finalScore") ?? "").trim();
+  const scoreOverride = scoreRaw === "" ? null : Number(scoreRaw);
+  if (scoreOverride !== null && (!Number.isFinite(scoreOverride) || scoreOverride < 0))
+    return { error: "Pontuação inválida." };
+
   const commUpdate: Record<string, unknown> = { status: "DECIDIDA", commanderObservation };
   let finalScore: number;
   if (decisionType === "Arquivamento") {
@@ -584,15 +590,17 @@ export async function proferirDecisao(_prev: State, formData: FormData): Promise
     const novoTipo = regra.defaultCommunicationType
       ? await prisma.communicationType.findFirst({ where: { name: regra.defaultCommunicationType }, select: { score: true } })
       : null;
-    finalScore = pontuacaoAutomatica(novoTipo?.score ?? commOriginal.type.score, regra.halfCpi1);
+    const padrao = pontuacaoAutomatica(novoTipo?.score ?? commOriginal.type.score, regra.halfCpi1);
+    finalScore = scoreOverride ?? padrao;
     commUpdate.manualRuleId = regra.id;
     commUpdate.article = regra.article;
     commUpdate.item = regra.item ?? null;
     commUpdate.letter = regra.letter ?? null;
     commUpdate.halfCpi1 = regra.halfCpi1;
   } else {
-    // Punição / Homologação: pontuação do próprio enquadramento atual.
-    finalScore = pontuacaoAutomatica(commOriginal.type.score, commOriginal.halfCpi1);
+    // Punição / Homologação: padrão = pontuação do enquadramento atual.
+    const padrao = pontuacaoAutomatica(commOriginal.type.score, commOriginal.halfCpi1);
+    finalScore = scoreOverride ?? padrao;
   }
   commUpdate.finalScore = finalScore;
 
@@ -695,6 +703,13 @@ export async function alterarDecisao(_prev: State, formData: FormData): Promise<
   // Enquadramento atual (vira o "original" em caso de reenquadramento).
   const curArticle = comm.article, curItem = comm.item, curLetter = comm.letter;
 
+  // Padrão automático (Tipos de Comunicação), com possibilidade de o Comandante
+  // sobrescrever a pontuação final ao alterar a decisão (antes da publicação).
+  const scoreRaw = String(formData.get("finalScore") ?? "").trim();
+  const scoreOverride = scoreRaw === "" ? null : Number(scoreRaw);
+  if (scoreOverride !== null && (!Number.isFinite(scoreOverride) || scoreOverride < 0))
+    return { error: "Pontuação inválida." };
+
   const commUpdate: Record<string, unknown> = { commanderObservation };
   const itemUpdate: Record<string, unknown> = { decisionSummary: decisionType };
   let finalScore: number;
@@ -710,7 +725,8 @@ export async function alterarDecisao(_prev: State, formData: FormData): Promise<
     const novoTipo = regra.defaultCommunicationType
       ? await prisma.communicationType.findFirst({ where: { name: regra.defaultCommunicationType }, select: { score: true } })
       : null;
-    finalScore = pontuacaoAutomatica(novoTipo?.score ?? comm.type.score, regra.halfCpi1);
+    const padrao = pontuacaoAutomatica(novoTipo?.score ?? comm.type.score, regra.halfCpi1);
+    finalScore = scoreOverride ?? padrao;
     commUpdate.manualRuleId = regra.id;
     commUpdate.article = regra.article;
     commUpdate.item = regra.item ?? null;
@@ -718,7 +734,8 @@ export async function alterarDecisao(_prev: State, formData: FormData): Promise<
     commUpdate.halfCpi1 = regra.halfCpi1;
     itemUpdate.originalArticle = curArticle; itemUpdate.originalItem = curItem; itemUpdate.originalLetter = curLetter;
   } else {
-    finalScore = pontuacaoAutomatica(comm.type.score, comm.halfCpi1);
+    const padrao = pontuacaoAutomatica(comm.type.score, comm.halfCpi1);
+    finalScore = scoreOverride ?? padrao;
     itemUpdate.originalArticle = null; itemUpdate.originalItem = null; itemUpdate.originalLetter = null;
   }
   commUpdate.finalScore = finalScore;

@@ -6,6 +6,7 @@ import {
   tomarCienciaAdaptacao,
   proferirDecisao,
 } from "../actions";
+import { pontuacaoAutomatica } from "@/lib/pontuacao";
 
 type Sugestao = { titulo: string; texto: string };
 
@@ -52,7 +53,8 @@ const SUGESTOES_DECISAO: Record<string, Sugestao[]> = {
   ],
 };
 
-type ManualRule = { id: string; article: string; item: string | null; letter: string | null; description: string };
+type ManualRule = { id: string; article: string; item: string | null; letter: string | null; description: string; defaultCommunicationType: string | null; halfCpi1: boolean };
+type Tipo = { name: string; score: number };
 
 type CommInfo = {
   id: string;
@@ -65,18 +67,21 @@ type CommInfo = {
   opinions: { id: string }[];
   decisions: { id: string; finalScore: number | null; decisionType: string }[];
   typeName: string;
+  typeScore: number;
+  halfCpi1: boolean;
   item: string | null;
 };
 type SessionInfo = { role: string; userId: string; email: string };
 
 export default function AcoesComm({
-  comm, session, alunoEhEssePerfil, mostraFormDefesa, manualRules,
+  comm, session, alunoEhEssePerfil, mostraFormDefesa, manualRules, tipos,
 }: {
   comm: CommInfo;
   session: SessionInfo;
   alunoEhEssePerfil: boolean;
   mostraFormDefesa: boolean;
   manualRules: ManualRule[];
+  tipos: Tipo[];
 }) {
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [arquivoErro, setArquivoErro] = useState("");
@@ -86,7 +91,31 @@ export default function AcoesComm({
   const [decisaoTipo, setDecisaoTipo] = useState("");
   const [decisaoTexto, setDecisaoTexto] = useState("");
   const [novoRuleId, setNovoRuleId] = useState<string>("");
+  const [pontos, setPontos] = useState("");
+  const [pontosManual, setPontosManual] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Pontuação padrão (definida em Tipos de Comunicação), conforme a decisão e o
+  // enquadramento. Arquivamento não pontua; reenquadramento usa o novo artigo.
+  const padraoPontuacao = (tipo: string, ruleId: string): number | null => {
+    if (tipo === "Arquivamento") return 0;
+    if (tipo === "Reenquadrar artigo") {
+      const r = manualRules.find((x) => x.id === ruleId);
+      if (!r) return null;
+      const ts = r.defaultCommunicationType
+        ? tipos.find((t) => t.name === r.defaultCommunicationType)?.score ?? comm.typeScore
+        : comm.typeScore;
+      return pontuacaoAutomatica(ts, r.halfCpi1);
+    }
+    return pontuacaoAutomatica(comm.typeScore, comm.halfCpi1); // Punição / Homologação
+  };
+  function aplicarPadrao(tipo: string, ruleId: string) {
+    const p = padraoPontuacao(tipo, ruleId);
+    setPontos(p != null ? String(p) : "");
+    setPontosManual(false);
+  }
+  const padraoAtual = padraoPontuacao(decisaoTipo, novoRuleId);
+  const mostrarPontos = !!decisaoTipo && decisaoTipo !== "Arquivamento" && padraoAtual != null;
 
   const [defState, defAction, defPending] = useActionState(tomarCienciaComDefesa, undefined);
   const [semDefState, semDefAction, semDefPending] = useActionState(tomarCienciaSemDefesa, undefined);
@@ -319,7 +348,7 @@ export default function AcoesComm({
                 required
                 className="input max-w-xs"
                 value={decisaoTipo}
-                onChange={(e) => { setDecisaoTipo(e.target.value); setNovoRuleId(""); }}
+                onChange={(e) => { setDecisaoTipo(e.target.value); setNovoRuleId(""); aplicarPadrao(e.target.value, ""); }}
               >
                 <option value="">Selecione</option>
                 {comm.typeName.toLowerCase().includes("elogiosa") ? (
@@ -347,7 +376,7 @@ export default function AcoesComm({
                   required
                   className="input"
                   value={novoRuleId}
-                  onChange={(e) => setNovoRuleId(e.target.value)}
+                  onChange={(e) => { setNovoRuleId(e.target.value); aplicarPadrao("Reenquadrar artigo", e.target.value); }}
                 >
                   <option value="">Selecione o artigo</option>
                   {manualRules.map((r) => (
@@ -408,13 +437,41 @@ export default function AcoesComm({
                 placeholder="Texto curto que aparecerá na coluna Observação do caderno, além das observações automáticas."
               />
             </div>
-            {/* Pontuação automática: vem do tipo (Tipos de Comunicação), com
-                metade no Art. 146, I. Arquivamento não pontua. */}
-            <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
-              {decisaoTipo === "Arquivamento"
-                ? "Arquivamento não desconta nem acresce a nota de conduta."
-                : "A pontuação é automática, conforme o tipo da comunicação (ajustável em Tipos de Comunicação)."}
-            </p>
+            {/* Pontuação: padrão vem de Tipos de Comunicação, mas o Comandante
+                pode alterar a pontuação final (regulamento/curso pode diferir). */}
+            {decisaoTipo === "Arquivamento" ? (
+              <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                Arquivamento não desconta nem acresce a nota de conduta.
+              </p>
+            ) : mostrarPontos ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Pontuação final <span className="text-red-500">*</span>
+                </label>
+                <input
+                  name="finalScore"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  className="input max-w-xs"
+                  value={pontos}
+                  onChange={(e) => { setPontos(e.target.value); setPontosManual(padraoAtual != null && parseFloat(e.target.value) !== padraoAtual); }}
+                />
+                {pontosManual ? (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mt-1">
+                    ⚠ Pontuação alterada do padrão ({padraoAtual?.toFixed(1)} pt, definido em Tipos de Comunicação) para {pontos || "—"} pt. Use quando o regulamento vigente para o curso exigir valor diferente.
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-400 mt-1">
+                    Padrão (Tipos de Comunicação): {padraoAtual?.toFixed(1)} pt — pode ser alterado conforme o regulamento vigente para o curso.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                Selecione o novo artigo para calcular a pontuação padrão.
+              </p>
+            )}
             {/* Anexo(s) da decisão */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
