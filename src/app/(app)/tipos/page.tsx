@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { verifyRole } from "@/lib/dal";
 import Link from "next/link";
 import ExcluirTipoBtn from "./_components/ExcluirTipoBtn";
+import { ehTipoSistema } from "@/lib/tiposComunicacao";
 
 export default async function TiposPage() {
   await verifyRole("ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA", "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO");
@@ -44,7 +45,9 @@ export default async function TiposPage() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     <Link href={`/tipos/${t.id}/editar`} className="text-xs text-[#1e3a5f] hover:underline">Editar</Link>
-                    <ExcluirTipoBtn id={t.id} />
+                    {ehTipoSistema(t.name)
+                      ? <span className="text-xs text-gray-300" title="Tipo padrão do sistema — não pode ser excluído">Excluir</span>
+                      : <ExcluirTipoBtn id={t.id} />}
                   </div>
                 </td>
               </tr>

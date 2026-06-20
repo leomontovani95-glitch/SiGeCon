@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { verifyRole } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
 import { logger } from "@/lib/logger";
+import { ehTipoSistema } from "@/lib/tiposComunicacao";
 
 type State = { error: string } | undefined;
 
@@ -16,6 +17,11 @@ export async function excluirTipo(id: string, _prev: State, _formData: FormData)
     select: { name: true, _count: { select: { communications: true } } },
   });
   if (!tipo) return { error: "Tipo não encontrado." };
+  // Tipo de sistema: o nome é referenciado por código em vários fluxos; excluir
+  // quebraria cadastro de CPI/TD e o caderno. Pode ser editado/inativado, não excluído.
+  if (ehTipoSistema(tipo.name)) {
+    return { error: `"${tipo.name}" é um tipo padrão do sistema e não pode ser excluído. Se necessário, edite a pontuação ou defina como inativo.` };
+  }
   // Não exclui tipo em uso: comunicações o referenciam (FK). Orienta a inativar.
   if (tipo._count.communications > 0) {
     return { error: `Não é possível excluir "${tipo.name}": há ${tipo._count.communications} comunicação(ões) usando este tipo. Para descontinuá-lo, edite e defina como inativo.` };
