@@ -152,7 +152,7 @@ export default function PrintLayout({ title, children, extraPages, extraStyles, 
         .print-field span { font-size: 10pt; color: #111; }
         .print-text { font-size: 10pt; line-height: 1.5; text-align: justify; white-space: pre-wrap; }
         .print-protocol { font-family: monospace; font-size: 11pt; font-weight: bold; color: #1e3a5f; }
-        .print-signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 40px; }
+        .print-signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 40px; break-inside: avoid; page-break-inside: avoid; }
         .print-sig-line { border-top: 1px solid #000; padding-top: 6px; text-align: center; font-size: 9pt; }
         .print-table { width: 100%; border-collapse: collapse; font-size: 9pt; }
         .print-table th { background: #1e3a5f; color: white; padding: 6px 8px; text-align: left; font-size: 8pt; }
@@ -161,8 +161,6 @@ export default function PrintLayout({ title, children, extraPages, extraStyles, 
         .print-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 8pt; font-weight: bold; }
         .badge-desfav { background: #fee2e2; color: #991b1b; }
         .badge-fav { background: #dcfce7; color: #166534; }
-        .print-footer { position: fixed; bottom: 8mm; left: 18mm; right: 15mm; font-size: 7.5pt; color: #888; border-top: 1px solid #ddd; padding-top: 3px; display: flex; justify-content: space-between; }
-        @media screen { .print-footer { display: none; } }
 
         /* Cabeçalho repetido por página (repeatHeader): thead reimpresso pelo
            navegador no topo de cada página. */
@@ -197,11 +195,6 @@ export default function PrintLayout({ title, children, extraPages, extraStyles, 
             {children}
           </>
         )}
-
-        <div className="print-footer">
-          <span suppressHydrationWarning>SiGeCon — Documento gerado em {new Date().toLocaleString("pt-BR")}</span>
-          <span>Documento de uso interno — APM/ES</span>
-        </div>
       </div>
 
       {extraPages?.map((page, i) => (

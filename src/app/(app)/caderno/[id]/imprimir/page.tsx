@@ -132,7 +132,7 @@ const GRUPOS: { label: string; short: string; note?: string; isTdTac?: boolean; 
 function TabelaTipo({ items, label, note, isTdTac, bar, barText, title }: { items: Item[]; label: string; note?: string; isTdTac?: boolean; bar: string; barText: string; title: string }) {
   if (items.length === 0) return null;
   return (
-    <div className="print-section" style={{ marginTop: 24, pageBreakInside: "avoid" }}>
+    <div className="print-section" style={{ marginTop: 14, pageBreakInside: "avoid" }}>
       {/* Título sem barra/borda: texto centralizado, maior, na cor do nível. */}
       <h3 style={{
         fontSize: "11pt", fontWeight: "bold", color: title,
@@ -307,12 +307,12 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
       </table>
 
       {/* Tabela de desenvolvimento */}
-      <table className="aacp-table" style={{ marginBottom: 5 }}>
+      <table className="aacp-table" style={{ marginBottom: 2 }}>
         <thead>
           <tr>
             <th style={{ width: "10%", textAlign: "center" }}>DIA</th>
             <th style={{ width: "8%", textAlign: "center" }}>CPI</th>
-            <th style={{ width: "67%" }}>AÇÕES</th>
+            <th style={{ width: "67%", textAlign: "center" }}>AÇÕES</th>
             <th style={{ width: "15%", textAlign: "center" }}>PERÍODO</th>
           </tr>
         </thead>
@@ -344,8 +344,8 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
         { label: "Observações", items: aacp.observacoes },
         { label: "Dispositivos Legais", items: aacp.dispositivosLegais },
       ].map(sec => sec.items.length > 0 && (
-        <div key={sec.label} style={{ marginBottom: 5, border: "1px solid #000" }}>
-          <p style={{ margin: 0, fontWeight: "bold", textAlign: "center", textTransform: "uppercase", fontSize: "7pt", background: "#f3f4f6", padding: "2px 0", borderBottom: "1px solid #000" }}>
+        <div key={sec.label} style={{ marginBottom: 2, border: "1px solid #000" }}>
+          <p style={{ margin: 0, fontWeight: "bold", textAlign: "center", textTransform: "uppercase", fontSize: "7pt", background: "#1e3a5f", color: "white", padding: "2px 0", borderBottom: "1px solid #000" }}>
             {sec.label}
           </p>
           <div style={{ padding: "3px 8px" }}>
@@ -357,13 +357,13 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
       ))}
 
       {/* Rodapé */}
-      <div style={{ fontSize: "7pt", marginTop: 6, marginBottom: 12, textAlign: "right" }}>
+      <div style={{ fontSize: "7pt", marginTop: 2, marginBottom: 4, textAlign: "right" }}>
         <span>LAVRADO EM: {format(new Date(), "dd/MM/yyyy", { locale: ptBR })}</span>
       </div>
 
       {/* Assinatura — função sempre preenchida; nome em branco se não houver
           titular ativo na função no momento da geração. */}
-      <div className="print-signatures" style={{ marginTop: 48 }}>
+      <div className="print-signatures" style={{ marginTop: 35 }}>
         <div className="print-sig-line" style={{ gridColumn: "1 / -1", maxWidth: 400, margin: "0 auto" }}>
           <p style={{ fontWeight: "bold" }}>{chefe ? `${chefe.rank} ${chefe.fullName}` : " "}</p>
           <p>Chefe da Divisão Acadêmica</p>
@@ -412,8 +412,8 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
 
   const extraStyles = `
     @media print {
-      @page { size: A4 portrait; margin: 8mm 5mm 12mm 5mm; }
-      .print-page, .extra-page { padding: 2mm 3mm 12mm 3mm !important; }
+      @page { size: A4 portrait; margin: 6mm 5mm 14mm 5mm; }
+      .print-page, .extra-page { padding: 2mm 3mm 4mm 3mm !important; }
     }
     .cd-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 7pt; table-layout: fixed; border: 1px solid #d1d5db; border-radius: 6px; }
     .cd-table th { padding: 4px 5px; font-size: 6.5pt; text-align: center; text-transform: uppercase; font-weight: bold; overflow: hidden; white-space: nowrap; border-right: 1px solid #d1d5db; border-bottom: 1px solid #d1d5db; }
@@ -435,7 +435,7 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
     .cd-col-pont  { width: 5%; text-align: center; }
     .aacp-table { width: 100%; border-collapse: collapse; font-size: 7.5pt; table-layout: fixed; }
     .aacp-table th { background: #1e3a5f; color: white; padding: 4px 5px; font-size: 7pt; text-align: left; border: 1px solid #000; }
-    .aacp-table td { padding: 3.5px 5px; border: 1px solid #000; vertical-align: middle; }
+    .aacp-table td { padding: 2px 5px; border: 1px solid #000; vertical-align: middle; }
     .cd-title-block { text-align: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #ccc; }
     .cd-title-block p { margin: 0 0 3px 0; color: #1e3a5f; font-weight: bold; letter-spacing: 0.5px; line-height: 1.3; }
     .cd-title-block .cd-curso   { font-size: 11pt; }
@@ -505,7 +505,7 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
       )}
 
       {(comandante || schoolRole) && (
-        <div className="print-signatures" style={{ marginTop: 48 }}>
+        <div className="print-signatures" style={{ marginTop: 35 }}>
           <div className="print-sig-line" style={{ gridColumn: "1 / -1", maxWidth: 400, margin: "0 auto" }}>
             {/* Função sempre preenchida; nome em branco se não houver titular ativo. */}
             <p style={{ fontWeight: "bold" }}>{comandante ? `${comandante.rank} ${comandante.fullName}` : " "}</p>
