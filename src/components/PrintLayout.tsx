@@ -7,12 +7,32 @@ type Props = {
   extraPages?: React.ReactNode[];
   extraStyles?: string;
   escola?: string;
+  /** Repete o cabeçalho institucional no topo de TODAS as páginas impressas
+   *  (via <thead> de tabela — o navegador repete o thead a cada quebra de
+   *  página, ocupando espaço real e sem sobrepor o conteúdo). */
+  repeatHeader?: boolean;
 };
 
-export default function PrintLayout({ title, children, extraPages, extraStyles, escola }: Props) {
+export default function PrintLayout({ title, children, extraPages, extraStyles, escola, repeatHeader }: Props) {
   useEffect(() => {
     document.title = title;
   }, [title]);
+
+  const headerEl = (
+    /* Cabeçalho institucional com logos */
+    <div className="print-header">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo-pmes.png" alt="PMES" className="print-header-logo" width={68} height={68} loading="eager" />
+      <div className="print-header-text">
+        <p className="linha1">Governo do Estado do Espírito Santo</p>
+        <p className="linha2">Polícia Militar</p>
+        <p className="linha3">Academia de Polícia Militar</p>
+        {escola && <p className="linha4">{escola}</p>}
+      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/brasao-apm.png" alt="APM/ES" className="print-header-logo" width={68} height={68} loading="eager" />
+    </div>
+  );
 
   return (
     <>
@@ -143,6 +163,13 @@ export default function PrintLayout({ title, children, extraPages, extraStyles, 
         .badge-fav { background: #dcfce7; color: #166534; }
         .print-footer { position: fixed; bottom: 8mm; left: 18mm; right: 15mm; font-size: 7.5pt; color: #888; border-top: 1px solid #ddd; padding-top: 3px; display: flex; justify-content: space-between; }
         @media screen { .print-footer { display: none; } }
+
+        /* Cabeçalho repetido por página (repeatHeader): thead reimpresso pelo
+           navegador no topo de cada página. */
+        .print-running { width: 100%; border-collapse: collapse; }
+        .print-running > thead { display: table-header-group; }
+        .print-running > thead > tr > th { padding: 0; font-weight: normal; text-align: left; }
+        .print-running > tbody > tr > td { padding: 0; vertical-align: top; }
       `}</style>
 
       <div className="no-print-bar">
@@ -153,21 +180,23 @@ export default function PrintLayout({ title, children, extraPages, extraStyles, 
       {extraStyles && <style>{extraStyles}</style>}
 
       <div className="print-page">
-        {/* Cabeçalho institucional com logos */}
-        <div className="print-header">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-pmes.png" alt="PMES" className="print-header-logo" width={68} height={68} loading="eager" />
-          <div className="print-header-text">
-            <p className="linha1">Governo do Estado do Espírito Santo</p>
-            <p className="linha2">Polícia Militar</p>
-            <p className="linha3">Academia de Polícia Militar</p>
-            {escola && <p className="linha4">{escola}</p>}
-          </div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brasao-apm.png" alt="APM/ES" className="print-header-logo" width={68} height={68} loading="eager" />
-        </div>
-
-        {children}
+        {repeatHeader ? (
+          /* Cabeçalho repetido em todas as páginas: vai no <thead>, que o
+             navegador reimprime no topo de cada página ocupando espaço real. */
+          <table className="print-running">
+            <thead>
+              <tr><th>{headerEl}</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>{children}</td></tr>
+            </tbody>
+          </table>
+        ) : (
+          <>
+            {headerEl}
+            {children}
+          </>
+        )}
 
         <div className="print-footer">
           <span suppressHydrationWarning>SiGeCon — Documento gerado em {new Date().toLocaleString("pt-BR")}</span>

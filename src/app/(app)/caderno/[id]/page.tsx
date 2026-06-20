@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { abreviarPelotao, platoonOrder, formatCadernoNumero } from "@/lib/utils";
-import { verifySession } from "@/lib/dal";
+import { verifySession, canManageCaderno, escolaNoEscopo } from "@/lib/dal";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -130,11 +130,12 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
 
   const numero = formatCadernoNumero(caderno);
 
-  const canEdit = [
-    "ADMINISTRADOR", "PROTOCOLO",
-    "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA",
-    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
-  ].includes(session.role) && caderno.status !== "PUBLICADO";
+  // Revisar/Publicar: apenas gestores do caderno (Oficial→Comandante de Escola
+  // + Administração/Div. Acadêmica), dentro da escola do caderno e em rascunho.
+  const canEdit =
+    canManageCaderno(session.role, session.additionalRoles) &&
+    escolaNoEscopo(session, caderno.course?.school ?? caderno.school) &&
+    caderno.status !== "PUBLICADO";
 
   const isArquivado = (i: { decisionSummary: string; recordType: string }) =>
     i.recordType === "Arquivamento" ||

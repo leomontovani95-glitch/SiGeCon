@@ -3,12 +3,13 @@ import { redirect } from "next/navigation";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/db";
-import { verifySession, canEmitOpinion, canDecide, ESFO_CFO_RANK, cursosPermitidosParaCPI, escolaNoEscopo } from "@/lib/dal";
+import { verifySession, canEmitOpinion, canDecide, canChangeBookDecision, ESFO_CFO_RANK, cursosPermitidosParaCPI, escolaNoEscopo } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
 import { criarComProtocoloUnico } from "@/lib/protocolo";
 import { comTransacaoRetry, adicionarAoCaderno } from "@/lib/caderno";
 import { logger } from "@/lib/logger";
 import { calcularPrazoDefesa } from "@/lib/prazos";
+import { pontuacaoAutomatica } from "@/lib/pontuacao";
 
 type State = { error: string } | undefined;
 export type LoteState =
@@ -31,7 +32,6 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
   const factPlace       = String(formData.get("factPlace") ?? "").trim() || null;
   const factDescription = String(formData.get("factDescription") ?? "").trim();
   const manualRuleId    = String(formData.get("manualRuleId") ?? "").trim();
-  const suggestedScore  = formData.get("suggestedScore") ? Number(formData.get("suggestedScore")) : null;
   const communicantRank = String(formData.get("communicantRank") ?? "").trim();
   const communicantNameRaw = String(formData.get("communicantName") ?? "").trim();
   const communicantName = communicantRank
@@ -59,6 +59,10 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
   if (!tipo)  return { error: "Tipo de comunicação não encontrado." };
   if (!aluno) return { error: "Aluno não encontrado." };
   if (!aluno.course.active) return { error: "Curso inativo: não é possível registrar novas comunicações para alunos deste curso." };
+
+  // Pontuação automática: vem do tipo (aba Tipos de Comunicação), com metade
+  // para o Art. 146, I. Não é mais informada manualmente no formulário.
+  const suggestedScore = pontuacaoAutomatica(tipo.score, regra.article, regra.item);
 
   if (isAluno) {
     // Apenas CPI e Referência Elogiosa são permitidos para alunos
@@ -188,7 +192,6 @@ export async function registrarComunicacaoEmLote(_prev: LoteState, formData: For
   const factPlace       = String(formData.get("factPlace") ?? "").trim() || null;
   const factDescription = String(formData.get("factDescription") ?? "").trim();
   const manualRuleId    = String(formData.get("manualRuleId") ?? "").trim();
-  const suggestedScore  = formData.get("suggestedScore") ? Number(formData.get("suggestedScore")) : null;
   const communicantRank = String(formData.get("communicantRank") ?? "").trim();
   const communicantNameRaw = String(formData.get("communicantName") ?? "").trim();
   const communicantName = communicantRank ? `${communicantRank} ${communicantNameRaw}`.trim() : communicantNameRaw || null;
@@ -206,6 +209,9 @@ export async function registrarComunicacaoEmLote(_prev: LoteState, formData: For
 
   const tipo = await prisma.communicationType.findUnique({ where: { id: typeId } });
   if (!tipo) return { error: "Tipo de comunicação não encontrado." };
+
+  // Pontuação automática (igual ao registro individual).
+  const suggestedScore = pontuacaoAutomatica(tipo.score, regra.article, regra.item);
 
   const witnessRanks = formData.getAll("witnessRank") as string[];
   const witnessNames = formData.getAll("witnessName") as string[];
@@ -532,13 +538,13 @@ export async function proferirDecisao(_prev: State, formData: FormData): Promise
   const communicationId = String(formData.get("communicationId") ?? "");
   const decisionType = String(formData.get("decisionType") ?? "");
   const text = String(formData.get("text") ?? "").trim();
-  const finalScore = formData.get("finalScore") ? Number(formData.get("finalScore")) : null;
   if (!text || !decisionType) return { error: "Informe decisão e fundamentação." };
 
-  // Captura artigo original antes de qualquer atualização (para histórico de reenquadramento)
+  // Comunicação atual: enquadramento (para histórico de reenquadramento) e tipo
+  // (para a pontuação automática).
   const commOriginal = await prisma.communication.findUnique({
     where: { id: communicationId },
-    select: { article: true, item: true, letter: true, status: true, course: { select: { school: true } } },
+    select: { article: true, item: true, letter: true, status: true, type: { select: { score: true } }, course: { select: { school: true } } },
   });
   if (!commOriginal) return { error: "Comunicação não encontrada." };
   if (!escolaNoEscopo(session, commOriginal.course.school))
@@ -549,18 +555,31 @@ export async function proferirDecisao(_prev: State, formData: FormData): Promise
   const originalItem    = commOriginal?.item    ?? null;
   const originalLetter  = commOriginal?.letter  ?? null;
 
-  // Reenquadramento: atualiza o artigo da comunicação
-  const commUpdate: Record<string, unknown> = { status: "DECIDIDA", finalScore };
-  if (decisionType === "Reenquadrar artigo") {
+  // Pontuação automática (módulo) conforme o tipo cadastrado, com metade no
+  // Art. 146, I. Arquivamento não pontua; reenquadramento usa o tipo do NOVO
+  // enquadramento. Não é mais informada manualmente na decisão.
+  const commUpdate: Record<string, unknown> = { status: "DECIDIDA" };
+  let finalScore: number;
+  if (decisionType === "Arquivamento") {
+    finalScore = 0;
+  } else if (decisionType === "Reenquadrar artigo") {
     const newManualRuleId = String(formData.get("newManualRuleId") ?? "").trim();
     if (!newManualRuleId) return { error: "Selecione o novo artigo para reenquadramento." };
     const regra = await prisma.manualRule.findUnique({ where: { id: newManualRuleId } });
     if (!regra) return { error: "Artigo não encontrado no Manual do Aluno." };
+    const novoTipo = regra.defaultCommunicationType
+      ? await prisma.communicationType.findFirst({ where: { name: regra.defaultCommunicationType }, select: { score: true } })
+      : null;
+    finalScore = pontuacaoAutomatica(novoTipo?.score ?? commOriginal.type.score, regra.article, regra.item);
     commUpdate.manualRuleId = regra.id;
     commUpdate.article = regra.article;
     commUpdate.item = regra.item ?? null;
     commUpdate.letter = regra.letter ?? null;
+  } else {
+    // Punição / Homologação: pontuação do próprio enquadramento atual.
+    finalScore = pontuacaoAutomatica(commOriginal.type.score, commOriginal.article, commOriginal.item);
   }
+  commUpdate.finalScore = finalScore;
 
   // Processar anexos da decisão (opcionais)
   const arquivosDecisao = (formData.getAll("fileDecisao") as File[]).filter((f) => f && f.size > 0);
@@ -631,39 +650,85 @@ export async function proferirDecisao(_prev: State, formData: FormData): Promise
   redirect(`/comunicacoes/${communicationId}`);
 }
 
-// ── Corrigir pontuação após decisão (Comandante) ──────────────────────────
-export async function corrigirPontuacao(_prev: State, formData: FormData): Promise<State> {
+// ── Alterar a decisão de uma comunicação já decidida (Comandante) ──────────
+// Disponível na página da comunicação, enquanto o caderno NÃO foi publicado.
+// A pontuação é automática (conforme o tipo / novo enquadramento); o reflexo
+// no caderno rascunho é imediato.
+export async function alterarDecisao(_prev: State, formData: FormData): Promise<State> {
   const session = await verifySession();
-  if (!canDecide(session.role, session.additionalRoles))
-    return { error: "Sem permissão para corrigir pontuação." };
+  if (!canChangeBookDecision(session.role, session.additionalRoles))
+    return { error: "Sem permissão para alterar decisões." };
 
-  const decisionId = String(formData.get("decisionId") ?? "").trim();
   const communicationId = String(formData.get("communicationId") ?? "").trim();
-  const raw = formData.get("novaScore");
-  const novaScore = raw !== null && raw !== "" ? Number(raw) : null;
+  const decisionType    = String(formData.get("decisionType") ?? "").trim();
+  const text            = String(formData.get("text") ?? "").trim();
+  if (!communicationId) return { error: "Dados inválidos." };
+  if (!decisionType)    return { error: "Selecione o tipo de decisão." };
+  if (!text)            return { error: "Informe a fundamentação da decisão." };
 
-  if (!decisionId || !communicationId) return { error: "Dados inválidos." };
-
-  const decision = await prisma.decision.findFirst({
-    where: { id: decisionId, communicationId },
-    include: { communication: { select: { course: { select: { school: true } } } } },
+  const comm = await prisma.communication.findUnique({
+    where: { id: communicationId },
+    select: { status: true, article: true, item: true, letter: true, type: { select: { score: true } }, course: { select: { school: true } } },
   });
-  if (!decision) return { error: "Decisão não encontrada." };
-  if (!escolaNoEscopo(session, decision.communication.course.school))
+  if (!comm) return { error: "Comunicação não encontrada." };
+  if (!escolaNoEscopo(session, comm.course.school))
     return { error: "Sem permissão: comunicação de outra escola." };
+  if (comm.status !== "DECIDIDA")
+    return { error: "Só é possível alterar a decisão antes da publicação do caderno." };
 
-  await prisma.decision.update({ where: { id: decisionId }, data: { finalScore: novaScore } });
-  await prisma.communication.update({ where: { id: communicationId }, data: { finalScore: novaScore } });
-  await prisma.disciplinaryBookItem.updateMany({ where: { communicationId }, data: { score: novaScore } });
+  // Enquadramento atual (vira o "original" em caso de reenquadramento).
+  const curArticle = comm.article, curItem = comm.item, curLetter = comm.letter;
 
-  await auditLog(
-    session.userId,
-    "CORRECAO_PONTUACAO",
-    "Decision",
-    decisionId,
-    `Pontuação corrigida para: ${novaScore ?? 0}`,
-  );
+  const commUpdate: Record<string, unknown> = {};
+  const itemUpdate: Record<string, unknown> = { decisionSummary: decisionType };
+  let finalScore: number;
 
+  if (decisionType === "Arquivamento") {
+    finalScore = 0;
+    itemUpdate.originalArticle = null; itemUpdate.originalItem = null; itemUpdate.originalLetter = null;
+  } else if (decisionType === "Reenquadrar artigo") {
+    const newManualRuleId = String(formData.get("newManualRuleId") ?? "").trim();
+    if (!newManualRuleId) return { error: "Selecione o novo artigo para reenquadramento." };
+    const regra = await prisma.manualRule.findUnique({ where: { id: newManualRuleId } });
+    if (!regra) return { error: "Artigo não encontrado no Manual do Aluno." };
+    const novoTipo = regra.defaultCommunicationType
+      ? await prisma.communicationType.findFirst({ where: { name: regra.defaultCommunicationType }, select: { score: true } })
+      : null;
+    finalScore = pontuacaoAutomatica(novoTipo?.score ?? comm.type.score, regra.article, regra.item);
+    commUpdate.manualRuleId = regra.id;
+    commUpdate.article = regra.article;
+    commUpdate.item = regra.item ?? null;
+    commUpdate.letter = regra.letter ?? null;
+    itemUpdate.originalArticle = curArticle; itemUpdate.originalItem = curItem; itemUpdate.originalLetter = curLetter;
+  } else {
+    finalScore = pontuacaoAutomatica(comm.type.score, comm.article, comm.item);
+    itemUpdate.originalArticle = null; itemUpdate.originalItem = null; itemUpdate.originalLetter = null;
+  }
+  commUpdate.finalScore = finalScore;
+  itemUpdate.score = finalScore;
+
+  try {
+    const ultima = await prisma.decision.findFirst({ where: { communicationId }, orderBy: { decidedAt: "desc" } });
+    if (ultima) {
+      await prisma.decision.update({ where: { id: ultima.id }, data: { decisionType, text, finalScore } });
+    } else {
+      await prisma.decision.create({ data: { communicationId, authorityId: session.userId, decisionType, text, finalScore } });
+    }
+    await prisma.communication.update({ where: { id: communicationId }, data: commUpdate });
+
+    // Atualiza o snapshot apenas em cadernos NÃO publicados.
+    const itens = await prisma.disciplinaryBookItem.findMany({
+      where: { communicationId, disciplinaryBook: { status: { not: "PUBLICADO" } } },
+      select: { id: true },
+    });
+    if (itens.length > 0) {
+      await prisma.disciplinaryBookItem.updateMany({ where: { id: { in: itens.map((i) => i.id) } }, data: itemUpdate });
+    }
+    await auditLog(session.userId, "ALTERAR_DECISAO", "Communication", communicationId, `Nova decisão: ${decisionType} (${finalScore})`);
+  } catch (e) {
+    logger.error("alterarDecisao", e, { communicationId });
+    return { error: "Erro ao alterar a decisão. Tente novamente." };
+  }
   redirect(`/comunicacoes/${communicationId}`);
 }
 

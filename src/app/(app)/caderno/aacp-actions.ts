@@ -1,13 +1,17 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { verifyRole } from "@/lib/dal";
+import { verifyRole, escolaNoEscopo, CADERNO_MANAGERS } from "@/lib/dal";
 
-const ROLES = [
-  "ADMINISTRADOR", "PROTOCOLO",
-  "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA",
-  "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
-] as const;
+// Escopo de escola da AACP: deriva da escola do caderno vinculado.
+async function aacpNoEscopo(session: { role: string; escola?: string | null }, disciplinaryBookId: string): Promise<boolean> {
+  const book = await prisma.disciplinaryBook.findUnique({
+    where: { id: disciplinaryBookId },
+    select: { school: true, course: { select: { school: true } } },
+  });
+  if (!book) return false;
+  return escolaNoEscopo(session, book.course?.school ?? book.school);
+}
 
 function getNextSaturday(): Date {
   const today = new Date();
@@ -67,7 +71,8 @@ const DEFAULT_DISPOSITIVOS = [
 ];
 
 export async function criarAACP(disciplinaryBookId: string) {
-  await verifyRole(...ROLES);
+  const session = await verifyRole(...CADERNO_MANAGERS);
+  if (!(await aacpNoEscopo(session, disciplinaryBookId))) return;
 
   const sat = getNextSaturday();
   const sun = new Date(sat);
@@ -113,18 +118,20 @@ export type AACPSaveData = {
 };
 
 export async function removerAACP(aacpId: string) {
-  await verifyRole(...ROLES);
+  const session = await verifyRole(...CADERNO_MANAGERS);
   const aacp = await prisma.aacp.findUnique({ where: { id: aacpId }, select: { disciplinaryBookId: true } });
   if (!aacp) return;
+  if (!(await aacpNoEscopo(session, aacp.disciplinaryBookId))) return;
   await prisma.aacp.delete({ where: { id: aacpId } });
   revalidatePath(`/caderno/${aacp.disciplinaryBookId}/editar`);
 }
 
 export async function salvarAACP(aacpId: string, data: AACPSaveData) {
-  await verifyRole(...ROLES);
+  const session = await verifyRole(...CADERNO_MANAGERS);
 
   const aacp = await prisma.aacp.findUnique({ where: { id: aacpId }, select: { disciplinaryBookId: true } });
   if (!aacp) return;
+  if (!(await aacpNoEscopo(session, aacp.disciplinaryBookId))) return;
 
   await prisma.$transaction(async (tx) => {
     // Deleta sub-items (cascade cuida das actions)

@@ -1,14 +1,11 @@
 "use server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { verifyRole, getSchoolFilter } from "@/lib/dal";
+import { verifyRole, getSchoolFilter, escolaNoEscopo, CADERNO_MANAGERS } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
 
 export async function criarCaderno() {
-  const session = await verifyRole(
-    "ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA",
-    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
-  );
+  const session = await verifyRole(...CADERNO_MANAGERS);
 
   // Busca comunicações DECIDIDAS — filtra pela escola do usuário para evitar contaminação cruzada
   const school = getSchoolFilter(session.role, session.escola);
@@ -81,16 +78,15 @@ export async function criarCaderno() {
 }
 
 export async function publicarCaderno(id: string) {
-  const session = await verifyRole(
-    "ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA",
-    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
-  );
+  const session = await verifyRole(...CADERNO_MANAGERS);
 
   const caderno = await prisma.disciplinaryBook.findUnique({
     where: { id },
-    include: { items: true },
+    include: { items: true, course: { select: { school: true } } },
   });
   if (!caderno) return;
+  // Escopo de escola: só publica cadernos da(s) escola(s) a que tem acesso.
+  if (!escolaNoEscopo(session, caderno.course?.school ?? caderno.school)) return;
 
   // Publica o caderno e atualiza todas as comunicações para PUBLICADA_CADERNO
   await prisma.disciplinaryBook.update({
@@ -111,15 +107,13 @@ export async function publicarCaderno(id: string) {
 }
 
 export async function adicionarItem(cadernoId: string, communicationId: string) {
-  const session = await verifyRole(
-    "ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA",
-    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
-  );
+  const session = await verifyRole(...CADERNO_MANAGERS);
   const comm = await prisma.communication.findUnique({
     where: { id: communicationId },
-    include: { student: true, type: true, decisions: true },
+    include: { student: true, type: true, decisions: true, course: { select: { school: true } } },
   });
   if (!comm || comm.status !== "DECIDIDA") return;
+  if (!escolaNoEscopo(session, comm.course?.school)) return;
 
   // Verifica se já está neste caderno
   const jaExiste = await prisma.disciplinaryBookItem.findFirst({
@@ -148,13 +142,14 @@ export async function adicionarItem(cadernoId: string, communicationId: string) 
 }
 
 export async function removerItemCaderno(cadernoId: string, itemId: string) {
-  const session = await verifyRole(
-    "ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA",
-    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
-  );
+  const session = await verifyRole(...CADERNO_MANAGERS);
 
-  const caderno = await prisma.disciplinaryBook.findUnique({ where: { id: cadernoId } });
+  const caderno = await prisma.disciplinaryBook.findUnique({
+    where: { id: cadernoId },
+    include: { course: { select: { school: true } } },
+  });
   if (!caderno || caderno.status === "PUBLICADO") return;
+  if (!escolaNoEscopo(session, caderno.course?.school ?? caderno.school)) return;
 
   await prisma.disciplinaryBookItem.delete({
     where: { id: itemId, disciplinaryBookId: cadernoId },

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { verifySession, getSchoolFilter } from "@/lib/dal";
+import { verifySession, getSchoolFilter, canManageCaderno, escolaNoEscopo } from "@/lib/dal";
 import { normalizeSituacaoCurso, activeWhereCurso, courseScopeWhere, buildSituacaoOptions } from "@/lib/cursos";
 import SituacaoCursoFilter from "@/components/SituacaoCursoFilter";
 import { formatCadernoNumero } from "@/lib/utils";
@@ -8,12 +8,6 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import Link from "next/link";
 import CriarCadernoBtn from "./_components/CriarCadernoBtn";
-
-const CADERNO_MANAGERS = [
-  "ADMINISTRADOR", "PROTOCOLO",
-  "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA",
-  "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
-];
 
 export default async function CadernoPage({
   searchParams,
@@ -27,7 +21,7 @@ export default async function CadernoPage({
   const cursoId = sp.cursoId ?? "";
   const situacao = normalizeSituacaoCurso(sp.situacao);
 
-  const canManage = CADERNO_MANAGERS.includes(session.role);
+  const canManage = canManageCaderno(session.role, session.additionalRoles);
   const school = getSchoolFilter(session.role, session.escola);
 
   // Cursos disponíveis para este usuário (filtra por escola e situação)
@@ -168,7 +162,7 @@ export default async function CadernoPage({
                 </td>
                 <td className="px-4 py-3 flex gap-3">
                   <Link href={`/caderno/${c.id}`} className="text-xs text-[#1e3a5f] hover:underline">Ver</Link>
-                  {canManage && c.status !== "PUBLICADO" && (!school || c.school === school || c.school === null) && (
+                  {canManage && c.status !== "PUBLICADO" && escolaNoEscopo(session, c.course?.school ?? c.school) && (
                     <Link href={`/caderno/${c.id}/editar`} className="text-xs text-gray-500 hover:underline">Revisar / Publicar</Link>
                   )}
                 </td>

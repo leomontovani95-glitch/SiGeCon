@@ -10,6 +10,7 @@ const POSTOS = [
 ];
 import { registrarComunicacao } from "../actions";
 import { dataLocalISO } from "@/lib/utils";
+import { ehCpi1Metade } from "@/lib/pontuacao";
 import ResultadosPessoa from "./ResultadosPessoa";
 
 type Tipo  = { id: string; name: string; score: number };
@@ -242,17 +243,11 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
   });
   const [ruleId, setRuleId] = useState(() => (regras.length === 1 ? regras[0].id : ""));
 
-  // Tipo e pontuação (controlados para auto-fill)
+  // Tipo (controlado para auto-fill). A pontuação não é mais informada aqui —
+  // é automática (vem do tipo cadastrado em Tipos de Comunicação).
   const [typeId, setTypeId] = useState(() => {
     if (!regraAutoFill?.defaultCommunicationType) return "";
     return tipos.find((t) => t.name === regraAutoFill.defaultCommunicationType)?.id ?? "";
-  });
-  const [score, setScore] = useState(() => {
-    const t = regraAutoFill?.defaultCommunicationType
-      ? tipos.find((x) => x.name === regraAutoFill.defaultCommunicationType)
-      : undefined;
-    // Prefere a pontuação do dispositivo (defaultScore); senão, a do tipo.
-    return t ? String(regraAutoFill?.defaultScore ?? t.score) : "";
   });
 
   // Período de Adaptação
@@ -283,20 +278,20 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
   // ── auto-fill ao selecionar alínea ───────────────────────────────────
   function selecionarRegra(r: Regra) {
     setRuleId(r.id);
-    // Pontuação sugerida vem do dispositivo (defaultScore) quando definida —
-    // assim Art. 146, I, a/b valem 0,1 mesmo sendo CPI 1. Senão, usa o score do tipo.
+    // Auto-seleciona o tipo conforme o dispositivo. A pontuação é derivada do
+    // tipo no servidor (com metade para o Art. 146, I).
     if (r.defaultCommunicationType) {
       const tipo = tipos.find((t) => t.name === r.defaultCommunicationType);
-      if (tipo) { setTypeId(tipo.id); setScore(String(r.defaultScore ?? tipo.score)); }
+      if (tipo) setTypeId(tipo.id);
     }
   }
 
   // ── reset em cascata ─────────────────────────────────────────────────
   function handleArtigoChange(val: string) {
-    setArtigo(val); setInciso(""); setRuleId(""); setTypeId(""); setScore("");
+    setArtigo(val); setInciso(""); setRuleId(""); setTypeId("");
   }
   function handleIncisoChange(val: string) {
-    setInciso(val); setRuleId(""); setTypeId(""); setScore("");
+    setInciso(val); setRuleId(""); setTypeId("");
     // Auto-selecionar se há uma única alínea (ex: Art. 170)
     const lista = alineas(regras, artigo, val);
     if (lista.length === 1) selecionarRegra(lista[0]);
@@ -605,20 +600,14 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
               </option>
             ))}
           </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Pontuação sugerida</label>
-          <input
-            name="suggestedScore"
-            type="number"
-            step="0.1"
-            min="0"
-            value={score}
-            onChange={(e) => setScore(e.target.value)}
-            placeholder="Auto-preenchida ao selecionar o dispositivo"
-            className="input"
-          />
+          {/* A pontuação é automática (vem do tipo, ajustável em Tipos de
+              Comunicação). O Art. 146, I vale metade. */}
+          {regraAtual && ehCpi1Metade(regraAtual.article, regraAtual.item) && (
+            <p className="text-xs text-amber-700 mt-1 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+              ⚠ Art. 146, I — embora seja <strong>CPI 1</strong>, esta conduta vale <strong>50%</strong> da
+              pontuação (metade da CPI 1).
+            </p>
+          )}
         </div>
 
         <div>

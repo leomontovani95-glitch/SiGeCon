@@ -3,6 +3,7 @@ import { verifySession } from "@/lib/dal";
 import { usuarioAtivoNaFuncao } from "@/lib/signatarios";
 import { platoonOrder, abreviarPelotao, escolaHeaderLabel, formatCadernoNumero } from "@/lib/utils";
 import { coresTipo } from "@/lib/coresComunicacao";
+import { ehCpi1Metade, OBS_CPI1_METADE } from "@/lib/pontuacao";
 import { nomeExtensoCurso } from "@/lib/cursos";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
@@ -89,6 +90,12 @@ function obsCell(item: Item): string {
   const TD_TAC = new Set(["TD Leve", "TD Média", "TD Grave", "TAC", "Elogio publicado em BI"]);
   if (TD_TAC.has(item.recordType)) {
     return fmtBGPM(item.communication.bgpmNumber, item.communication.bgpmYear) ?? item.shortObservation ?? "—";
+  }
+  // CPI 1 do Art. 146, I (a/b): vale 50% da pontuação de CPI 1 (0,1 em vez de
+  // 0,2). Sinaliza na Observação quando houve sanção (não arquivado/reenquadrado,
+  // já tratados acima).
+  if (item.recordType === "CPI 1" && ehCpi1Metade(item.communication.article, item.communication.item)) {
+    return item.shortObservation ?? OBS_CPI1_METADE;
   }
   return item.shortObservation ?? "—";
 }
@@ -428,8 +435,9 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
     .cd-title-block .cd-caderno { font-size: 12.5pt; margin-top: 5px; }
     .cd-meta-row { display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: flex-end; gap: 16px; }
     .cd-meta-row .print-field { margin-bottom: 0; }
-    .cd-counts { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 2px 16px; margin-top: 7px; padding-top: 5px; border-top: 1px solid #e5e7eb; }
-    .cd-count { font-size: 8pt; color: #6b7280; white-space: nowrap; }
+    .cd-counts { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 2px 0; margin-top: 7px; padding-top: 5px; border-top: 1px solid #e5e7eb; }
+    .cd-count { font-size: 8pt; color: #6b7280; white-space: nowrap; padding: 0 12px; border-right: 1px solid #d1d5db; }
+    .cd-count:last-child { border-right: none; }
     .cd-count strong { font-size: 9.5pt; color: #1e3a5f; margin-right: 2px; }
     .cd-header-section { margin-bottom: 4px !important; }
     .cd-header-section + .print-section { margin-top: 12px !important; }
@@ -439,6 +447,7 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
     <PrintLayout
       title={`Caderno Disciplinar ${numero}`}
       escola={escolaHeaderLabel(escolaEfetiva)}
+      repeatHeader
       extraStyles={extraStyles}
       extraPages={caderno.aacp ? [
         <AACPAnexo key="aacp" aacp={caderno.aacp} caderno={caderno} chefe={chefeDivisao} />

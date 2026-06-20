@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { abreviarPelotao, platoonOrder, formatCadernoNumero } from "@/lib/utils";
-import { verifyRole, getSchoolFilter } from "@/lib/dal";
-import { notFound } from "next/navigation";
+import { verifyRole, getSchoolFilter, escolaNoEscopo, CADERNO_MANAGERS } from "@/lib/dal";
+import { notFound, redirect } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import Link from "next/link";
@@ -13,10 +13,7 @@ import RemoverAACPBtn from "../../_components/RemoverAACPBtn";
 import AACPEditor from "../../_components/AACPEditor";
 
 export default async function EditarCadernoPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await verifyRole(
-    "ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA",
-    "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
-  );
+  const session = await verifyRole(...CADERNO_MANAGERS);
   const { id } = await params;
 
   const school = getSchoolFilter(session.role, session.escola);
@@ -56,6 +53,12 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
   ]);
 
   if (!caderno) notFound();
+
+  // Escopo de escola: gestor só revisa/publica cadernos da(s) escola(s) a que
+  // tem acesso (Administração/Div. Acadêmica acessam todas).
+  if (!escolaNoEscopo(session, caderno.course?.school ?? caderno.school)) {
+    redirect(`/caderno/${id}`);
+  }
 
   caderno.items.sort((a, b) => {
     const pa = platoonOrder(a.student.platoon?.name);
@@ -114,6 +117,7 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
                     <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Nº</th>
                     <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Nome</th>
                     <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Data Fato</th>
+                    <th className="text-left px-3 py-3 font-medium whitespace-nowrap">Decisão</th>
                     <th className="text-right px-3 py-3 font-medium whitespace-nowrap">Pont.</th>
                     {canPublish && <th className="px-3 py-3"></th>}
                   </tr>
@@ -136,6 +140,7 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
                       <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">
                         {format(new Date(item.factDate), "dd/MM/yyyy", { locale: ptBR })}
                       </td>
+                      <td className="px-3 py-2.5 text-xs text-gray-600 whitespace-nowrap">{item.decisionSummary}</td>
                       <td className="px-3 py-2.5 text-right font-bold text-xs">
                         {item.score != null ? (
                           <span className={item.score > 0 ? "text-red-600" : item.score < 0 ? "text-green-600" : "text-gray-500"}>
@@ -152,7 +157,7 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
                   ))}
                   {caderno.items.length === 0 && (
                     <tr>
-                      <td colSpan={canPublish ? 9 : 8} className="px-4 py-6 text-center text-gray-400">
+                      <td colSpan={canPublish ? 10 : 9} className="px-4 py-6 text-center text-gray-400">
                         Nenhum registro compilado.
                       </td>
                     </tr>

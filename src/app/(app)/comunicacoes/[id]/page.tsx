@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/db";
-import { verifySession, canEmitOpinion, getSchoolFilter } from "@/lib/dal";
+import { verifySession, canEmitOpinion, canChangeBookDecision, escolaNoEscopo, getSchoolFilter } from "@/lib/dal";
 import { formatCadernoNumero } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import AcoesComm from "../_components/AcoesComm";
+import AlterarDecisaoBtn from "../_components/AlterarDecisaoBtn";
 import ParecerForm from "../_components/ParecerForm";
 import Link from "next/link";
 
@@ -31,7 +32,7 @@ export default async function ComunicacaoPage({
   const sp = await searchParams;
   const mostraFormDefesa = sp.defesa === "1";
 
-  const [manualRules, comm, tipos] = await Promise.all([
+  const [manualRules, comm] = await Promise.all([
     prisma.manualRule.findMany({ where: { active: true }, orderBy: [{ article: "asc" }, { item: "asc" }] }),
     prisma.communication.findUnique({
       where: { id },
@@ -46,10 +47,8 @@ export default async function ComunicacaoPage({
         communicantUser: { select: { id: true, role: true, student: { select: { id: true } } } },
       },
     }),
-    prisma.communicationType.findMany({ select: { name: true, score: true } }),
   ]);
   if (!comm) notFound();
-  const tiposScore = Object.fromEntries(tipos.map((t) => [t.name, t.score]));
 
   if (session.role === "ALUNO") {
     const ehEsteAluno = comm.student.userId === session.userId;
@@ -406,6 +405,29 @@ export default async function ComunicacaoPage({
               </p>
             </div>
           ))}
+          {/* Alterar decisão: só Comandante de Escola (+ Admin), na escola do
+              caderno, e enquanto o caderno não foi publicado (status DECIDIDA). */}
+          {canChangeBookDecision(session.role, session.additionalRoles) &&
+            escolaNoEscopo(session, comm.student.course.school) &&
+            comm.status === "DECIDIDA" && (
+              <div className="mt-3 pt-3 border-t border-green-200">
+                <AlterarDecisaoBtn
+                  communicationId={comm.id}
+                  protocolo={comm.protocolNumber}
+                  recordType={comm.type.name}
+                  isElogiosa={comm.type.name.toLowerCase().includes("elogiosa")}
+                  currentDecision={comm.decisions[0]?.decisionType ?? ""}
+                  currentText={comm.decisions[0]?.text ?? ""}
+                  manualRules={manualRules.map((r) => ({
+                    id: r.id,
+                    article: r.article,
+                    item: r.item ?? null,
+                    letter: r.letter ?? null,
+                    description: r.description,
+                  }))}
+                />
+              </div>
+            )}
         </div>
       )}
 
@@ -450,7 +472,6 @@ export default async function ComunicacaoPage({
           letter: r.letter ?? null,
           description: r.description,
         }))}
-        tiposScore={tiposScore}
       />}
     </div>
   );

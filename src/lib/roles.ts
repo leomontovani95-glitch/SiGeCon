@@ -38,6 +38,34 @@ export const PARECERISTAS: UserRole[] = [
   "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
 ];
 
+// ── Gestão de caderno disciplinar ────────────────────────────────────────
+// Quem pode Revisar/Publicar caderno, gerar/editar AACP e adicionar/remover
+// registros: do Oficial ao Comandante de cada escola, mais Administração e
+// Chefe da Divisão Acadêmica. (NÃO inclui Protocolo, Chefe de Curso, etc.)
+export const CADERNO_MANAGERS: UserRole[] = [
+  "ADMINISTRADOR", "CHEFE_DIVISAO_ACADEMICA",
+  "COMANDANTE_ESFAP", "COMANDANTE_ESFO",
+  "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO",
+  "OFICIAL_ESFAP", "OFICIAL_ESFO",
+];
+
+export function canManageCaderno(role: string, additionalRoles?: string) {
+  const all = effectiveRoles({ role, additionalRoles });
+  return all.some((r) => (CADERNO_MANAGERS as string[]).includes(r));
+}
+
+// Alterar a decisão de uma comunicação dentro de um caderno rascunho é
+// exclusivo dos Comandantes de Escola (respeitando a escola do caderno) e da
+// Administração. O escopo de escola é checado à parte com escolaNoEscopo().
+export const BOOK_DECISION_CHANGERS: UserRole[] = [
+  "ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO",
+];
+
+export function canChangeBookDecision(role: string, additionalRoles?: string) {
+  const all = effectiveRoles({ role, additionalRoles });
+  return all.some((r) => (BOOK_DECISION_CHANGERS as string[]).includes(r));
+}
+
 // Retorna todos os roles efetivos de uma session (primário + adicionais)
 export function effectiveRoles(session: { role: string; additionalRoles?: string }): string[] {
   const extras = (session.additionalRoles ?? "").split(",").map((r) => r.trim()).filter(Boolean);

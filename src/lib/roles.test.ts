@@ -3,6 +3,8 @@ import {
   effectiveRoles,
   canDecide,
   canEmitOpinion,
+  canManageCaderno,
+  canChangeBookDecision,
   canManageUserRole,
   manageableRoles,
   getSchoolFilter,
@@ -32,6 +34,38 @@ describe("canDecide / canEmitOpinion", () => {
   });
   it("considera funções adicionais", () => {
     expect(canDecide("PROTOCOLO", "COMANDANTE_ESFAP")).toBe(true);
+  });
+});
+
+describe("canManageCaderno (gestão de caderno: Oficial→Comandante + Admin/Div.Acad.)", () => {
+  it("oficial, subcomandante, comandante e admin/div.acad. gerenciam", () => {
+    for (const r of [
+      "OFICIAL_ESFAP", "OFICIAL_ESFO", "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO",
+      "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "ADMINISTRADOR", "CHEFE_DIVISAO_ACADEMICA",
+    ]) {
+      expect(canManageCaderno(r)).toBe(true);
+    }
+  });
+  it("protocolo, chefe de curso e aluno NÃO gerenciam", () => {
+    expect(canManageCaderno("PROTOCOLO")).toBe(false);
+    expect(canManageCaderno("CHEFE_CURSO")).toBe(false);
+    expect(canManageCaderno("ALUNO")).toBe(false);
+  });
+  it("considera funções adicionais", () => {
+    expect(canManageCaderno("PROTOCOLO", "OFICIAL_ESFO")).toBe(true);
+  });
+});
+
+describe("canChangeBookDecision (alterar decisão: só Comandante de Escola + Admin)", () => {
+  it("comandantes de escola e admin podem", () => {
+    expect(canChangeBookDecision("COMANDANTE_ESFAP")).toBe(true);
+    expect(canChangeBookDecision("COMANDANTE_ESFO")).toBe(true);
+    expect(canChangeBookDecision("ADMINISTRADOR")).toBe(true);
+  });
+  it("oficial, subcomandante e chefe da div. acadêmica NÃO podem", () => {
+    expect(canChangeBookDecision("OFICIAL_ESFAP")).toBe(false);
+    expect(canChangeBookDecision("SUBCOMANDANTE_ESFO")).toBe(false);
+    expect(canChangeBookDecision("CHEFE_DIVISAO_ACADEMICA")).toBe(false);
   });
 });
 

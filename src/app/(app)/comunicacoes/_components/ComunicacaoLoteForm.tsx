@@ -3,6 +3,7 @@ import { useActionState, useState, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { registrarComunicacaoEmLote, type LoteState } from "../actions";
 import { dataLocalISO } from "@/lib/utils";
+import { ehCpi1Metade } from "@/lib/pontuacao";
 import ResultadosPessoa from "./ResultadosPessoa";
 
 const POSTOS = [
@@ -87,7 +88,6 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
   const [inciso, setInciso] = useState("");
   const [ruleId, setRuleId] = useState("");
   const [typeId, setTypeId] = useState("");
-  const [score, setScore] = useState("");
 
   // Período de Adaptação
   const [adaptationPeriod, setAdaptationPeriod] = useState(false);
@@ -104,7 +104,7 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
 
   function trocarModo(m: Modo) {
     setModo(m);
-    setArtigo(""); setInciso(""); setRuleId(""); setScore("");
+    setArtigo(""); setInciso(""); setRuleId("");
     if (m === "REF") {
       setTypeId(tipoRef?.id ?? "");
     } else {
@@ -115,16 +115,16 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
   function selecionarRegra(r: Regra) {
     setRuleId(r.id);
     if (modo === "CPI") {
-      // Pontuação sugerida vem do score do tipo (CommunicationType) — fonte única.
+      // Auto-seleciona o tipo; a pontuação é automática (derivada do tipo).
       if (r.defaultCommunicationType) {
         const tipo = tipos.find((t) => t.name === r.defaultCommunicationType);
-        if (tipo) { setTypeId(tipo.id); setScore(String(tipo.score)); }
+        if (tipo) setTypeId(tipo.id);
       }
     }
   }
-  function handleArtigoChange(val: string) { setArtigo(val); setInciso(""); setRuleId(""); if (modo === "CPI") { setTypeId(""); setScore(""); } }
+  function handleArtigoChange(val: string) { setArtigo(val); setInciso(""); setRuleId(""); if (modo === "CPI") setTypeId(""); }
   function handleIncisoChange(val: string) {
-    setInciso(val); setRuleId(""); if (modo === "CPI") { setTypeId(""); setScore(""); }
+    setInciso(val); setRuleId(""); if (modo === "CPI") setTypeId("");
     const lista = alineas(regras, artigo, val);
     if (lista.length === 1) selecionarRegra(lista[0]);
   }
@@ -444,19 +444,20 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
             </div>
           </div>
         ) : (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Comunicação *</label>
-              <select value={typeId} onChange={(e) => setTypeId(e.target.value)} className="input">
-                <option value="">{ruleId ? "Selecione" : "Selecione o dispositivo legal primeiro"}</option>
-                {tiposCPI.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.score.toFixed(1)} pt)</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Pontuação sugerida</label>
-              <input name="suggestedScore" type="number" step="0.1" min="0" value={score} onChange={(e) => setScore(e.target.value)} className="input" />
-            </div>
-          </>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Comunicação *</label>
+            <select value={typeId} onChange={(e) => setTypeId(e.target.value)} className="input">
+              <option value="">{ruleId ? "Selecione" : "Selecione o dispositivo legal primeiro"}</option>
+              {tiposCPI.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.score.toFixed(1)} pt)</option>)}
+            </select>
+            {/* Pontuação automática (derivada do tipo); Art. 146, I vale metade. */}
+            {regraAtual && ehCpi1Metade(regraAtual.article, regraAtual.item) && (
+              <p className="text-xs text-amber-700 mt-1 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                ⚠ Art. 146, I — embora seja <strong>CPI 1</strong>, esta conduta vale <strong>50%</strong> da
+                pontuação (metade da CPI 1).
+              </p>
+            )}
+          </div>
         )}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">{isRef ? "Data do Elogio *" : "Data do Fato *"}</label>

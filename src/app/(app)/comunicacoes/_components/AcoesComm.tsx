@@ -5,7 +5,6 @@ import {
   tomarCienciaSemDefesa,
   tomarCienciaAdaptacao,
   proferirDecisao,
-  corrigirPontuacao,
 } from "../actions";
 
 type Sugestao = { titulo: string; texto: string };
@@ -53,16 +52,6 @@ const SUGESTOES_DECISAO: Record<string, Sugestao[]> = {
   ],
 };
 
-function nomeCpiDoInciso(typeName: string, item: string | null): string {
-  const name = typeName.toLowerCase();
-  if (name.includes("referência elogiosa") || name.includes("referencia elogiosa")) return "Referência Elogiosa";
-  if (!item) return "CPI 1";
-  if (item === "I") return "CPI 1";
-  if (item === "II") return "CPI 2";
-  if (item === "III") return "CPI 3";
-  return "CPI 1";
-}
-
 type ManualRule = { id: string; article: string; item: string | null; letter: string | null; description: string };
 
 type CommInfo = {
@@ -81,25 +70,14 @@ type CommInfo = {
 type SessionInfo = { role: string; userId: string; email: string };
 
 export default function AcoesComm({
-  comm, session, alunoEhEssePerfil, mostraFormDefesa, manualRules, tiposScore,
+  comm, session, alunoEhEssePerfil, mostraFormDefesa, manualRules,
 }: {
   comm: CommInfo;
   session: SessionInfo;
   alunoEhEssePerfil: boolean;
   mostraFormDefesa: boolean;
   manualRules: ManualRule[];
-  tiposScore: Record<string, number>;
 }) {
-  // Pontuação padrão de cada inciso vem do banco (CommunicationType.score),
-  // editável em /tipos conforme a legislação vigente — não fica fixa no código.
-  const pontuacaoPadrao = (typeName: string, item: string | null): number | null => {
-    const name = typeName.toLowerCase();
-    if (name.includes("referência elogiosa") || name.includes("referencia elogiosa"))
-      return tiposScore["Referência Elogiosa"] ?? null;
-    if (name.startsWith("cpi")) return tiposScore[nomeCpiDoInciso(typeName, item)] ?? null;
-    return null;
-  };
-
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [arquivoErro, setArquivoErro] = useState("");
   const [arquivosDecisao, setArquivosDecisao] = useState<File[]>([]);
@@ -107,29 +85,18 @@ export default function AcoesComm({
   const fileDecisaoRef = useRef<HTMLInputElement>(null);
   const [decisaoTipo, setDecisaoTipo] = useState("");
   const [decisaoTexto, setDecisaoTexto] = useState("");
-  // Padrão da decisão = pontuação registrada (snapshot). A comunicação mantém o
-  // valor com que foi registrada mesmo que /tipos mude depois.
-  const [finalScoreDecisao, setFinalScoreDecisao] = useState<string>(() =>
-    comm.suggestedScore != null ? comm.suggestedScore.toFixed(1) : "",
-  );
   const [novoRuleId, setNovoRuleId] = useState<string>("");
-  const [mostraCorrecao, setMostraCorrecao] = useState(false);
-  const [novaPontuacao, setNovaPontuacao] = useState<string>("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [defState, defAction, defPending] = useActionState(tomarCienciaComDefesa, undefined);
   const [semDefState, semDefAction, semDefPending] = useActionState(tomarCienciaSemDefesa, undefined);
   const [adaptacaoState, adaptacaoAction, adaptacaoPending] = useActionState(tomarCienciaAdaptacao, undefined);
   const [decisaoState, decisaoAction, decisaoPending] = useActionState(proferirDecisao, undefined);
-  const [correcaoState, correcaoAction, correcaoPending] = useActionState(corrigirPontuacao, undefined);
 
   const canTakeAck = alunoEhEssePerfil && comm.status === "AGUARDANDO_CIENCIA";
   const canDecide =
     ["ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA"].includes(session.role) &&
     comm.status === "AGUARDANDO_DECISAO";
-  const canEditScore =
-    ["ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA"].includes(session.role) &&
-    comm.decisions.length > 0;
 
   const baseUrl = `/comunicacoes/${comm.id}`;
 
@@ -337,72 +304,6 @@ export default function AcoesComm({
         </div>
       )}
 
-      {/* ── CORREÇÃO DE PONTUAÇÃO (após decisão) ────────────── */}
-      {canEditScore && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="font-semibold text-yellow-900">Corrigir Pontuação Aplicada</h3>
-            <button
-              type="button"
-              onClick={() => {
-                if (!mostraCorrecao) {
-                  const dec = comm.decisions[0];
-                  setNovaPontuacao(dec.finalScore !== null ? dec.finalScore.toFixed(1) : "");
-                }
-                setMostraCorrecao(!mostraCorrecao);
-              }}
-              className="text-xs text-yellow-700 hover:text-yellow-900 underline"
-            >
-              {mostraCorrecao ? "Cancelar" : "Corrigir pontuação →"}
-            </button>
-          </div>
-          {!mostraCorrecao && (
-            <p className="text-xs text-gray-500">
-              Pontuação atual: <strong>{comm.decisions[0]?.finalScore != null ? `${comm.decisions[0].finalScore.toFixed(1)} pt` : "—"}</strong>
-            </p>
-          )}
-          {mostraCorrecao && (
-            <form action={correcaoAction} className="space-y-3 mt-3">
-              <input type="hidden" name="decisionId" value={comm.decisions[0].id} />
-              <input type="hidden" name="communicationId" value={comm.id} />
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nova pontuação</label>
-                <input
-                  name="novaScore"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  value={novaPontuacao}
-                  onChange={(e) => setNovaPontuacao(e.target.value)}
-                  className="input max-w-xs"
-                />
-                {(() => {
-                  const padrao = comm.suggestedScore;
-                  const atual = novaPontuacao !== "" ? Number(novaPontuacao) : null;
-                  if (padrao != null && atual !== null && Math.abs(atual - padrao) > 0.001) {
-                    return (
-                      <p className="text-xs text-red-600 mt-1 font-medium">
-                        ⚠ Pontuação diferente do padrão registrado ({padrao.toFixed(1)} pt)
-                      </p>
-                    );
-                  }
-                  return null;
-                })()}
-                <p className="text-xs text-gray-400 mt-1">
-                  A correção será refletida automaticamente no caderno disciplinar.
-                </p>
-              </div>
-              {correcaoState?.error && (
-                <p className="text-sm text-red-600">{correcaoState.error}</p>
-              )}
-              <button type="submit" disabled={correcaoPending} className="btn-primary">
-                {correcaoPending ? "Salvando..." : "Salvar Correção"}
-              </button>
-            </form>
-          )}
-        </div>
-      )}
-
       {/* ── DECISÃO (Comandante) ─────────────────────────────── */}
       {canDecide && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-5">
@@ -418,16 +319,7 @@ export default function AcoesComm({
                 required
                 className="input max-w-xs"
                 value={decisaoTipo}
-                onChange={(e) => {
-                  const tipo = e.target.value;
-                  setDecisaoTipo(tipo);
-                  setNovoRuleId("");
-                  if (tipo === "Arquivamento") {
-                    setFinalScoreDecisao("0");
-                  } else if (tipo !== "Reenquadrar artigo") {
-                    if (comm.suggestedScore != null) setFinalScoreDecisao(comm.suggestedScore.toFixed(1));
-                  }
-                }}
+                onChange={(e) => { setDecisaoTipo(e.target.value); setNovoRuleId(""); }}
               >
                 <option value="">Selecione</option>
                 {comm.typeName.toLowerCase().includes("elogiosa") ? (
@@ -455,17 +347,7 @@ export default function AcoesComm({
                   required
                   className="input"
                   value={novoRuleId}
-                  onChange={(e) => {
-                    const selectedId = e.target.value;
-                    setNovoRuleId(selectedId);
-                    if (selectedId) {
-                      const regra = manualRules.find((r) => r.id === selectedId);
-                      if (regra) {
-                        const newScore = pontuacaoPadrao(comm.typeName, regra.item);
-                        if (newScore !== null) setFinalScoreDecisao(newScore.toFixed(1));
-                      }
-                    }
-                  }}
+                  onChange={(e) => setNovoRuleId(e.target.value)}
                 >
                   <option value="">Selecione o artigo</option>
                   {manualRules.map((r) => (
@@ -512,54 +394,13 @@ export default function AcoesComm({
                 onChange={(e) => setDecisaoTexto(e.target.value)}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Pontuação final aplicada</label>
-              <input
-                name="finalScore"
-                type="number"
-                step="0.1"
-                min="0"
-                value={finalScoreDecisao}
-                onChange={(e) => setFinalScoreDecisao(e.target.value)}
-                className="input max-w-xs"
-              />
-              {(() => {
-                if (decisaoTipo === "Arquivamento") {
-                  const atual = finalScoreDecisao !== "" ? Number(finalScoreDecisao) : 0;
-                  if (atual !== 0) {
-                    return (
-                      <p className="text-xs text-red-600 mt-1 font-medium">
-                        ⚠ Pontuação diferente do padrão para arquivamento (0 pt)
-                      </p>
-                    );
-                  }
-                  return null;
-                }
-                const isReenq = decisaoTipo === "Reenquadrar artigo";
-                if (isReenq && !novoRuleId) return null;
-                const itemEfetivo = isReenq
-                  ? (manualRules.find((r) => r.id === novoRuleId)?.item ?? null)
-                  : comm.item;
-                // Original: compara com o que foi registrado (snapshot).
-                // Reenquadramento: compara com o padrão atual do novo enquadramento.
-                const padrao = isReenq ? pontuacaoPadrao(comm.typeName, itemEfetivo) : comm.suggestedScore;
-                const rotulo = isReenq ? nomeCpiDoInciso(comm.typeName, itemEfetivo) : "registrado";
-                const atual = finalScoreDecisao !== "" ? Number(finalScoreDecisao) : null;
-                if (padrao != null && atual !== null && Math.abs(atual - padrao) > 0.001) {
-                  return (
-                    <p className="text-xs text-red-600 mt-1 font-medium">
-                      ⚠ Pontuação diferente do padrão {rotulo} ({padrao.toFixed(1)} pt)
-                    </p>
-                  );
-                }
-                return null;
-              })()}
-              {decisaoTipo === "Arquivamento" && (
-                <p className="text-xs text-teal-700 mt-1 font-medium">
-                  Arquivamento não desconta nem acresce a nota de conduta.
-                </p>
-              )}
-            </div>
+            {/* Pontuação automática: vem do tipo (Tipos de Comunicação), com
+                metade no Art. 146, I. Arquivamento não pontua. */}
+            <p className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+              {decisaoTipo === "Arquivamento"
+                ? "Arquivamento não desconta nem acresce a nota de conduta."
+                : "A pontuação é automática, conforme o tipo da comunicação (ajustável em Tipos de Comunicação)."}
+            </p>
             {/* Anexo(s) da decisão */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
