@@ -63,6 +63,7 @@ const DEFAULT_OBSERVACOES = [
   "Os alunos de AACP estão proibidos de sair da APM em qualquer situação, inclusive durante o horário de almoço, salvo questões de urgência/emergência, com autorização do Oficial de Dia",
   "Intervalos extras para hidratação e alimentação poderão ser definidos pelo Oficial de Dia",
   "O Oficial de Dia poderá inverter a ordem das atividades bem como suprimi-las de acordo com a demanda e quantidade de alunos presentes no cumprimento da AACP",
+  "Os alunos escalados no serviço interno de guarda ou em instrução nos mesmos dias de cumprimento de AACP deverão seguir a seguinte determinação: a) CPI 1 e Guarda/Instrução no sábado: cumprirá AACP no domingo, das 07h às 12h; b) CPI 2 e Guarda/Instrução no sábado: cumprirá AACP no domingo, das 07h às 18h; c) CPI 3 e Guarda/Instrução no sábado: cumprirá AACP no domingo, das 07h às 18h, e o restante da carga conforme memorando publicado pela Escola; d) CPI 3 e Guarda/Instrução no domingo: cumprirá AACP normalmente no sábado, das 07h às 18h, e o restante da carga horária conforme memorando publicado pela Escola",
 ];
 
 const DEFAULT_DISPOSITIVOS = [

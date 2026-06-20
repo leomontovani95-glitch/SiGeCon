@@ -122,7 +122,7 @@ const GRUPOS: { label: string; short: string; note?: string; isTdTac?: boolean; 
   { label: "CPI 2",     short: "CPI 2", ...coresTipo("CPI 2"), filter: (i) => i.recordType === "CPI 2"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
   { label: "CPI 3",     short: "CPI 3", ...coresTipo("CPI 3"), filter: (i) => i.recordType === "CPI 3"                 && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
   { label: "Reenquadramentos",          short: "Reenq.", ...coresTipo("Reenquadramento"), filter: (i) => i.decisionSummary === "Reenquadrar artigo" },
-  { label: "TD / TAC — Transgressões Disciplinares e Termos de Ajuste de Conduta",
+  { label: "TD / TAC",
     short: "TD/TAC", isTdTac: true,       ...coresTipo("TD / TAC"), filter: (i) => TD_TAC_SET.has(i.recordType)             && i.decisionSummary !== "Reenquadrar artigo" && !isArquivadoPDF(i) },
   { label: "Referências Elogiosas",     short: "Ref. Elog.", ...coresTipo("Referência Elogiosa"), filter: (i) => i.recordType === "Referência Elogiosa"   && !isArquivadoPDF(i) },
   { label: "Elogios publicados em BI",  short: "Elogio BI", ...coresTipo("Elogio publicado em BI"), filter: (i) => i.recordType === "Elogio publicado em BI" && !isArquivadoPDF(i) },
@@ -349,9 +349,13 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
             {sec.label}
           </p>
           <div style={{ padding: "3px 8px" }}>
-            {sec.items.map((item) => (
-              <p key={item.id} style={{ margin: "1px 0", fontSize: "7.5pt", textAlign: "justify" }}>— {item.text}</p>
-            ))}
+            {sec.items.map((item, i) => {
+              const txt = item.text.trim();
+              const comPonto = txt.endsWith(".") ? txt : `${txt}.`;
+              return (
+                <p key={item.id} style={{ margin: "0 0 5px", fontSize: "7.5pt", textAlign: "justify" }}>{i + 1}. {comPonto}</p>
+              );
+            })}
           </div>
         </div>
       ))}
