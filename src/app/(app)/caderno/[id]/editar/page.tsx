@@ -125,7 +125,7 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
                 <tbody className="divide-y divide-gray-100">
                   {caderno.items.map((item, idx) => (
                     <tr key={item.id} className={idx % 2 === 0 ? "bg-white hover:bg-gray-50" : "bg-gray-50 hover:bg-gray-100"}>
-                      <td className="px-3 py-2.5 font-mono text-xs">
+                      <td className="px-3 py-2.5 font-mono text-xs whitespace-nowrap">
                         <Link href={`/comunicacoes/${item.communicationId}`} className="text-blue-700 hover:underline hover:text-blue-900">
                           {item.communication.protocolNumber}
                         </Link>
@@ -204,7 +204,7 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
                 <tbody className="divide-y divide-gray-100">
                   {pendentesDisponiveis.map((c) => (
                     <tr key={c.id} className="hover:bg-yellow-50">
-                      <td className="px-3 py-2 font-mono text-xs text-gray-500">{c.protocolNumber}</td>
+                      <td className="px-3 py-2 font-mono text-xs text-gray-500 whitespace-nowrap">{c.protocolNumber}</td>
                       <td className="px-3 py-2 font-medium text-gray-900">
                         <Link href={`/alunos/${c.student.id}`} className="hover:text-[#1e3a5f] hover:underline">{c.student.warName}</Link>
                       </td>

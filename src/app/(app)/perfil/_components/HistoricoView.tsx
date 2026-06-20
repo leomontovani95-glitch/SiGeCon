@@ -218,7 +218,7 @@ export default function HistoricoView({
             <tbody className="divide-y divide-gray-100">
               {commsVisiveis.map((c) => (
                 <tr key={c.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 font-mono text-xs text-gray-700">{c.protocolNumber}</td>
+                  <td className="px-3 py-2 font-mono text-xs text-gray-700 whitespace-nowrap">{c.protocolNumber}</td>
                   <td className="px-3 py-2 text-gray-700">{c.type.name}</td>
                   <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
                   <td className="px-3 py-2 text-gray-600 text-xs">

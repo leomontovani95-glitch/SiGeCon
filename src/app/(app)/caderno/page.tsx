@@ -210,7 +210,7 @@ export default async function CadernoPage({
               <tbody className="divide-y divide-gray-100">
                 {naoIncluidos.map((c) => (
                   <tr key={c.id} className="hover:bg-yellow-50">
-                    <td className="px-4 py-2.5 font-mono text-xs text-gray-500">{c.protocolNumber}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-gray-500 whitespace-nowrap">{c.protocolNumber}</td>
                     <td className="px-4 py-2.5 font-medium text-gray-900">
                       <Link href={`/alunos/${c.student.id}`} className="hover:text-[#1e3a5f] hover:underline">{c.student.warName}</Link>
                     </td>

@@ -131,6 +131,7 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
           defenseDeadline: calcularPrazoDefesa(new Date()),
         },
       }),
+      adaptationPeriod,
     );
     commId = comm.id;
     protocolNumber = comm.protocolNumber;
@@ -248,6 +249,7 @@ export async function registrarComunicacaoEmLote(_prev: LoteState, formData: For
             defenseDeadline: calcularPrazoDefesa(new Date()),
           },
         }),
+        adaptationPeriod,
       );
       if (testemunhas.length > 0) {
         await prisma.witness.createMany({

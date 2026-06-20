@@ -131,7 +131,7 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
           <tbody>
             {aluno.communications.map((c) => (
               <tr key={c.id}>
-                <td style={{ fontFamily: "monospace", fontSize: "8pt" }}>{c.protocolNumber}</td>
+                <td style={{ fontFamily: "monospace", fontSize: "8pt", whiteSpace: "nowrap" }}>{c.protocolNumber}</td>
                 <td>{c.type.name}</td>
                 <td>{format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
                 <td style={{ fontSize: "8pt" }}>

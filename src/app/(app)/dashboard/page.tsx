@@ -521,7 +521,7 @@ export default async function DashboardPage({
                   const diasVencido = Math.abs(differenceInCalendarDays(prazo, agora));
                   return (
                     <tr key={c.id} className="bg-red-50 hover:bg-red-100 transition-colors">
-                      <td className="px-4 py-2.5 font-mono text-xs text-gray-600">{c.protocolNumber}</td>
+                      <td className="px-4 py-2.5 font-mono text-xs text-gray-600 whitespace-nowrap">{c.protocolNumber}</td>
                       <td className="px-4 py-2.5 font-semibold text-gray-900">
                         <Link href={`/alunos/${c.student.id}`} className="hover:text-[#1e3a5f] hover:underline">{c.student.warName}</Link>
                       </td>

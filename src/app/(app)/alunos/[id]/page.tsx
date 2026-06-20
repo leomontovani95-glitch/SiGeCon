@@ -298,7 +298,7 @@ export default async function AlunoPage({
             {commsVisiveis.map((c) => (
               <tr key={c.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3">
-                  <Link href={`/comunicacoes/${c.id}`} className="font-mono text-xs text-[#1e3a5f] hover:underline">
+                  <Link href={`/comunicacoes/${c.id}`} className="font-mono text-xs text-[#1e3a5f] hover:underline whitespace-nowrap">
                     {c.protocolNumber}
                   </Link>
                 </td>

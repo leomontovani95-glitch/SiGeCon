@@ -154,7 +154,7 @@ export default async function RelatoriosImprimirPage({
               const desfav = c.type.scoreNature === "DESFAVORAVEL";
               return (
                 <tr key={c.id}>
-                  <td style={{ fontFamily: "monospace", fontSize: "8pt" }}>{c.protocolNumber}</td>
+                  <td style={{ fontFamily: "monospace", fontSize: "8pt", whiteSpace: "nowrap" }}>{c.protocolNumber}</td>
                   <td>{c.type.name}</td>
                   <td style={{ fontWeight: "bold" }}>{c.student.warName}</td>
                   <td>{c.student.course.name}</td>

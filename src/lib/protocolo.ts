@@ -16,11 +16,14 @@ const prefixos: Record<string, string> = {
   "TAC":      "TAC",
 };
 
-export async function gerarProtocolo(typeName: string, courseName: string): Promise<string> {
+export async function gerarProtocolo(typeName: string, courseName: string, adaptacao = false): Promise<string> {
   const prefixo = prefixos[typeName] ?? "COM";
-  // Formato: "CPI - 0001 - CFO 1"
+  // Formato normal: "CPI - 0001 - CFO 1".
+  // Período de adaptação: sufixo " (A)" e NUMERAÇÃO PRÓPRIA (independente das
+  // comunicações normais), pois o endsWith filtra só as de adaptação.
+  // Ex.: "CPI - 0001 - CFSd 2026 (A)".
   const base = `${prefixo} - `;
-  const sufixo = ` - ${courseName}`;
+  const sufixo = adaptacao ? ` - ${courseName} (A)` : ` - ${courseName}`;
 
   const ultimo = await prisma.communication.findFirst({
     where: { protocolNumber: { startsWith: base, endsWith: sufixo } },
@@ -47,10 +50,11 @@ export async function criarComProtocoloUnico<T>(
   typeName: string,
   courseName: string,
   criar: (protocolNumber: string) => Promise<T>,
+  adaptacao = false,
   tentativas = 5,
 ): Promise<T> {
   for (let t = 1; t <= tentativas; t++) {
-    const protocolNumber = await gerarProtocolo(typeName, courseName);
+    const protocolNumber = await gerarProtocolo(typeName, courseName, adaptacao);
     try {
       return await criar(protocolNumber);
     } catch (e) {
