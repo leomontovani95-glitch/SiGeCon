@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { verifyRole } from "@/lib/dal";
 import Link from "next/link";
+import ExcluirTipoBtn from "./_components/ExcluirTipoBtn";
 
 export default async function TiposPage() {
   await verifyRole("ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA", "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO");
@@ -10,7 +11,7 @@ export default async function TiposPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Tipos de Comunicação</h1>
-          <p className="text-sm text-gray-500">Configuração das pontuações (NPCE 2025)</p>
+          <p className="text-sm text-gray-500">Configuração das pontuações (NPCE)</p>
         </div>
         <Link href="/tipos/novo" className="bg-[#1e3a5f] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#16304f] transition-colors">+ Novo Tipo</Link>
       </div>
@@ -41,7 +42,10 @@ export default async function TiposPage() {
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <Link href={`/tipos/${t.id}/editar`} className="text-xs text-[#1e3a5f] hover:underline">Editar</Link>
+                  <div className="flex items-center gap-3">
+                    <Link href={`/tipos/${t.id}/editar`} className="text-xs text-[#1e3a5f] hover:underline">Editar</Link>
+                    <ExcluirTipoBtn id={t.id} />
+                  </div>
                 </td>
               </tr>
             ))}

@@ -10,23 +10,23 @@ type AlunoInfo = {
   rg: string; functionalNumber: string | null;
 };
 
-const TD_TIPOS = [
-  { value: "TD Leve",  label: "TD Leve — Transgressão Disciplinar Leve",  score: 1.0 },
-  { value: "TD Média", label: "TD Média — Transgressão Disciplinar Média", score: 2.0 },
-  { value: "TD Grave", label: "TD Grave — Transgressão Disciplinar Grave", score: 3.0 },
+// Pontuação de fallback caso o tipo não esteja cadastrado em Tipos de Comunicação.
+const TD_FALLBACK: Record<string, number> = { "TD Leve": 1.0, "TD Média": 2.0, "TD Grave": 3.0 };
+const TD_LABELS: { value: string; label: string }[] = [
+  { value: "TD Leve",  label: "TD Leve — Transgressão Disciplinar Leve" },
+  { value: "TD Média", label: "TD Média — Transgressão Disciplinar Média" },
+  { value: "TD Grave", label: "TD Grave — Transgressão Disciplinar Grave" },
 ];
 
 const BGPM_NUMS = Array.from({ length: 55 }, (_, i) => String(i + 1).padStart(3, "0"));
 
-function defaultScore(tipo: string) {
-  if (tipo === "TD Leve")  return 1.0;
-  if (tipo === "TD Média") return 2.0;
-  if (tipo === "TD Grave") return 3.0;
-  return 0;
-}
-
-export default function TransgressaoForm({ cursos }: { cursos: Curso[] }) {
+export default function TransgressaoForm({ cursos, tdScores }: { cursos: Curso[]; tdScores: Record<string, number> }) {
   const [state, formAction, pending] = useActionState(registrarTransgressao, undefined);
+
+  // Pontuação padrão de cada TD vem de Tipos de Comunicação (tdScores); usa o
+  // fallback apenas se o tipo não estiver cadastrado.
+  const defaultScore = (tipo: string) => tdScores[tipo] ?? TD_FALLBACK[tipo] ?? 0;
+  const TD_TIPOS = TD_LABELS.map((t) => ({ ...t, score: defaultScore(t.value) }));
 
   const [cursoId, setCursoId]         = useState("");
   const [numCurso, setNumCurso]       = useState("");

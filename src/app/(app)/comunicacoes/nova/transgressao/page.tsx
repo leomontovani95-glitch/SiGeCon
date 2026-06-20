@@ -5,11 +5,19 @@ import TransgressaoForm from "../../_components/TransgressaoForm";
 export default async function NovaTransgressaoPage() {
   const session = await verifyStaff();
   const school = getSchoolFilter(session.role, session.escola);
-  const cursos = await prisma.course.findMany({
-    where: { active: true, ...(school ? { school } : {}) },
-    orderBy: { name: "asc" },
-    select: { id: true, name: true },
-  });
+  const [cursos, tdTipos] = await Promise.all([
+    prisma.course.findMany({
+      where: { active: true, ...(school ? { school } : {}) },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    // Pontuação dos TD vem de Tipos de Comunicação (fonte única), não fixa no form.
+    prisma.communicationType.findMany({
+      where: { name: { in: ["TD Leve", "TD Média", "TD Grave"] } },
+      select: { name: true, score: true },
+    }),
+  ]);
+  const tdScores: Record<string, number> = Object.fromEntries(tdTipos.map((t) => [t.name, t.score]));
   return (
     <div className="p-6 max-w-3xl">
       <div className="mb-6">
@@ -18,7 +26,7 @@ export default async function NovaTransgressaoPage() {
           Registro de sanção disciplinar publicada em BGPM — o lançamento vai diretamente para o caderno rascunho do curso.
         </p>
       </div>
-      <TransgressaoForm cursos={cursos} />
+      <TransgressaoForm cursos={cursos} tdScores={tdScores} />
     </div>
   );
 }

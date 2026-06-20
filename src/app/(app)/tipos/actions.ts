@@ -7,6 +7,29 @@ import { logger } from "@/lib/logger";
 
 type State = { error: string } | undefined;
 
+const TIPO_ROLES = ["ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA", "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO"] as const;
+
+export async function excluirTipo(id: string, _prev: State, _formData: FormData): Promise<State> {
+  const session = await verifyRole(...TIPO_ROLES);
+  const tipo = await prisma.communicationType.findUnique({
+    where: { id },
+    select: { name: true, _count: { select: { communications: true } } },
+  });
+  if (!tipo) return { error: "Tipo não encontrado." };
+  // Não exclui tipo em uso: comunicações o referenciam (FK). Orienta a inativar.
+  if (tipo._count.communications > 0) {
+    return { error: `Não é possível excluir "${tipo.name}": há ${tipo._count.communications} comunicação(ões) usando este tipo. Para descontinuá-lo, edite e defina como inativo.` };
+  }
+  try {
+    await prisma.communicationType.delete({ where: { id } });
+    await auditLog(session.userId, "DELETE", "CommunicationType", id, tipo.name);
+  } catch (e) {
+    logger.error("tipos: excluir tipo", e);
+    return { error: "Não foi possível excluir o tipo." };
+  }
+  redirect("/tipos");
+}
+
 export async function salvarTipo(id: string | null, _prev: State, formData: FormData): Promise<State> {
   const session = await verifyRole("ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA", "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO");
   const name = String(formData.get("name") ?? "").trim();
