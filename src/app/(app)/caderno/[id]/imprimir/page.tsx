@@ -363,7 +363,7 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
 
       {/* Assinatura — função sempre preenchida; nome em branco se não houver
           titular ativo na função no momento da geração. */}
-      <div className="print-signatures" style={{ marginTop: 35 }}>
+      <div className="print-signatures" style={{ marginTop: 45 }}>
         <div className="print-sig-line" style={{ gridColumn: "1 / -1", maxWidth: 400, margin: "0 auto" }}>
           <p style={{ fontWeight: "bold" }}>{chefe ? `${chefe.rank} ${chefe.fullName}` : " "}</p>
           <p>Chefe da Divisão Acadêmica</p>
@@ -412,7 +412,7 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
 
   const extraStyles = `
     @media print {
-      @page { size: A4 portrait; margin: 6mm 5mm 14mm 5mm; }
+      @page { size: A4 portrait; margin: 6mm 5mm 6mm 5mm; }
       .print-page, .extra-page { padding: 2mm 3mm 4mm 3mm !important; }
     }
     .cd-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 7pt; table-layout: fixed; border: 1px solid #d1d5db; border-radius: 6px; }
@@ -505,7 +505,7 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
       )}
 
       {(comandante || schoolRole) && (
-        <div className="print-signatures" style={{ marginTop: 35 }}>
+        <div className="print-signatures" style={{ marginTop: 45 }}>
           <div className="print-sig-line" style={{ gridColumn: "1 / -1", maxWidth: 400, margin: "0 auto" }}>
             {/* Função sempre preenchida; nome em branco se não houver titular ativo. */}
             <p style={{ fontWeight: "bold" }}>{comandante ? `${comandante.rank} ${comandante.fullName}` : " "}</p>
