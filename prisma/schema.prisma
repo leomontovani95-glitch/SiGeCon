@@ -114,6 +114,10 @@ model ManualRule {
   theme                    String?
   defaultCommunicationType String?
   defaultScore             Float?
+  // Dispositivo enquadrado como CPI 1 que vale METADE da pontuação (50%).
+  // Configurável por dispositivo: ao mudar a legislação, basta marcar/desmarcar
+  // aqui sem alterar código. Padrão "Não" (false) na inclusão de novos artigos.
+  halfCpi1                 Boolean  @default(false)
   active                   Boolean  @default(true)
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
@@ -153,6 +157,13 @@ model Communication {
   letter         String?
   suggestedScore   Float?
   finalScore       Float?
+  // Snapshot, no registro/reenquadramento, de que o dispositivo vale 50% da
+  // CPI 1 (vem de ManualRule.halfCpi1). Mantido na comunicação para que a
+  // pontuação e a observação do caderno não mudem se a regra for editada depois.
+  halfCpi1         Boolean   @default(false)
+  // Observação livre do Comandante para a coluna "Observação" do caderno
+  // disciplinar — complementa as observações automáticas (não as substitui).
+  commanderObservation String?
   status           String    @default("REGISTRADA")
   defenseDeadline  DateTime?
   communicantName   String?

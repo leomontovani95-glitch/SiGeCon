@@ -143,7 +143,7 @@ async function main() {
   // ── Manual do Aluno ────────────────────────────────────────────────────────
   await prisma.manualRule.upsert({
     where: { id: "manual-146-i" },
-    update: {},
+    update: { halfCpi1: true },
     create: {
       id: "manual-146-i",
       article: "146",
@@ -152,6 +152,7 @@ async function main() {
       description: "Fardamento em desalinho",
       defaultCommunicationType: "CPI 1",
       defaultScore: 0.1,
+      halfCpi1: true,
       active: true,
     },
   });

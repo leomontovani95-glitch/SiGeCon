@@ -179,7 +179,7 @@ export default function AcoesComm({
         <div className="bg-green-50 border border-green-200 rounded-xl p-5">
           <h3 className="font-semibold text-green-900 mb-2">Ciência da Referência Elogiosa</h3>
           <p className="text-sm text-gray-600 mb-4">
-            Esta é uma Referência Elogiosa. Tome ciência para registrar o seu conhecimento e encaminhar ao Oficial da Escola.
+            Esta é uma Referência Elogiosa. Tome ciência para registrar o seu conhecimento e encaminhar para a homologação do Comandante da Escola.
           </p>
           <form action={semDefAction}>
             <input type="hidden" name="communicationId" value={comm.id} />
@@ -225,7 +225,7 @@ export default function AcoesComm({
           </div>
 
           <p className="text-xs text-gray-500 mt-3">
-            <strong>Atenção:</strong> em ambos os casos, a comunicação será encaminhada automaticamente ao Subcomandante ou Oficial da Escola para emissão de parecer.
+            <strong>Atenção:</strong> se apresentar defesa, ela será encaminhada ao Subcomandante ou Oficial da Escola para parecer. Se optar por apenas tomar ciência (sem defesa), a comunicação seguirá diretamente para a decisão do Comandante da Escola.
           </p>
         </div>
       )}
@@ -392,6 +392,20 @@ export default function AcoesComm({
                 className="input"
                 value={decisaoTexto}
                 onChange={(e) => setDecisaoTexto(e.target.value)}
+              />
+            </div>
+            {/* Observação livre do Comandante para a coluna "Observação" do
+                caderno disciplinar — complementa as observações automáticas. */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Observação para o caderno disciplinar{" "}
+                <span className="text-gray-400 font-normal">(opcional)</span>
+              </label>
+              <textarea
+                name="commanderObservation"
+                rows={2}
+                className="input"
+                placeholder="Texto curto que aparecerá na coluna Observação do caderno, além das observações automáticas."
               />
             </div>
             {/* Pontuação automática: vem do tipo (Tipos de Comunicação), com

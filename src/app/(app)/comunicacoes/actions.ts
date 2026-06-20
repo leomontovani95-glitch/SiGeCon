@@ -61,8 +61,8 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
   if (!aluno.course.active) return { error: "Curso inativo: não é possível registrar novas comunicações para alunos deste curso." };
 
   // Pontuação automática: vem do tipo (aba Tipos de Comunicação), com metade
-  // para o Art. 146, I. Não é mais informada manualmente no formulário.
-  const suggestedScore = pontuacaoAutomatica(tipo.score, regra.article, regra.item);
+  // para dispositivos marcados como "50% da CPI 1". Não é informada manualmente.
+  const suggestedScore = pontuacaoAutomatica(tipo.score, regra.halfCpi1);
 
   if (isAluno) {
     // Apenas CPI e Referência Elogiosa são permitidos para alunos
@@ -124,6 +124,7 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
           article: regra.article,
           item: regra.item,
           letter: regra.letter,
+          halfCpi1: regra.halfCpi1,
           suggestedScore, communicantName, communicantUserId,
           adaptationPeriod,
           status: "AGUARDANDO_CIENCIA",
@@ -211,7 +212,7 @@ export async function registrarComunicacaoEmLote(_prev: LoteState, formData: For
   if (!tipo) return { error: "Tipo de comunicação não encontrado." };
 
   // Pontuação automática (igual ao registro individual).
-  const suggestedScore = pontuacaoAutomatica(tipo.score, regra.article, regra.item);
+  const suggestedScore = pontuacaoAutomatica(tipo.score, regra.halfCpi1);
 
   const witnessRanks = formData.getAll("witnessRank") as string[];
   const witnessNames = formData.getAll("witnessName") as string[];
@@ -241,6 +242,7 @@ export async function registrarComunicacaoEmLote(_prev: LoteState, formData: For
             reporterId: session.userId, factDate: new Date(factDate + "T12:00:00"),
             factTime, factPlace, factDescription,
             manualRuleId, article: regra.article, item: regra.item, letter: regra.letter,
+            halfCpi1: regra.halfCpi1,
             suggestedScore, communicantName, communicantUserId, adaptationPeriod,
             status: "AGUARDANDO_CIENCIA",
             defenseDeadline: calcularPrazoDefesa(new Date()),
@@ -353,7 +355,7 @@ export async function tomarCienciaSemDefesa(_prev: State, formData: FormData): P
 
   const comm = await prisma.communication.findUnique({
     where: { id: communicationId },
-    include: { student: true },
+    include: { student: true, type: true },
   });
   if (!comm) return { error: "Comunicação não encontrada." };
   if (comm.student.userId !== session.userId)
@@ -361,16 +363,26 @@ export async function tomarCienciaSemDefesa(_prev: State, formData: FormData): P
   if (comm.status !== "AGUARDANDO_CIENCIA")
     return { error: "Esta comunicação não aguarda ciência." };
 
+  // Sem defesa (ou Referência Elogiosa, cuja única opção é tomar ciência): não há
+  // o que o Oficial avaliar em parecer, então a comunicação segue DIRETO para a
+  // decisão do Comandante da escola, registrando a mensagem padrão de ciência.
+  const ehElogiosa = comm.type.name.toLowerCase().includes("elogiosa");
+  const mensagemPadrao = ehElogiosa
+    ? "O aluno tomou ciência da Referência Elogiosa."
+    : "O aluno tomou ciência da comunicação e optou por não apresentar defesa.";
+
   try {
     await prisma.studentAcknowledgement.create({
-      data: { communicationId, studentId: comm.studentId, method: "SEM_DEFESA" },
+      data: { communicationId, studentId: comm.studentId, method: "SEM_DEFESA", notes: mensagemPadrao },
     });
     await prisma.communication.update({
       where: { id: communicationId },
-      data: { status: "AGUARDANDO_PARECER" },
+      data: { status: "AGUARDANDO_DECISAO" },
     });
     await auditLog(session.userId, "CIENCIA_SEM_DEFESA", "Communication", communicationId,
-      "Sem defesa — encaminhado ao Subcomandante/Oficial para parecer");
+      ehElogiosa
+        ? "Ciência da Referência Elogiosa — encaminhado ao Comandante para decisão"
+        : "Ciência sem defesa — encaminhado ao Comandante para decisão");
   } catch (e) {
     logger.error("tomarCienciaSemDefesa", e, { communicationId });
     return { error: "Erro ao registrar ciência. Tente novamente." };
@@ -538,13 +550,14 @@ export async function proferirDecisao(_prev: State, formData: FormData): Promise
   const communicationId = String(formData.get("communicationId") ?? "");
   const decisionType = String(formData.get("decisionType") ?? "");
   const text = String(formData.get("text") ?? "").trim();
+  const commanderObservation = String(formData.get("commanderObservation") ?? "").trim() || null;
   if (!text || !decisionType) return { error: "Informe decisão e fundamentação." };
 
   // Comunicação atual: enquadramento (para histórico de reenquadramento) e tipo
   // (para a pontuação automática).
   const commOriginal = await prisma.communication.findUnique({
     where: { id: communicationId },
-    select: { article: true, item: true, letter: true, status: true, type: { select: { score: true } }, course: { select: { school: true } } },
+    select: { article: true, item: true, letter: true, halfCpi1: true, status: true, type: { select: { score: true } }, course: { select: { school: true } } },
   });
   if (!commOriginal) return { error: "Comunicação não encontrada." };
   if (!escolaNoEscopo(session, commOriginal.course.school))
@@ -555,10 +568,11 @@ export async function proferirDecisao(_prev: State, formData: FormData): Promise
   const originalItem    = commOriginal?.item    ?? null;
   const originalLetter  = commOriginal?.letter  ?? null;
 
-  // Pontuação automática (módulo) conforme o tipo cadastrado, com metade no
-  // Art. 146, I. Arquivamento não pontua; reenquadramento usa o tipo do NOVO
-  // enquadramento. Não é mais informada manualmente na decisão.
-  const commUpdate: Record<string, unknown> = { status: "DECIDIDA" };
+  // Pontuação automática (módulo) conforme o tipo cadastrado, com metade nos
+  // dispositivos marcados como "50% da CPI 1". Arquivamento não pontua;
+  // reenquadramento usa o tipo e a flag do NOVO enquadramento. Não é informada
+  // manualmente na decisão.
+  const commUpdate: Record<string, unknown> = { status: "DECIDIDA", commanderObservation };
   let finalScore: number;
   if (decisionType === "Arquivamento") {
     finalScore = 0;
@@ -570,14 +584,15 @@ export async function proferirDecisao(_prev: State, formData: FormData): Promise
     const novoTipo = regra.defaultCommunicationType
       ? await prisma.communicationType.findFirst({ where: { name: regra.defaultCommunicationType }, select: { score: true } })
       : null;
-    finalScore = pontuacaoAutomatica(novoTipo?.score ?? commOriginal.type.score, regra.article, regra.item);
+    finalScore = pontuacaoAutomatica(novoTipo?.score ?? commOriginal.type.score, regra.halfCpi1);
     commUpdate.manualRuleId = regra.id;
     commUpdate.article = regra.article;
     commUpdate.item = regra.item ?? null;
     commUpdate.letter = regra.letter ?? null;
+    commUpdate.halfCpi1 = regra.halfCpi1;
   } else {
     // Punição / Homologação: pontuação do próprio enquadramento atual.
-    finalScore = pontuacaoAutomatica(commOriginal.type.score, commOriginal.article, commOriginal.item);
+    finalScore = pontuacaoAutomatica(commOriginal.type.score, commOriginal.halfCpi1);
   }
   commUpdate.finalScore = finalScore;
 
@@ -662,13 +677,14 @@ export async function alterarDecisao(_prev: State, formData: FormData): Promise<
   const communicationId = String(formData.get("communicationId") ?? "").trim();
   const decisionType    = String(formData.get("decisionType") ?? "").trim();
   const text            = String(formData.get("text") ?? "").trim();
+  const commanderObservation = String(formData.get("commanderObservation") ?? "").trim() || null;
   if (!communicationId) return { error: "Dados inválidos." };
   if (!decisionType)    return { error: "Selecione o tipo de decisão." };
   if (!text)            return { error: "Informe a fundamentação da decisão." };
 
   const comm = await prisma.communication.findUnique({
     where: { id: communicationId },
-    select: { status: true, article: true, item: true, letter: true, type: { select: { score: true } }, course: { select: { school: true } } },
+    select: { status: true, article: true, item: true, letter: true, halfCpi1: true, type: { select: { score: true } }, course: { select: { school: true } } },
   });
   if (!comm) return { error: "Comunicação não encontrada." };
   if (!escolaNoEscopo(session, comm.course.school))
@@ -679,7 +695,7 @@ export async function alterarDecisao(_prev: State, formData: FormData): Promise<
   // Enquadramento atual (vira o "original" em caso de reenquadramento).
   const curArticle = comm.article, curItem = comm.item, curLetter = comm.letter;
 
-  const commUpdate: Record<string, unknown> = {};
+  const commUpdate: Record<string, unknown> = { commanderObservation };
   const itemUpdate: Record<string, unknown> = { decisionSummary: decisionType };
   let finalScore: number;
 
@@ -694,14 +710,15 @@ export async function alterarDecisao(_prev: State, formData: FormData): Promise<
     const novoTipo = regra.defaultCommunicationType
       ? await prisma.communicationType.findFirst({ where: { name: regra.defaultCommunicationType }, select: { score: true } })
       : null;
-    finalScore = pontuacaoAutomatica(novoTipo?.score ?? comm.type.score, regra.article, regra.item);
+    finalScore = pontuacaoAutomatica(novoTipo?.score ?? comm.type.score, regra.halfCpi1);
     commUpdate.manualRuleId = regra.id;
     commUpdate.article = regra.article;
     commUpdate.item = regra.item ?? null;
     commUpdate.letter = regra.letter ?? null;
+    commUpdate.halfCpi1 = regra.halfCpi1;
     itemUpdate.originalArticle = curArticle; itemUpdate.originalItem = curItem; itemUpdate.originalLetter = curLetter;
   } else {
-    finalScore = pontuacaoAutomatica(comm.type.score, comm.article, comm.item);
+    finalScore = pontuacaoAutomatica(comm.type.score, comm.halfCpi1);
     itemUpdate.originalArticle = null; itemUpdate.originalItem = null; itemUpdate.originalLetter = null;
   }
   commUpdate.finalScore = finalScore;

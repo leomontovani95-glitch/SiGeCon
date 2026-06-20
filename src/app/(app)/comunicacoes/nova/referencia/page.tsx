@@ -39,8 +39,10 @@ export default async function NovaReferenciaPage() {
       where: { active: true, name: { in: ["Referência Elogiosa"] } },
     }),
     prisma.manualRule.findMany({
-      where: { active: true, article: "170", defaultCommunicationType: "Referência Elogiosa" },
-      orderBy: [{ item: "asc" }],
+      // Dispositivos cujo tipo é Referência Elogiosa — independe do número do
+      // artigo (não fica preso ao 170).
+      where: { active: true, defaultCommunicationType: "Referência Elogiosa" },
+      orderBy: [{ article: "asc" }, { item: "asc" }],
     }),
     prisma.course.findMany({
       where: {

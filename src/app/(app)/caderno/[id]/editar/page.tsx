@@ -142,11 +142,19 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
                       </td>
                       <td className="px-3 py-2.5 text-xs text-gray-600 whitespace-nowrap">{item.decisionSummary}</td>
                       <td className="px-3 py-2.5 text-right font-bold text-xs">
-                        {item.score != null ? (
-                          <span className={item.score > 0 ? "text-red-600" : item.score < 0 ? "text-green-600" : "text-gray-500"}>
-                            {item.score > 0 ? "−" : item.score < 0 ? "+" : ""}{Math.abs(item.score).toFixed(1)}
-                          </span>
-                        ) : "—"}
+                        {item.score == null ? "—" : item.score === 0 ? (
+                          <span className="text-gray-500">0.0</span>
+                        ) : (() => {
+                          // Favorável/desfavorável vem do TIPO do registro — não do
+                          // sinal do score (que é sempre gravado como magnitude positiva).
+                          // Só desfavoráveis com sanção descontam (−); elogios somam (+).
+                          const fav = ["Referência Elogiosa", "Elogio publicado em BI"].includes(item.recordType);
+                          return (
+                            <span className={fav ? "text-green-600" : "text-red-600"}>
+                              {fav ? "+" : "−"}{Math.abs(item.score).toFixed(1)}
+                            </span>
+                          );
+                        })()}
                       </td>
                       {canPublish && (
                         <td className="px-3 py-2.5 text-xs">

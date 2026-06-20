@@ -250,6 +250,24 @@ export async function ascenderAluno(studentId: string, _prev: State, formData: F
     return { error: "Sem permissão para mover alunos de outra escola." };
   }
 
+  // A ascensão reinicia a nota (nova matrícula). Por isso, todas as comunicações
+  // EM NOME do aluno (como comunicado) devem estar publicadas em caderno antes da
+  // mudança — senão ficariam "presas" na matrícula antiga, fora do trâmite. O
+  // filtro por studentId já exclui aquelas em que ele é apenas COMUNICANTE (essas
+  // têm o studentId de outro aluno e seguem normalmente). Não vale p/ remanescente.
+  const pendentes = await prisma.communication.findMany({
+    where: { studentId, status: { not: "PUBLICADA_CADERNO" } },
+    select: { protocolNumber: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (pendentes.length > 0) {
+    const lista = pendentes.slice(0, 5).map((c) => c.protocolNumber).join(", ");
+    const extra = pendentes.length > 5 ? ` e mais ${pendentes.length - 5}` : "";
+    return {
+      error: `Ainda há ${pendentes.length} comunicação(ões) pendente(s) em nome do aluno que não foram publicadas em caderno (${lista}${extra}). É preciso tramitá-las e publicá-las antes que o aluno possa mudar de curso. Observação: comunicações em que o aluno é apenas comunicante não impedem a ascensão.`,
+    };
+  }
+
   const destino = await prisma.course.findUnique({ where: { id: destinoCourseId } });
   if (!destino) return { error: "Curso de destino não encontrado." };
   if (!destino.active) return { error: "O curso de destino está inativo." };

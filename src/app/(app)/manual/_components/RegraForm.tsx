@@ -26,13 +26,33 @@ export default function RegraForm({ defaultValues, id }: Props) {
 
   const [tipo, setTipo] = useState(defaultValues?.defaultCommunicationType ?? "");
   const [score, setScore] = useState(defaultValues?.defaultScore ?? "");
+  // "50% da pont. da CPI 1": padrão Não. Quando Sim, o dispositivo é tratado
+  // como CPI 1 valendo metade da pontuação (na CPI e na observação do caderno).
+  const [metade, setMetade] = useState(defaultValues?.halfCpi1 === "true");
 
-  // Ao escolher o tipo, pré-preenche a pontuação com o valor padrão dele —
-  // mas o campo continua editável (ex.: Art. 146, I, a/b → 0,1, metade da CPI 1).
+  // Pontuação efetiva exibida para um tipo, considerando o "50% da CPI 1".
+  function pontuacaoPara(t: string, ehMetade: boolean): string {
+    if (!(t in TIPO_SCORE)) return "";
+    const base = TIPO_SCORE[t];
+    const val = ehMetade ? base / 2 : base;
+    return String(Math.round(val * 100) / 100);
+  }
+
+  // Ao escolher o tipo, pré-preenche a pontuação com o valor padrão dele
+  // (metade se "50% da CPI 1" = Sim) — mas o campo continua editável.
   function onTipoChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const t = e.target.value;
     setTipo(t);
-    if (t in TIPO_SCORE) setScore(String(TIPO_SCORE[t]));
+    const p = pontuacaoPara(t, metade);
+    if (p !== "") setScore(p);
+  }
+
+  // Ao alternar o "50% da CPI 1", reflete na pontuação exibida (se houver tipo).
+  function onMetadeChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const novo = e.target.value === "true";
+    setMetade(novo);
+    const p = pontuacaoPara(tipo, novo);
+    if (p !== "") setScore(p);
   }
 
   return (
@@ -61,11 +81,16 @@ export default function RegraForm({ defaultValues, id }: Props) {
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de comunicação sugerido</label>
-          <select name="defaultCommunicationType" value={tipo} onChange={onTipoChange} className="input">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Tipo de comunicação sugerido <span className="text-red-500">*</span>
+          </label>
+          <select name="defaultCommunicationType" value={tipo} onChange={onTipoChange} required className="input">
             <option value="">Selecione</option>
             {TIPOS.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
+          <p className="text-xs text-gray-500 mt-1">
+            Obrigatório — define em qual tela o dispositivo aparece (CPI, Referência, etc.) e a pontuação automática.
+          </p>
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Pontuação do dispositivo</label>
@@ -83,6 +108,18 @@ export default function RegraForm({ defaultValues, id }: Props) {
             Pré-preenchida pelo tipo; ajuste para um artigo específico se a legislação exigir (ex.: Art. 146, I, a/b → 0,1).
           </p>
         </div>
+      </div>
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">50% da pont. da CPI 1</label>
+        <select name="halfCpi1" value={metade ? "true" : "false"} onChange={onMetadeChange} className="input max-w-xs">
+          <option value="false">Não</option>
+          <option value="true">Sim</option>
+        </select>
+        <p className="text-xs text-gray-500 mt-1">
+          {metade
+            ? "Sim — o dispositivo é uma CPI 1, mas vale 50% da pontuação. O aviso de CPI 1 continua aparecendo na confecção da CPI e a observação “50% da pont. de CPI 1” é incluída no caderno disciplinar."
+            : "Não (padrão) — a pontuação segue o tipo de comunicação cadastrado. Use “Sim” para artigos que valem metade da CPI 1 (ex.: Art. 146, I, a/b)."}
+        </p>
       </div>
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Situação</label>

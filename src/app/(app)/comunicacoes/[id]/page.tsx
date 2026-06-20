@@ -405,6 +405,11 @@ export default async function ComunicacaoPage({
               </p>
             </div>
           ))}
+          {comm.commanderObservation && (
+            <p className="text-sm text-gray-700 mt-3 pt-3 border-t border-green-200">
+              <span className="font-medium">Observação para o caderno:</span> {comm.commanderObservation}
+            </p>
+          )}
           {/* Alterar decisão: só Comandante de Escola (+ Admin), na escola do
               caderno, e enquanto o caderno não foi publicado (status DECIDIDA). */}
           {canChangeBookDecision(session.role, session.additionalRoles) &&
@@ -418,6 +423,7 @@ export default async function ComunicacaoPage({
                   isElogiosa={comm.type.name.toLowerCase().includes("elogiosa")}
                   currentDecision={comm.decisions[0]?.decisionType ?? ""}
                   currentText={comm.decisions[0]?.text ?? ""}
+                  currentObservation={comm.commanderObservation ?? ""}
                   manualRules={manualRules.map((r) => ({
                     id: r.id,
                     article: r.article,

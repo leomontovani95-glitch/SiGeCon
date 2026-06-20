@@ -3,7 +3,7 @@ import { verifySession } from "@/lib/dal";
 import { usuarioAtivoNaFuncao } from "@/lib/signatarios";
 import { platoonOrder, abreviarPelotao, escolaHeaderLabel, formatCadernoNumero } from "@/lib/utils";
 import { coresTipo } from "@/lib/coresComunicacao";
-import { ehCpi1Metade, OBS_CPI1_METADE } from "@/lib/pontuacao";
+import { OBS_CPI1_METADE } from "@/lib/pontuacao";
 import { nomeExtensoCurso } from "@/lib/cursos";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
@@ -22,7 +22,7 @@ async function fetchCaderno(id: string) {
       items: {
         include: {
           student: { include: { course: true, platoon: true } },
-          communication: { select: { protocolNumber: true, article: true, item: true, letter: true, bgpmNumber: true, bgpmYear: true, adaptationPeriod: true } },
+          communication: { select: { protocolNumber: true, article: true, item: true, letter: true, bgpmNumber: true, bgpmYear: true, adaptationPeriod: true, halfCpi1: true, commanderObservation: true } },
         },
       },
       aacp: {
@@ -83,21 +83,28 @@ function normalizarPeriodo(p: string): string {
 }
 
 function obsCell(item: Item): string {
-  if (item.communication.adaptationPeriod) return "Período de Adaptação";
-  if (item.decisionSummary === "Reenquadrar artigo") {
-    return fmtOrigEnq(item.originalArticle ?? null, item.originalItem ?? null, item.originalLetter ?? null);
+  // Observação automática (conforme o tipo/decisão), montada primeiro.
+  let auto: string | null;
+  if (item.communication.adaptationPeriod) {
+    auto = "Período de Adaptação";
+  } else if (item.decisionSummary === "Reenquadrar artigo") {
+    auto = fmtOrigEnq(item.originalArticle ?? null, item.originalItem ?? null, item.originalLetter ?? null);
+  } else {
+    const TD_TAC = new Set(["TD Leve", "TD Média", "TD Grave", "TAC", "Elogio publicado em BI"]);
+    if (TD_TAC.has(item.recordType)) {
+      auto = fmtBGPM(item.communication.bgpmNumber, item.communication.bgpmYear) ?? item.shortObservation ?? null;
+    } else if (item.recordType === "CPI 1" && item.communication.halfCpi1) {
+      // Dispositivo CPI 1 que vale 50% da pontuação: sinaliza na Observação.
+      auto = item.shortObservation ?? OBS_CPI1_METADE;
+    } else {
+      auto = item.shortObservation ?? null;
+    }
   }
-  const TD_TAC = new Set(["TD Leve", "TD Média", "TD Grave", "TAC", "Elogio publicado em BI"]);
-  if (TD_TAC.has(item.recordType)) {
-    return fmtBGPM(item.communication.bgpmNumber, item.communication.bgpmYear) ?? item.shortObservation ?? "—";
-  }
-  // CPI 1 do Art. 146, I (a/b): vale 50% da pontuação de CPI 1 (0,1 em vez de
-  // 0,2). Sinaliza na Observação quando houve sanção (não arquivado/reenquadrado,
-  // já tratados acima).
-  if (item.recordType === "CPI 1" && ehCpi1Metade(item.communication.article, item.communication.item)) {
-    return item.shortObservation ?? OBS_CPI1_METADE;
-  }
-  return item.shortObservation ?? "—";
+
+  // Observação livre do Comandante: complementa a automática (não a substitui).
+  const manual = item.communication.commanderObservation?.trim() || null;
+  const partes = [auto, manual].filter(Boolean) as string[];
+  return partes.length ? partes.join(" — ") : "—";
 }
 
 // Definição dos grupos na ordem de exibição

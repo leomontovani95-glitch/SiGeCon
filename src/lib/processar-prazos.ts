@@ -4,7 +4,7 @@ import { comTransacaoRetry, adicionarAoCaderno } from "@/lib/caderno";
 
 const NOTA_AUTO =
   "Prazo de 2 dias úteis encerrado sem que o aluno tomasse ciência ou apresentasse defesa. " +
-  "Comunicação encaminhada automaticamente ao Subcomandante/Oficial da Escola para emissão de parecer.";
+  "Comunicação encaminhada automaticamente ao Comandante da Escola para decisão.";
 
 const NOTA_AUTO_ADAPTACAO =
   "Prazo de 2 dias úteis encerrado sem que o aluno tomasse ciência. " +
@@ -66,11 +66,12 @@ export async function processarPrazosExpirados(): Promise<number> {
         return true;
       });
     } else {
-      // Fluxo normal: encaminha para parecer
+      // Sem resposta no prazo: como não há defesa a analisar, segue direto para
+      // a decisão do Comandante da Escola (mesma lógica da ciência sem defesa).
       processou = await comTransacaoRetry(async (tx) => {
         const claim = await tx.communication.updateMany({
           where: { id: comm.id, status: "AGUARDANDO_CIENCIA" },
-          data: { status: "AGUARDANDO_PARECER" },
+          data: { status: "AGUARDANDO_DECISAO" },
         });
         if (claim.count === 0) return false;
 

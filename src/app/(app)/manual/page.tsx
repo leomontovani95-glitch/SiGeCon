@@ -29,6 +29,7 @@ export default async function ManualPage() {
               <th className="text-left px-4 py-3 font-medium text-gray-700">Tema</th>
               <th className="text-left px-4 py-3 font-medium text-gray-700">Descrição da Conduta</th>
               <th className="text-left px-4 py-3 font-medium text-gray-700">Tipo</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-700">50% CPI 1</th>
               <th className="text-left px-4 py-3 font-medium text-gray-700">Ativo</th>
               <th className="text-left px-4 py-3 font-medium text-gray-700">Ações</th>
             </tr>
@@ -42,6 +43,11 @@ export default async function ManualPage() {
                 <td className="px-4 py-3 text-xs text-gray-500 max-w-[160px] truncate">{r.theme ?? "—"}</td>
                 <td className="px-4 py-3 text-gray-700 max-w-xs truncate">{r.description}</td>
                 <td className="px-4 py-3 text-gray-600">{r.defaultCommunicationType ?? "—"}</td>
+                <td className="px-4 py-3">
+                  {r.halfCpi1
+                    ? <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Sim</span>
+                    : <span className="text-xs text-gray-400">Não</span>}
+                </td>
                 <td className="px-4 py-3">
                   <span className={`text-xs px-2 py-0.5 rounded-full ${r.active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
                     {r.active ? "Sim" : "Não"}

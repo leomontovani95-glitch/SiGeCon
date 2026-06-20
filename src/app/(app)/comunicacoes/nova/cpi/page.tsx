@@ -40,9 +40,12 @@ export default async function NovaCPIPage() {
       orderBy: { name: "asc" },
     }),
     prisma.manualRule.findMany({
+      // Dispositivos cujo tipo sugerido é uma CPI — independe do número do
+      // artigo (assim, artigos fora da faixa antiga, ex.: 141 ou 155, aparecem
+      // automaticamente ao serem cadastrados como CPI 1/2/3).
       where: {
         active: true,
-        article: { in: ["142","143","144","145","146","147","148","149","150","151","152","153","154"] },
+        defaultCommunicationType: { in: ["CPI 1", "CPI 2", "CPI 3"] },
       },
       orderBy: [{ article: "asc" }, { item: "asc" }, { letter: "asc" }],
     }),

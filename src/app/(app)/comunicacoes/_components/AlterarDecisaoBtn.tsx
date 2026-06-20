@@ -11,12 +11,13 @@ type Props = {
   isElogiosa: boolean;
   currentDecision: string;
   currentText: string;
+  currentObservation: string;
   manualRules: ManualRule[];
 };
 
 export default function AlterarDecisaoBtn({
   communicationId, protocolo, recordType, isElogiosa,
-  currentDecision, currentText, manualRules,
+  currentDecision, currentText, currentObservation, manualRules,
 }: Props) {
   const [aberto, setAberto] = useState(false);
   const [state, formAction, pending] = useActionState(alterarDecisao, undefined);
@@ -91,6 +92,19 @@ export default function AlterarDecisaoBtn({
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Fundamentação <span className="text-red-500">*</span></label>
             <textarea name="text" required rows={4} defaultValue={currentText} className="input" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Observação para o caderno disciplinar <span className="text-gray-400 font-normal">(opcional)</span>
+            </label>
+            <textarea
+              name="commanderObservation"
+              rows={2}
+              defaultValue={currentObservation}
+              placeholder="Aparece na coluna Observação do caderno, além das observações automáticas."
+              className="input"
+            />
           </div>
 
           <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">

@@ -14,9 +14,11 @@ export async function salvarRegra(id: string | null, _prev: State, formData: For
   const letter = String(formData.get("letter") ?? "").trim() || null;
   const description = String(formData.get("description") ?? "").trim();
   const defaultCommunicationType = String(formData.get("defaultCommunicationType") ?? "").trim() || null;
+  const halfCpi1 = formData.get("halfCpi1") === "true";
   const active = formData.get("active") === "true";
 
   if (!article || !description) return { error: "Artigo e descrição são obrigatórios." };
+  if (!defaultCommunicationType) return { error: "Selecione o tipo de comunicação sugerido." };
 
   // Pontuação do dispositivo (editável, pré-preenchida pelo tipo no formulário).
   const rawScore = String(formData.get("defaultScore") ?? "").trim();
@@ -24,7 +26,7 @@ export async function salvarRegra(id: string | null, _prev: State, formData: For
   if (defaultScore !== null && !Number.isFinite(defaultScore)) return { error: "Pontuação inválida." };
 
   const theme = String(formData.get("theme") ?? "").trim() || null;
-  const data = { article, item, letter, description, theme, defaultCommunicationType, defaultScore, active };
+  const data = { article, item, letter, description, theme, defaultCommunicationType, defaultScore, halfCpi1, active };
   try {
     if (id) {
       await prisma.manualRule.update({ where: { id }, data });

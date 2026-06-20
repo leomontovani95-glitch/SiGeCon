@@ -10,7 +10,7 @@ export default async function EditarRegraPage({ params }: { params: Promise<{ id
   return (
     <div className="p-6 max-w-2xl">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Editar Dispositivo</h1>
-      <RegraForm id={regra.id} defaultValues={{ article: regra.article, item: regra.item ?? "", letter: regra.letter ?? "", description: regra.description, theme: regra.theme ?? "", defaultCommunicationType: regra.defaultCommunicationType ?? "", defaultScore: regra.defaultScore != null ? String(regra.defaultScore) : "", active: String(regra.active) }} />
+      <RegraForm id={regra.id} defaultValues={{ article: regra.article, item: regra.item ?? "", letter: regra.letter ?? "", description: regra.description, theme: regra.theme ?? "", defaultCommunicationType: regra.defaultCommunicationType ?? "", defaultScore: regra.defaultScore != null ? String(regra.defaultScore) : "", halfCpi1: String(regra.halfCpi1), active: String(regra.active) }} />
     </div>
   );
 }

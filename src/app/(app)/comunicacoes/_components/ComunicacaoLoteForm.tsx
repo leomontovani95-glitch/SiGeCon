@@ -3,7 +3,6 @@ import { useActionState, useState, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { registrarComunicacaoEmLote, type LoteState } from "../actions";
 import { dataLocalISO } from "@/lib/utils";
-import { ehCpi1Metade } from "@/lib/pontuacao";
 import ResultadosPessoa from "./ResultadosPessoa";
 
 const POSTOS = [
@@ -18,6 +17,7 @@ type Regra = {
   id: string; article: string; item: string | null; letter: string | null;
   description: string; theme: string | null;
   defaultCommunicationType: string | null; defaultScore: number | null;
+  halfCpi1: boolean;
 };
 type AlunoInfo = {
   id: string; warName: string; fullName: string;
@@ -450,10 +450,11 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
               <option value="">{ruleId ? "Selecione" : "Selecione o dispositivo legal primeiro"}</option>
               {tiposCPI.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.score.toFixed(1)} pt)</option>)}
             </select>
-            {/* Pontuação automática (derivada do tipo); Art. 146, I vale metade. */}
-            {regraAtual && ehCpi1Metade(regraAtual.article, regraAtual.item) && (
+            {/* Pontuação automática (derivada do tipo); dispositivos marcados
+                como "50% da CPI 1" valem metade. */}
+            {regraAtual && regraAtual.halfCpi1 && (
               <p className="text-xs text-amber-700 mt-1 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                ⚠ Art. 146, I — embora seja <strong>CPI 1</strong>, esta conduta vale <strong>50%</strong> da
+                ⚠ Embora seja <strong>CPI 1</strong>, este dispositivo vale <strong>50%</strong> da
                 pontuação (metade da CPI 1).
               </p>
             )}

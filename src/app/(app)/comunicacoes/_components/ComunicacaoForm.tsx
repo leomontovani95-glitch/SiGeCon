@@ -10,7 +10,6 @@ const POSTOS = [
 ];
 import { registrarComunicacao } from "../actions";
 import { dataLocalISO } from "@/lib/utils";
-import { ehCpi1Metade } from "@/lib/pontuacao";
 import ResultadosPessoa from "./ResultadosPessoa";
 
 type Tipo  = { id: string; name: string; score: number };
@@ -18,6 +17,7 @@ type Regra = {
   id: string; article: string; item: string | null; letter: string | null;
   description: string; theme: string | null;
   defaultCommunicationType: string | null; defaultScore: number | null;
+  halfCpi1: boolean;
 };
 type AlunoInfo = {
   id: string; warName: string; fullName: string;
@@ -601,10 +601,10 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
             ))}
           </select>
           {/* A pontuação é automática (vem do tipo, ajustável em Tipos de
-              Comunicação). O Art. 146, I vale metade. */}
-          {regraAtual && ehCpi1Metade(regraAtual.article, regraAtual.item) && (
+              Comunicação). Dispositivos marcados como "50% da CPI 1" valem metade. */}
+          {regraAtual && regraAtual.halfCpi1 && (
             <p className="text-xs text-amber-700 mt-1 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-              ⚠ Art. 146, I — embora seja <strong>CPI 1</strong>, esta conduta vale <strong>50%</strong> da
+              ⚠ Embora seja <strong>CPI 1</strong>, este dispositivo vale <strong>50%</strong> da
               pontuação (metade da CPI 1).
             </p>
           )}
