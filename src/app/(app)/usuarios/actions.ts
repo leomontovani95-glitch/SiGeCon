@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { verifyRole, canManageUserRole, USER_MANAGERS, getSchoolFilter } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
 import { logger } from "@/lib/logger";
+import { maskRG } from "@/lib/utils";
 
 type State = { error: string } | undefined;
 
@@ -18,7 +19,9 @@ export async function salvarUsuario(id: string | null, _prev: State, formData: F
   const fullName         = String(formData.get("fullName")         ?? "").trim();
   const warName          = String(formData.get("warName")          ?? "").trim();
   const rank             = String(formData.get("rank")             ?? "").trim();
-  const rg               = String(formData.get("rg")              ?? "").trim();
+  // Padrão XX.XXX-X só nos cadastros novos; edição preserva o RG já salvo.
+  const rgInput          = String(formData.get("rg")              ?? "").trim();
+  const rg               = id === null ? maskRG(rgInput) : rgInput;
   const escola           = String(formData.get("escola")           ?? "TODAS").trim();
   const functionalNumber = String(formData.get("functionalNumber") ?? "").trim();
   const password         = String(formData.get("password")         ?? "");

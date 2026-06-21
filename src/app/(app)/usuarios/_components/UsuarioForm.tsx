@@ -2,6 +2,7 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import { salvarUsuario } from "../actions";
+import { maskRG } from "@/lib/utils";
 
 // Posto padrão sugerido por função (pode ser alterado manualmente)
 const ROLE_DEFAULT_RANK: Record<string, string> = {
@@ -43,6 +44,9 @@ export default function UsuarioForm({ defaultValues, additionalRolesDefault = []
   const [state, formAction, pending] = useActionState(action, undefined);
 
   const [rank, setRank] = useState(defaultValues?.rank ?? "");
+  // Em edição mostra o RG como está salvo (preserva os cadastros atuais); ao
+  // digitar, a máscara formata. Em cadastro novo, começa vazio e já formata.
+  const [rg, setRg] = useState(defaultValues?.rg ?? "");
 
   function handleRoleChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const suggestion = ROLE_DEFAULT_RANK[e.target.value];
@@ -87,7 +91,15 @@ export default function UsuarioForm({ defaultValues, additionalRolesDefault = []
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">RG *</label>
-          <input name="rg" defaultValue={defaultValues?.rg} required className="input" />
+          <input
+            name="rg"
+            value={rg}
+            onChange={(e) => setRg(maskRG(e.target.value))}
+            inputMode="numeric"
+            placeholder="XX.XXX-X"
+            required
+            className="input"
+          />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Número Funcional *</label>

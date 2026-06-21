@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { verifyStaff, verifyRole, VIEWERS_APM, getSchoolFilter } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
 import { logger } from "@/lib/logger";
-import { formatCourseNumber } from "@/lib/utils";
+import { formatCourseNumber, maskRG } from "@/lib/utils";
 
 type State = { error: string } | undefined;
 
@@ -45,7 +45,9 @@ export async function salvarAluno(id: string | null, _prev: State, formData: For
   // Padroniza para dois dígitos: "1" -> "01", "10" -> "10".
   const courseNumberRaw  = String(formData.get("courseNumber") ?? "").trim();
   const courseNumber     = courseNumberRaw ? formatCourseNumber(courseNumberRaw) : "";
-  const rg               = String(formData.get("rg") ?? "").trim();
+  // Padrão XX.XXX-X só nos cadastros novos; edição preserva o RG já salvo.
+  const rgInput          = String(formData.get("rg") ?? "").trim();
+  const rg               = id === null ? maskRG(rgInput) : rgInput;
   const functionalNumber = String(formData.get("functionalNumber") ?? "").trim() || null;
   const status           = String(formData.get("status") ?? "ATIVO");
 

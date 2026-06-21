@@ -1,5 +1,29 @@
 import { describe, it, expect } from "vitest";
-import { dataLocalISO, abreviarPelotao, platoonOrder } from "./utils";
+import { dataLocalISO, abreviarPelotao, platoonOrder, maskRG } from "./utils";
+
+describe("maskRG", () => {
+  it("formata 6 dígitos no padrão PMES XX.XXX-X", () => {
+    expect(maskRG("231936")).toBe("23.193-6");
+    expect(maskRG("200000")).toBe("20.000-0");
+  });
+  it("é idempotente para valor já formatado", () => {
+    expect(maskRG("23.193-6")).toBe("23.193-6");
+  });
+  it("ignora não-dígitos digitados", () => {
+    expect(maskRG("23a19-3 6")).toBe("23.193-6");
+  });
+  it("formata parcial enquanto digita (sem travar)", () => {
+    expect(maskRG("23")).toBe("2-3");
+    expect(maskRG("2319")).toBe("231-9");
+  });
+  it("não perde dígitos de RGs com 7 (agrupa à esquerda)", () => {
+    expect(maskRG("1234567")).toBe("123.456-7");
+  });
+  it("string vazia retorna vazio", () => {
+    expect(maskRG("")).toBe("");
+    expect(maskRG(null)).toBe("");
+  });
+});
 
 describe("dataLocalISO", () => {
   it("retorna a data LOCAL do Date informado (não desliza para UTC)", () => {
