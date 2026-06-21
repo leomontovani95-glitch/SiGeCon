@@ -142,7 +142,7 @@ function TabelaTipo({ items, label, note, isTdTac, bar, barText, title }: { item
         {label}
       </h3>
       {note && (
-        <p style={{ fontSize: "7.5pt", color: "#6b7280", fontStyle: "italic", textAlign: "center", marginBottom: 6 }}>
+        <p style={{ fontSize: "7.5pt", color: "#000", fontStyle: "italic", textAlign: "center", marginBottom: 6 }}>
           Obs.: {note}
         </p>
       )}
@@ -494,7 +494,7 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
 
       {totalRegistros === 0 && (
         <div className="print-section">
-          <p style={{ textAlign: "center", color: "#9ca3af", fontSize: "9pt" }}>Nenhum registro neste caderno.</p>
+          <p style={{ textAlign: "center", color: "#000", fontSize: "9pt" }}>Nenhum registro neste caderno.</p>
         </div>
       )}
 

@@ -51,7 +51,7 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
           <tbody>
             <tr>
               {resumo.map(({ label, value, color }) => (
-                <td key={label} style={{ textAlign: "center", fontWeight: "bold", fontSize: "11pt", padding: "5px 6px", color: value > 0 ? color : "#9ca3af" }}>
+                <td key={label} style={{ textAlign: "center", fontWeight: "bold", fontSize: "11pt", padding: "5px 6px", color: value > 0 ? color : "#000" }}>
                   {value}
                 </td>
               ))}
@@ -69,7 +69,7 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
           <div>
             <p style={{ margin: 0, fontSize: "10pt" }}>Pontuação desfavorável total: <strong style={{ color: "#b91c1c" }}>−{desfavoravel.toFixed(1)}</strong></p>
             <p style={{ margin: 0, fontSize: "10pt" }}>Pontuação favorável total: <strong style={{ color: "#15803d" }}>+{favoravel.toFixed(1)}</strong></p>
-            <p style={{ margin: 0, fontSize: "9pt", color: "#555" }}>Nota base: 10,00 | Cálculo: 10 − desfavorável + favorável</p>
+            <p style={{ margin: 0, fontSize: "9pt", color: "#000" }}>Nota base: 10,00 | Cálculo: 10 − desfavorável + favorável</p>
             {nota < 6 && <p style={{ margin: 0, fontSize: "9pt", color: "#7f1d1d", fontWeight: "bold" }}>SITUAÇÃO: REPROVADO (nota abaixo de 6,0)</p>}
             {nota >= 6 && nota < 7 && <p style={{ margin: 0, fontSize: "9pt", color: "#b91c1c", fontWeight: "bold" }}>ATENÇÃO: Zona de risco (nota abaixo de 7,0)</p>}
           </div>
@@ -91,7 +91,7 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
             </thead>
             <tbody>
               <tr>
-                <td style={{ fontStyle: "italic", color: "#888" }}>Início do curso</td>
+                <td style={{ fontStyle: "italic", color: "#000" }}>Início do curso</td>
                 <td>—</td>
                 <td style={{ textAlign: "right", fontWeight: "bold" }}>10,00</td>
                 <td style={{ textAlign: "right" }}>—</td>
@@ -104,7 +104,7 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
                     <td style={{ fontFamily: "monospace", fontSize: "8pt" }}>{e.label}</td>
                     <td>{format(e.date, "dd/MM/yyyy", { locale: ptBR })}</td>
                     <td style={{ textAlign: "right", fontWeight: "bold" }}>{e.nota.toFixed(2)}</td>
-                    <td style={{ textAlign: "right", fontWeight: "bold", color: variacao < 0 ? "#b91c1c" : variacao > 0 ? "#15803d" : "#888" }}>
+                    <td style={{ textAlign: "right", fontWeight: "bold", color: variacao < 0 ? "#b91c1c" : variacao > 0 ? "#15803d" : "#000" }}>
                       {variacao === 0 ? "—" : `${variacao > 0 ? "+" : ""}${variacao.toFixed(2)}`}
                     </td>
                   </tr>
@@ -149,7 +149,7 @@ export default async function HistoricoAlunoPage({ params }: { params: Promise<{
               </tr>
             ))}
             {aluno.communications.length === 0 && (
-              <tr><td colSpan={6} style={{ textAlign: "center", color: "#888" }}>Nenhuma comunicação registrada.</td></tr>
+              <tr><td colSpan={6} style={{ textAlign: "center", color: "#000" }}>Nenhuma comunicação registrada.</td></tr>
             )}
           </tbody>
         </table>

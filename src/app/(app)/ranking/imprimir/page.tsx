@@ -103,7 +103,7 @@ export default async function RankingImprimirPage({
     <PrintLayout title={`Ranking de Conduta — ${escopo}`} escola={escolaHeaderLabel(escolaHeader)}>
       <div className="print-section">
         <h2>Ranking de Conduta</h2>
-        <p style={{ fontSize: "9pt", color: "#555", marginBottom: "10px" }}>
+        <p style={{ fontSize: "9pt", color: "#000", marginBottom: "10px" }}>
           {escopo} · {ranking.length} aluno(s) · ordenação: {ORDEM_LABELS[ordem]} · notas baseadas nos cadernos publicados
         </p>
 
@@ -118,7 +118,7 @@ export default async function RankingImprimirPage({
           borderRadius: "6px",
           backgroundColor: "#f9fafb",
         }}>
-          <span style={{ fontSize: "8pt", color: "#374151", fontWeight: "bold", marginRight: "4px", alignSelf: "center" }}>
+          <span style={{ fontSize: "8pt", color: "#000", fontWeight: "bold", marginRight: "4px", alignSelf: "center" }}>
             Total: {ranking.length}
           </span>
           {FAIXAS.map((f) => (
@@ -140,7 +140,7 @@ export default async function RankingImprimirPage({
       </div>
 
       {ranking.length === 0 ? (
-        <p style={{ fontSize: "10pt", color: "#666", textAlign: "center", marginTop: "40px" }}>
+        <p style={{ fontSize: "10pt", color: "#000", textAlign: "center", marginTop: "40px" }}>
           Nenhum aluno encontrado no escopo selecionado.
         </p>
       ) : (
@@ -162,11 +162,11 @@ export default async function RankingImprimirPage({
               const corFaixa = FAIXA_CORES[faixa.label];
               return (
                 <tr key={a.warName + a.courseNumber}>
-                  <td style={{ textAlign: "center", fontWeight: "bold", color: "#6b7280" }}>{idx + 1}º</td>
+                  <td style={{ textAlign: "center", fontWeight: "bold", color: "#000" }}>{idx + 1}º</td>
                   <td style={{ textAlign: "center", fontFamily: "monospace" }}>{a.courseNumber}</td>
                   <td style={{ fontWeight: "bold" }}>{a.warName}</td>
-                  <td style={{ fontSize: "8pt", color: "#374151" }}>{a.fullName}</td>
-                  <td style={{ fontSize: "8pt", color: "#6b7280", whiteSpace: "nowrap" }}>{abreviarPelotao(a.platoonName)}</td>
+                  <td style={{ fontSize: "8pt", color: "#000" }}>{a.fullName}</td>
+                  <td style={{ fontSize: "8pt", color: "#000", whiteSpace: "nowrap" }}>{abreviarPelotao(a.platoonName)}</td>
                   <td style={{ textAlign: "center", fontSize: "8pt", fontWeight: "bold", color: corFaixa }}>
                     {faixa.label}
                   </td>

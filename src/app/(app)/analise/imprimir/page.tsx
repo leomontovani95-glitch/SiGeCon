@@ -196,7 +196,7 @@ export default async function AnaliseImprimirPage({
       margin: 0 0 10px 0; color: #1e3a5f; letter-spacing: 0.5px;
     }
     .analise-section .subtitulo {
-      font-size: 8pt; color: #6b7280; margin: -6px 0 10px 0;
+      font-size: 8pt; color: #000; margin: -6px 0 10px 0;
     }
     .analise-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
     .summary-cards { display: flex; gap: 12px; margin-bottom: 20px; }
@@ -206,7 +206,7 @@ export default async function AnaliseImprimirPage({
     }
     .summary-card .valor { font-size: 20pt; font-weight: bold; display: block; }
     .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
-    .bar-row .label { width: 68px; font-size: 8pt; text-align: right; flex-shrink: 0; color: #374151; }
+    .bar-row .label { width: 68px; font-size: 8pt; text-align: right; flex-shrink: 0; color: #000; }
     .bar-row .bar-track { flex: 1; background: #e5e7eb; height: 13px; border-radius: 2px; overflow: hidden; }
     .bar-row .bar-fill  { height: 13px; border-radius: 2px; }
     .bar-row .count { width: 28px; font-size: 8pt; font-weight: bold; text-align: right; flex-shrink: 0; }
@@ -223,7 +223,7 @@ export default async function AnaliseImprimirPage({
       {/* ── Título e filtros ── */}
       <div className="print-section">
         <h2>Análise de Comunicações</h2>
-        <p style={{ fontSize: "9pt", color: "#555", marginBottom: "14px" }}>
+        <p style={{ fontSize: "9pt", color: "#000", marginBottom: "14px" }}>
           <strong>{escopo}</strong>{"  ·  "}{periodoLabel}
         </p>
       </div>
@@ -288,12 +288,12 @@ export default async function AnaliseImprimirPage({
                 <span className="legend-dot" style={{ background: PRINT_COLORS[i % PRINT_COLORS.length] }} />
                 {t.name}&nbsp;
                 <strong>{t.value}</strong>&nbsp;
-                <span style={{ color: "#6b7280" }}>({total > 0 ? ((t.value / total) * 100).toFixed(0) : 0}%)</span>
+                <span style={{ color: "#000" }}>({total > 0 ? ((t.value / total) * 100).toFixed(0) : 0}%)</span>
               </span>
             ))}
           </div>
           {tipoData.length === 0 && (
-            <p style={{ fontSize: "8pt", color: "#9ca3af" }}>Sem dados no período.</p>
+            <p style={{ fontSize: "8pt", color: "#000" }}>Sem dados no período.</p>
           )}
         </div>
       </div>
@@ -316,10 +316,10 @@ export default async function AnaliseImprimirPage({
               {evolucaoMensalData.map((m) => (
                 <tr key={m.mes}>
                   <td style={{ fontWeight: "bold" }}>{m.mes}</td>
-                  <td style={{ color: m.CPI > 0 ? "#991b1b" : "#9ca3af", fontWeight: m.CPI > 0 ? "bold" : "normal" }}>
+                  <td style={{ color: m.CPI > 0 ? "#991b1b" : "#000", fontWeight: m.CPI > 0 ? "bold" : "normal" }}>
                     {m.CPI}
                   </td>
-                  <td style={{ color: m.fav > 0 ? "#166534" : "#9ca3af", fontWeight: m.fav > 0 ? "bold" : "normal" }}>
+                  <td style={{ color: m.fav > 0 ? "#166534" : "#000", fontWeight: m.fav > 0 ? "bold" : "normal" }}>
                     {m.fav}
                   </td>
                   <td style={{ fontWeight: "bold" }}>{m.CPI + m.fav}</td>
@@ -328,7 +328,7 @@ export default async function AnaliseImprimirPage({
             </tbody>
           </table>
         ) : (
-          <p style={{ fontSize: "8pt", color: "#9ca3af" }}>Sem dados no período.</p>
+          <p style={{ fontSize: "8pt", color: "#000" }}>Sem dados no período.</p>
         )}
       </div>
 
@@ -356,7 +356,7 @@ export default async function AnaliseImprimirPage({
                       key={gi}
                       style={{
                         background: v > 0 ? CPI_COLORS_BG[gi] : "transparent",
-                        color: v > 0 ? CPI_COLORS_TEXT[gi] : "#9ca3af",
+                        color: v > 0 ? CPI_COLORS_TEXT[gi] : "#000",
                         fontWeight: v > 0 ? "bold" : "normal",
                         textAlign: "center",
                       }}
@@ -370,7 +370,7 @@ export default async function AnaliseImprimirPage({
             </tbody>
           </table>
         ) : (
-          <p style={{ fontSize: "8pt", color: "#9ca3af" }}>Sem CPIs registradas no período.</p>
+          <p style={{ fontSize: "8pt", color: "#000" }}>Sem CPIs registradas no período.</p>
         )}
       </div>
 
@@ -396,7 +396,7 @@ export default async function AnaliseImprimirPage({
             ))}
           </>
         ) : (
-          <p style={{ fontSize: "8pt", color: "#9ca3af" }}>Nenhum artigo registrado no período.</p>
+          <p style={{ fontSize: "8pt", color: "#000" }}>Nenhum artigo registrado no período.</p>
         )}
       </div>
 
@@ -418,7 +418,7 @@ export default async function AnaliseImprimirPage({
             <tbody>
               {topAlunos.map((a, i) => (
                 <tr key={i}>
-                  <td style={{ fontWeight: "bold", color: i < 3 ? "#991b1b" : "#6b7280" }}>{i + 1}º</td>
+                  <td style={{ fontWeight: "bold", color: i < 3 ? "#991b1b" : "#000" }}>{i + 1}º</td>
                   <td style={{ fontWeight: "bold" }}>{a.warName}</td>
                   <td>{a.courseName}</td>
                   <td>{a.platoonName}</td>
@@ -435,7 +435,7 @@ export default async function AnaliseImprimirPage({
             </tbody>
           </table>
         ) : (
-          <p style={{ fontSize: "8pt", color: "#9ca3af" }}>Sem dados no período.</p>
+          <p style={{ fontSize: "8pt", color: "#000" }}>Sem dados no período.</p>
         )}
       </div>
 

@@ -143,8 +143,8 @@ export default async function RankingComunicantesImprimirPage({
   const extraStyles = `
     @media print { @page { size: A4 landscape; } }
     .rc-table { width: 100%; border-collapse: collapse; font-size: 8pt; }
-    .rc-table th { background: #1e3a5f; color: white; padding: 5px 6px; text-align: left; font-size: 7.5pt; text-transform: uppercase; }
-    .rc-table td { padding: 4px 6px; border-bottom: 1px solid #e5e7eb; }
+    .rc-table th { background: #1e3a5f; color: white; padding: 5px 6px; text-align: left; font-size: 7.5pt; text-transform: uppercase; border: 1px solid #000; }
+    .rc-table td { padding: 4px 6px; border: 1px solid #000; }
     .rc-table tr:nth-child(even) td { background: #f9fafb; }
     .rc-num { font-family: monospace; }
   `;
@@ -157,13 +157,13 @@ export default async function RankingComunicantesImprimirPage({
     >
       <div className="print-section">
         <h2>Ranking de Comunicantes</h2>
-        <p style={{ fontSize: "9pt", color: "#555", marginBottom: "10px" }}>
+        <p style={{ fontSize: "9pt", color: "#000", marginBottom: "10px" }}>
           {labelEscopo} · {entries.length} comunicante(s){filtroTexto ? ` · ${filtroTexto}` : ""}
         </p>
       </div>
 
       {entries.length === 0 ? (
-        <p style={{ fontSize: "10pt", color: "#666", textAlign: "center", marginTop: "40px" }}>
+        <p style={{ fontSize: "10pt", color: "#000", textAlign: "center", marginTop: "40px" }}>
           Nenhum comunicante encontrado no escopo selecionado.
         </p>
       ) : (
@@ -201,7 +201,7 @@ export default async function RankingComunicantesImprimirPage({
 
               return (
                 <tr key={e.key}>
-                  <td style={{ textAlign: "center", color: "#6b7280" }}>{idx + 1}</td>
+                  <td style={{ textAlign: "center", color: "#000" }}>{idx + 1}</td>
                   <td className="rc-num">{posto}</td>
                   <td style={{ fontWeight: "bold" }}>
                     {nomeGuerra}{isManual ? <span style={{ color: "#b45309", fontWeight: "normal" }}> (manual)</span> : null}

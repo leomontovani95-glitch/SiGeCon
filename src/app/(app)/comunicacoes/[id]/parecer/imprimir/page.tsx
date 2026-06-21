@@ -47,7 +47,7 @@ export default async function ImprimirParecerPage({ params }: { params: Promise<
       {comm.defenses.length > 0 && (
         <div className="print-section">
           <h2>Análise da Defesa Apresentada</h2>
-          <p style={{ fontSize: "9pt", color: "#555", marginBottom: 6, fontStyle: "italic" }}>O aluno apresentou justificativa/defesa em {format(new Date(comm.defenses[0].submittedAt), "dd/MM/yyyy", { locale: ptBR })}.</p>
+          <p style={{ fontSize: "9pt", color: "#000", marginBottom: 6, fontStyle: "italic" }}>O aluno apresentou justificativa/defesa em {format(new Date(comm.defenses[0].submittedAt), "dd/MM/yyyy", { locale: ptBR })}.</p>
         </div>
       )}
 

@@ -57,7 +57,7 @@ export default async function TermoCienciaPage({ params }: { params: Promise<{ i
           <p style={{ fontSize: "11pt" }}>
             O aluno tem até <strong>{format(prazo, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</strong> (2 dias úteis) para apresentar justificativa ou defesa, caso deseje.
           </p>
-          <p style={{ fontSize: "9pt", color: "#555", marginTop: 6 }}>
+          <p style={{ fontSize: "9pt", color: "#000", marginTop: 6 }}>
             Sábados e domingos não são contados no prazo. O não exercício desse direito implica prosseguimento da tramitação normalmente.
           </p>
         </div>

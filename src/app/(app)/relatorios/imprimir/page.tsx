@@ -124,7 +124,7 @@ export default async function RelatoriosImprimirPage({
     <PrintLayout title={`Relatório de Comunicações — ${escopo}`} escola={escolaHeaderLabel(escolaHeader)}>
       <div className="print-section">
         <h2>Relatório de Comunicações</h2>
-        <p style={{ fontSize: "9pt", color: "#555", marginBottom: "12px" }}>{filtros.join("  ·  ")}</p>
+        <p style={{ fontSize: "9pt", color: "#000", marginBottom: "12px" }}>{filtros.join("  ·  ")}</p>
         <div style={{ display: "flex", gap: "24px", marginBottom: "16px", fontSize: "9pt" }}>
           <span><strong>{total}</strong> total</span>
           <span style={{ color: "#991b1b" }}><strong>{desfavoraveis}</strong> desfavoráveis</span>
@@ -133,7 +133,7 @@ export default async function RelatoriosImprimirPage({
       </div>
 
       {comunicacoes.length === 0 ? (
-        <p style={{ fontSize: "10pt", color: "#666", textAlign: "center", marginTop: "40px" }}>
+        <p style={{ fontSize: "10pt", color: "#000", textAlign: "center", marginTop: "40px" }}>
           Nenhuma comunicação encontrada com os filtros aplicados.
         </p>
       ) : (
@@ -165,7 +165,7 @@ export default async function RelatoriosImprimirPage({
                   <td>
                     <span
                       className={`print-badge ${desfav ? "badge-desfav" : "badge-fav"}`}
-                      style={{ color: statusLabel.includes("Arquiv") ? "#374151" : undefined,
+                      style={{ color: statusLabel.includes("Arquiv") ? "#000" : undefined,
                                background: statusLabel.includes("Arquiv") ? "#f3f4f6" : undefined }}
                     >
                       {statusLabel}
@@ -173,7 +173,7 @@ export default async function RelatoriosImprimirPage({
                   </td>
                   <td style={{ textAlign: "right", fontWeight: "bold",
                                color: c.finalScore != null && c.finalScore > 0 ? "#991b1b" :
-                                      c.finalScore != null && c.finalScore < 0 ? "#166534" : "#6b7280" }}>
+                                      c.finalScore != null && c.finalScore < 0 ? "#166534" : "#000" }}>
                     {c.finalScore != null ? `${c.finalScore > 0 ? "−" : c.finalScore < 0 ? "+" : ""}${Math.abs(c.finalScore).toFixed(1)}` : "—"}
                   </td>
                 </tr>

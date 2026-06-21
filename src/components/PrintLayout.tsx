@@ -145,18 +145,18 @@ export default function PrintLayout({ title, children, extraPages, extraStyles, 
 
         /* ── Seções e campos ── */
         .print-section { margin-bottom: 16px; }
-        .print-section h2 { font-size: 11pt; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-bottom: 8px; color: #1e3a5f; letter-spacing: 0.5px; }
+        .print-section h2 { font-size: 11pt; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #000; padding-bottom: 4px; margin-bottom: 8px; color: #1e3a5f; letter-spacing: 0.5px; }
         .print-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; }
         .print-field { margin-bottom: 6px; }
-        .print-field label { font-size: 8pt; font-weight: bold; color: #555; display: block; text-transform: uppercase; }
+        .print-field label { font-size: 8pt; font-weight: bold; color: #000; display: block; text-transform: uppercase; }
         .print-field span { font-size: 10pt; color: #111; }
         .print-text { font-size: 10pt; line-height: 1.5; text-align: justify; white-space: pre-wrap; }
         .print-protocol { font-family: monospace; font-size: 11pt; font-weight: bold; color: #1e3a5f; }
         .print-signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 40px; break-inside: avoid; page-break-inside: avoid; }
         .print-sig-line { border-top: 1px solid #000; padding-top: 6px; text-align: center; font-size: 9pt; }
         .print-table { width: 100%; border-collapse: collapse; font-size: 9pt; }
-        .print-table th { background: #1e3a5f; color: white; padding: 6px 8px; text-align: left; font-size: 8pt; }
-        .print-table td { padding: 5px 8px; border-bottom: 1px solid #e5e7eb; }
+        .print-table th { background: #1e3a5f; color: white; padding: 6px 8px; text-align: left; font-size: 8pt; border: 1px solid #000; }
+        .print-table td { padding: 5px 8px; border: 1px solid #000; }
         .print-table tr:nth-child(even) td { background: #f9fafb; }
         .print-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 8pt; font-weight: bold; }
         .badge-desfav { background: #fee2e2; color: #991b1b; }

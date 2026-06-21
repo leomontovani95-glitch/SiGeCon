@@ -49,7 +49,7 @@ export default async function ImprimirDecisaoPage({ params }: { params: Promise<
       {comm.opinions.length > 0 && (
         <div className="print-section">
           <h2>Síntese do Parecer</h2>
-          <p style={{ fontSize: "9pt", color: "#555" }}>
+          <p style={{ fontSize: "9pt", color: "#000" }}>
             {comm.opinions[0].author.fullName} recomendou: <strong>{comm.opinions[0].recommendation ?? "sem recomendação específica"}</strong>.
           </p>
         </div>
@@ -73,7 +73,7 @@ export default async function ImprimirDecisaoPage({ params }: { params: Promise<
         <div className="print-sig-line" style={{ gridColumn: "1 / -1", maxWidth: 360, margin: "0 auto" }}>
           <p>{decision.authority.rank} {decision.authority.fullName}</p>
           <p>Comandante da Escola</p>
-          <p style={{ fontSize: "8pt", color: "#666" }}>{format(new Date(decision.decidedAt), "dd/MM/yyyy", { locale: ptBR })}</p>
+          <p style={{ fontSize: "8pt", color: "#000" }}>{format(new Date(decision.decidedAt), "dd/MM/yyyy", { locale: ptBR })}</p>
         </div>
       </div>
     </PrintLayout>
