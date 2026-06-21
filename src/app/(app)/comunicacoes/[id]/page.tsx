@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { verifySession, canEmitOpinion, canChangeBookDecision, canDecideAsCommander, canDecideAsDivision, escolaNoEscopo, getSchoolFilter } from "@/lib/dal";
+import { verifySession, canEmitOpinion, canChangeBookDecision, canDecideAsCommander, canDecideAsDivision, escolaNoEscopo, getSchoolFilter, temVistaRestritaComunicacao } from "@/lib/dal";
 import { formatCadernoNumero } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
@@ -67,6 +67,11 @@ export default async function ComunicacaoPage({
     && comm.communicantUserId === session.userId
     && comm.student.userId !== session.userId;
 
+  // Vista restrita: só o histórico de tramitação, sem defesa/justificativa,
+  // parecer nem decisão. Vale para o aluno comunicante e para os perfis de
+  // apoio (Chefe de Curso e Setor de Protocolo).
+  const vistaRestrita = ehComunicante || temVistaRestritaComunicacao(session.role);
+
   const cadernoPublicado = comm.status === "PUBLICADA_CADERNO"
     ? await prisma.disciplinaryBook.findFirst({
         where: { status: "PUBLICADO", items: { some: { communicationId: comm.id } } },
@@ -126,7 +131,7 @@ export default async function ComunicacaoPage({
       color: "bg-teal-500",
       hideComunicante: false,
     }] : []),
-  ].filter((s) => !ehComunicante || !s.hideComunicante);
+  ].filter((s) => !vistaRestrita || !s.hideComunicante);
 
   return (
     <div className="p-6 max-w-4xl">
@@ -150,20 +155,22 @@ export default async function ComunicacaoPage({
             )}
           </div>
         </div>
-        {!ehComunicante && (
         <div className="flex gap-2 flex-wrap justify-end">
           <Link href={`/comunicacoes/${comm.id}/imprimir`} target="_blank" className="btn-secondary text-xs">
             Gerar PDF
           </Link>
         </div>
-      )}
       </div>
 
-      {ehComunicante && (
+      {vistaRestrita && (
         <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl px-5 py-4 flex items-start gap-3">
           <span className="text-blue-500 text-lg mt-0.5">ℹ</span>
           <p className="text-sm text-blue-800">
-            Você está visualizando esta comunicação como <strong>comunicante</strong>. A defesa do aluno, o parecer e a decisão do Comandante são restritos ao processo interno.
+            {ehComunicante ? (
+              <>Você está visualizando esta comunicação como <strong>comunicante</strong>. A defesa do aluno, o parecer e a decisão do Comandante são restritos ao processo interno.</>
+            ) : (
+              <>Visualização restrita: você acompanha apenas o <strong>histórico de tramitação</strong>. A defesa/justificativa do aluno, o parecer e a decisão são de acesso restrito ao processo interno.</>
+            )}
           </p>
         </div>
       )}
@@ -245,7 +252,7 @@ export default async function ComunicacaoPage({
         })()}
       </div>
 
-      {!ehComunicante && (comm.bgpmNumber || comm.tacEquivalent) && (
+      {!vistaRestrita && (comm.bgpmNumber || comm.tacEquivalent) && (
         <div className="bg-orange-50 rounded-xl border border-orange-200 p-4 mb-4">
           <h2 className="text-xs font-semibold text-orange-700 uppercase tracking-wide mb-2">Publicação em BGPM</h2>
           {comm.bgpmNumber && comm.bgpmYear && (
@@ -294,7 +301,7 @@ export default async function ComunicacaoPage({
         </div>
       )}
 
-      {!ehComunicante && comm.acknowledgements.some((a) => a.method === "PRAZO_EXPIRADO") && (
+      {!vistaRestrita && comm.acknowledgements.some((a) => a.method === "PRAZO_EXPIRADO") && (
         <div className="bg-red-50 rounded-xl border border-red-300 p-4 mb-4">
           <h2 className="text-xs font-semibold text-red-700 uppercase tracking-wide mb-1">
             ⚠ Encaminhamento Automático por Prazo Expirado
@@ -310,8 +317,8 @@ export default async function ComunicacaoPage({
         </div>
       )}
 
-      {/* Posição do aluno — oculto para o comunicante */}
-      {!ehComunicante && mostrarSecaoDefesa && (
+      {/* Posição do aluno — oculto na vista restrita (comunicante/apoio) */}
+      {!vistaRestrita && mostrarSecaoDefesa && (
         <div className="bg-amber-50 rounded-xl border border-amber-200 p-4 mb-4">
           <h2 className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">Posição do Aluno</h2>
           {tomouCienciaComDefesa ? (
@@ -352,7 +359,7 @@ export default async function ComunicacaoPage({
         </div>
       )}
 
-      {!ehComunicante && comm.divisionForwardReason && (
+      {!vistaRestrita && comm.divisionForwardReason && (
         <div className="bg-sky-50 rounded-xl border border-sky-200 p-4 mb-4">
           <h2 className="text-xs font-semibold text-sky-700 uppercase tracking-wide mb-2">Encaminhamento à Divisão Acadêmica</h2>
           <p className="text-sm text-gray-700 whitespace-pre-wrap">{comm.divisionForwardReason}</p>
@@ -365,7 +372,7 @@ export default async function ComunicacaoPage({
         </div>
       )}
 
-      {!ehComunicante && comm.opinions.length > 0 && (
+      {!vistaRestrita && comm.opinions.length > 0 && (
         <div className="bg-purple-50 rounded-xl border border-purple-200 p-4 mb-4">
           <h2 className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-2">Parecer</h2>
           {comm.opinions.map((o) => (
@@ -396,7 +403,7 @@ export default async function ComunicacaoPage({
         </div>
       )}
 
-      {!ehComunicante && comm.decisions.length > 0 && (
+      {!vistaRestrita && comm.decisions.length > 0 && (
         <div className="bg-green-50 rounded-xl border border-green-200 p-4 mb-4">
           <h2 className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-2">Decisão do Comandante</h2>
           {comm.decisions.map((d) => (

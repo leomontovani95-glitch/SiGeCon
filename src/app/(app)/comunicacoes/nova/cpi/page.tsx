@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { verifySession, verifyStaff, ESFO_CFO_RANK, cursosPermitidosParaCPI } from "@/lib/dal";
+import { verifySession, verifyStaff, getSchoolFilter, ESFO_CFO_RANK, cursosPermitidosParaCPI } from "@/lib/dal";
 import ComunicacaoForm from "../../_components/ComunicacaoForm";
 
 export default async function NovaCPIPage() {
@@ -10,6 +10,7 @@ export default async function NovaCPIPage() {
 
   let comunicanteFixo: { userId: string; rank: string; name: string; fullName: string; detail: string } | undefined;
   let allowedCourseIds: string[] | undefined;
+  let schoolFilter: string | null = null;
 
   if (isAluno) {
     const [student, allCourses] = await Promise.all([
@@ -32,6 +33,8 @@ export default async function NovaCPIPage() {
     };
   } else {
     await verifyStaff();
+    // Escopo de escola: só aparecem cursos da escola atribuída ao usuário.
+    schoolFilter = getSchoolFilter(session.role, session.escola);
   }
 
   const [tipos, regras, cursos] = await Promise.all([
@@ -53,6 +56,7 @@ export default async function NovaCPIPage() {
       where: {
         active: true,
         ...(allowedCourseIds !== undefined ? { id: { in: allowedCourseIds } } : {}),
+        ...(schoolFilter ? { school: schoolFilter } : {}),
       },
       orderBy: { name: "asc" },
     }),

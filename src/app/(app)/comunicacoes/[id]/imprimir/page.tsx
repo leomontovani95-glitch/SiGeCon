@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { verifySession } from "@/lib/dal";
+import { verifySession, temVistaRestritaComunicacao, getSchoolFilter } from "@/lib/dal";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -27,7 +27,21 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
   });
   if (!comm) notFound();
 
-  if (session.role === "ALUNO" && comm.student.userId !== session.userId) notFound();
+  // Controle de acesso espelhando a tela da comunicação.
+  const ehEsteAluno = comm.student.userId === session.userId;
+  const ehComunicante = comm.communicantUserId === session.userId && !ehEsteAluno;
+  if (session.role === "ALUNO") {
+    if (!ehEsteAluno && !ehComunicante) notFound();
+  } else {
+    // Isolamento por escola: staff fora do escopo não imprime a comunicação.
+    const escopo = getSchoolFilter(session.role, session.escola);
+    if (escopo && comm.student.course.school !== escopo) notFound();
+  }
+
+  // Vista restrita: o PDF sai apenas com o registro/andamento — sem defesa/
+  // justificativa do aluno, parecer nem decisão. Vale para o aluno comunicante
+  // e para os perfis de apoio (Chefe de Curso e Setor de Protocolo).
+  const vistaRestrita = ehComunicante || temVistaRestritaComunicacao(session.role);
 
   const isCPI = comm.type.name.startsWith("CPI");
   const docTitle = isCPI ? `CPI — ${comm.protocolNumber}` : `Referência Elogiosa — ${comm.protocolNumber}`;
@@ -90,7 +104,7 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
         </div>
       )}
 
-      {comm.defenses.length > 0 && (
+      {!vistaRestrita && comm.defenses.length > 0 && (
         <div className="print-section">
           <h2>Justificativa / Defesa do Aluno</h2>
           {comm.defenses.map((d) => (
@@ -105,7 +119,7 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
         </div>
       )}
 
-      {comm.opinions.length > 0 && (
+      {!vistaRestrita && comm.opinions.length > 0 && (
         <div className="print-section">
           <h2>Parecer</h2>
           {comm.opinions.map((o) => (
@@ -123,7 +137,7 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
         </div>
       )}
 
-      {comm.decisions.length > 0 && (
+      {!vistaRestrita && comm.decisions.length > 0 && (
         <div className="print-section">
           <h2>Decisão do Comandante da Escola</h2>
           {comm.decisions.map((d) => (

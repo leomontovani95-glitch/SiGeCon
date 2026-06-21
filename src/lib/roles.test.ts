@@ -10,6 +10,7 @@ import {
   getSchoolFilter,
   escolaNoEscopo,
   cursosPermitidosParaCPI,
+  temVistaRestritaComunicacao,
 } from "./roles";
 
 describe("effectiveRoles", () => {
@@ -31,6 +32,21 @@ describe("canDecide / canEmitOpinion", () => {
   it("parecerista emite parecer; comandante não", () => {
     expect(canEmitOpinion("OFICIAL_ESFO")).toBe(true);
     expect(canEmitOpinion("COMANDANTE_ESFO")).toBe(false);
+  });
+  it("administrador também emite parecer", () => {
+    expect(canEmitOpinion("ADMINISTRADOR")).toBe(true);
+  });
+});
+
+describe("temVistaRestritaComunicacao", () => {
+  it("Chefe de Curso e Protocolo têm vista restrita (só tramitação)", () => {
+    expect(temVistaRestritaComunicacao("CHEFE_CURSO")).toBe(true);
+    expect(temVistaRestritaComunicacao("PROTOCOLO")).toBe(true);
+  });
+  it("staff operacional e administração veem tudo", () => {
+    expect(temVistaRestritaComunicacao("ADMINISTRADOR")).toBe(false);
+    expect(temVistaRestritaComunicacao("COMANDANTE_ESFO")).toBe(false);
+    expect(temVistaRestritaComunicacao("OFICIAL_ESFAP")).toBe(false);
   });
   it("considera funções adicionais", () => {
     expect(canDecide("PROTOCOLO", "COMANDANTE_ESFAP")).toBe(true);

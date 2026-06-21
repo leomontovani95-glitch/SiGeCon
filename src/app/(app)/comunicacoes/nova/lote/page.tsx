@@ -1,9 +1,11 @@
 import { prisma } from "@/lib/db";
-import { verifyStaff } from "@/lib/dal";
+import { verifyStaff, getSchoolFilter } from "@/lib/dal";
 import ComunicacaoLoteForm from "../../_components/ComunicacaoLoteForm";
 
 export default async function NovaComunicacaoLotePage() {
-  await verifyStaff();
+  const session = await verifyStaff();
+  // Escopo de escola: só aparecem cursos da escola atribuída ao usuário.
+  const school = getSchoolFilter(session.role, session.escola);
 
   const [tipos, regras, cursos] = await Promise.all([
     prisma.communicationType.findMany({
@@ -14,7 +16,7 @@ export default async function NovaComunicacaoLotePage() {
       where: { active: true },
       orderBy: [{ article: "asc" }, { item: "asc" }, { letter: "asc" }],
     }),
-    prisma.course.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+    prisma.course.findMany({ where: { active: true, ...(school ? { school } : {}) }, orderBy: { name: "asc" } }),
   ]);
 
   return (

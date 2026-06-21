@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { verifySession } from "@/lib/dal";
+import { verifySession, getSchoolFilter } from "@/lib/dal";
 import { redirect } from "next/navigation";
 import { notFound } from "next/navigation";
 import { platoonOrder } from "@/lib/utils";
@@ -28,15 +28,21 @@ export default async function EditarAlunoPage({ params }: { params: Promise<{ id
   });
   if (!aluno) notFound();
 
+  // Escopo de escola: Protocolo/Chefe de Curso e comandos de escola só editam
+  // alunos da própria escola.
+  const escopo = getSchoolFilter(session.role, session.escola);
+  if (escopo && aluno.course.school !== escopo) redirect("/acesso-negado");
+
   // "Editar" sempre atua sobre a matrícula ATUAL (curso vigente), nunca sobre um
   // histórico anterior — mesmo quando a edição é acionada a partir da ficha de um
   // cadastro antigo (ascensão de curso). Os históricos anteriores são imutáveis.
   const { currentId } = await getMatriculas(aluno.rg);
   if (currentId && currentId !== aluno.id) redirect(`/alunos/${currentId}/editar`);
 
-  // Inclui também o curso atual (mesmo inativo) para que apareça no seletor de curso.
+  // Inclui também o curso atual (mesmo inativo) para que apareça no seletor de
+  // curso. Respeita o escopo de escola do usuário nos cursos ativos.
   const courses = await prisma.course.findMany({
-    where: { OR: [{ active: true }, { id: aluno.courseId }] },
+    where: { OR: [{ active: true, ...(escopo ? { school: escopo } : {}) }, { id: aluno.courseId }] },
     orderBy: { name: "asc" },
     include: { platoons: { where: { active: true }, orderBy: { name: "asc" } } },
   });

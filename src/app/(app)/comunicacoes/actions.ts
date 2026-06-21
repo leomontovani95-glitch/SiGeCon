@@ -86,9 +86,11 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
     const allCourses = await prisma.course.findMany({ where: { active: true }, select: { id: true, name: true, school: true } });
     const allowedIds = cursosPermitidosParaCPI(reporter.course.name, allCourses);
     if (!allowedIds.includes(aluno.courseId)) return { error: "Você não tem permissão para comunicar um aluno deste curso." };
-  } else if (session.role === "ALUNO") {
-    // Segurança: garante que nenhum outro aluno chegue aqui
-    return { error: "Sem permissão." };
+  } else {
+    // Staff: respeita o escopo de escola do usuário. Protocolo/Chefe de Curso e
+    // comandos de escola só registram comunicação para alunos da própria escola.
+    if (!escolaNoEscopo(session, aluno.course.school))
+      return { error: "Sem permissão para registrar comunicação para aluno de outra escola." };
   }
 
   // Testemunhas
@@ -231,6 +233,10 @@ export async function registrarComunicacaoEmLote(_prev: LoteState, formData: For
     }
     if (!aluno.course.active) {
       falhas.push({ label: `${aluno.warName} (Nº ${aluno.courseNumber})`, motivo: "Curso inativo — não recebe novas comunicações." });
+      continue;
+    }
+    if (!escolaNoEscopo(session, aluno.course.school)) {
+      falhas.push({ label: `${aluno.warName} (Nº ${aluno.courseNumber})`, motivo: "Aluno de outra escola — fora do seu escopo." });
       continue;
     }
 
@@ -848,6 +854,7 @@ export async function registrarElogioBi(_prev: State, formData: FormData): Promi
 
   if (!aluno)  return { error: "Aluno não encontrado." };
   if (!aluno.course.active) return { error: "Curso inativo: não é possível registrar novas comunicações para alunos deste curso." };
+  if (!escolaNoEscopo(session, aluno.course.school)) return { error: "Sem permissão para registrar comunicação para aluno de outra escola." };
   if (!tipo)   return { error: "Tipo 'Elogio publicado em BI' não cadastrado no sistema." };
   if (!regra)  return { error: "Dispositivo legal não encontrado." };
 
@@ -932,6 +939,7 @@ export async function registrarTransgressao(_prev: State, formData: FormData): P
   ]);
   if (!aluno) return { error: "Aluno não encontrado." };
   if (!aluno.course.active) return { error: "Curso inativo: não é possível registrar novas comunicações para alunos deste curso." };
+  if (!escolaNoEscopo(session, aluno.course.school)) return { error: "Sem permissão para registrar comunicação para aluno de outra escola." };
   if (!tipo)  return { error: "Tipo de transgressão não cadastrado no sistema." };
 
   const descricao = tipoComunicacao === "TAC"

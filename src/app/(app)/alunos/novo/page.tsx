@@ -1,4 +1,4 @@
-import { verifyStaff, VIEWERS_APM } from "@/lib/dal";
+import { verifyStaff, VIEWERS_APM, getSchoolFilter } from "@/lib/dal";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import AlunoForm from "../_components/AlunoForm";
@@ -6,8 +6,10 @@ import AlunoForm from "../_components/AlunoForm";
 export default async function NovoAlunoPage() {
   const session = await verifyStaff();
   if ((VIEWERS_APM as string[]).includes(session.role)) redirect("/acesso-negado");
+  // Escopo de escola: só aparecem cursos da escola atribuída ao usuário.
+  const school = getSchoolFilter(session.role, session.escola);
   const courses = await prisma.course.findMany({
-    where: { active: true },
+    where: { active: true, ...(school ? { school } : {}) },
     orderBy: { name: "asc" },
     include: { platoons: { where: { active: true }, orderBy: { name: "asc" } } },
   });

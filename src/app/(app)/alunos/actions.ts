@@ -57,6 +57,13 @@ export async function salvarAluno(id: string | null, _prev: State, formData: For
   const course = await prisma.course.findUnique({ where: { id: courseId } });
   if (!course) return { error: "Curso selecionado não encontrado." };
 
+  // Escopo de escola: Protocolo/Chefe de Curso e comandos de escola só cadastram
+  // alunos em cursos da própria escola (ex.: Protocolo da EsFAP não cria CFO).
+  const escopo = getSchoolFilter(session.role, session.escola);
+  if (escopo && course.school !== escopo) {
+    return { error: "Sem permissão para cadastrar alunos de outra escola." };
+  }
+
   const rank = rankDeAluno(course.name);
 
   try {

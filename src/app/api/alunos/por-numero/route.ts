@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/session";
-import { ESFO_CFO_RANK, cursosPermitidosParaCPI } from "@/lib/dal";
+import { ESFO_CFO_RANK, cursosPermitidosParaCPI, getSchoolFilter } from "@/lib/dal";
 import { formatCourseNumber } from "@/lib/utils";
 
 export async function GET(req: NextRequest) {
@@ -40,6 +40,13 @@ export async function GET(req: NextRequest) {
   });
 
   if (!aluno) return NextResponse.json({ aluno: null });
+
+  // Staff: respeita o escopo de escola — não retorna aluno de outra escola
+  // (ex.: Protocolo da EsFAP não localiza aluno do CFO/EsFO).
+  if (session.role !== "ALUNO") {
+    const escopo = getSchoolFilter(session.role, session.escola);
+    if (escopo && aluno.course.school !== escopo) return NextResponse.json({ aluno: null });
+  }
 
   return NextResponse.json({
     aluno: {

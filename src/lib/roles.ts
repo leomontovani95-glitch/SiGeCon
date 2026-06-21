@@ -27,8 +27,8 @@ export const COMANDANTES: UserRole[] = [
 // Acesso à aba "Manual do Aluno" (gerir dispositivos legais)
 export const MANUAL_ROLES: UserRole[] = [
   "ADMINISTRADOR", "CHEFE_DIVISAO_ACADEMICA",
-  "COMANDANTE_ESFO", "SUBCOMANDANTE_ESFO",
-  "COMANDANTE_ESFAP", "SUBCOMANDANTE_ESFAP",
+  "COMANDANTE_ESFO", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFO",
+  "COMANDANTE_ESFAP", "SUBCOMANDANTE_ESFAP", "OFICIAL_ESFAP",
 ];
 
 // Acesso de consulta geral: veem despachos mas não agem
@@ -74,7 +74,10 @@ export function effectiveRoles(session: { role: string; additionalRoles?: string
 
 export function canEmitOpinion(role: string, additionalRoles?: string) {
   const all = effectiveRoles({ role, additionalRoles });
-  return all.some((r) => (PARECERISTAS as string[]).includes(r));
+  // O Administrador acumula todas as atribuições e também pode emitir parecer.
+  // Mantido fora da lista PARECERISTAS de propósito: essa lista governa os
+  // badges/filas do painel (layout.tsx), onde o admin tem fila própria.
+  return all.some((r) => r === "ADMINISTRADOR" || (PARECERISTAS as string[]).includes(r));
 }
 
 export function canDecide(role: string, additionalRoles?: string) {
@@ -106,6 +109,17 @@ export function canDecideAsDivision(role: string, additionalRoles?: string) {
 
 export function canRegisterCommunication(role: string) {
   return role !== "ALUNO";
+}
+
+// Perfis de apoio que apenas acompanham o ANDAMENTO (histórico de tramitação)
+// das comunicações, sem acesso ao conteúdo sensível — defesa/justificativa do
+// aluno, parecer e decisão. Mantém maior controle e evita a divulgação de
+// informações sensíveis do processo. O aluno comunicante segue a mesma lógica
+// (tratada à parte na tela, pois depende do vínculo com a comunicação).
+export const RESTRICTED_COMM_VIEW_ROLES: UserRole[] = ["CHEFE_CURSO", "PROTOCOLO"];
+
+export function temVistaRestritaComunicacao(role: string): boolean {
+  return (RESTRICTED_COMM_VIEW_ROLES as string[]).includes(role);
 }
 
 export function canViewAllCommunications(role: string) {
