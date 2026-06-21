@@ -18,6 +18,18 @@ export function formatCourseNumber(n: string | null | undefined): string {
   return m[1].padStart(2, "0") + m[2];
 }
 
+// Formata o RG no padrão de exibição da PMES: XX.XXX-X (último dígito é o
+// verificador, após o hífen; os demais agrupados em milhares). Aceita entrada
+// só com números (231936 → 23.193-6) ou já formatada (idempotente). Tolera RGs
+// com mais dígitos sem perder informação (agrupa à esquerda).
+export function maskRG(value: string | null | undefined): string {
+  const d = (value ?? "").replace(/\D/g, "").slice(0, 9);
+  if (d.length <= 1) return d;
+  const check = d.slice(-1);
+  const body = d.slice(0, -1).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${body}-${check}`;
+}
+
 // Rótulo do caderno disciplinar: "CD Nº 01/2026 — CURSO". A numeração reinicia
 // a cada ano, por isso o ano (de criação) faz parte da identificação.
 export function formatCadernoNumero(

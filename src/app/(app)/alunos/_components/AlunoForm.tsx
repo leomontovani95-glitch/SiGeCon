@@ -2,6 +2,7 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import { salvarAluno } from "../actions";
+import { maskRG } from "@/lib/utils";
 
 type PlatoonOption = { id: string; name: string };
 type CourseOption  = { id: string; name: string; platoons: PlatoonOption[] };
@@ -28,6 +29,9 @@ export default function AlunoForm({ defaultValues, id, courses }: Props) {
   const [state, formAction, pending] = useActionState(action, undefined);
 
   const [courseId, setCourseId] = useState(defaultValues?.courseId ?? "");
+  // Em edição mostra o RG como está salvo (preserva os cadastros atuais); ao
+  // digitar, a máscara formata. Em cadastro novo, começa vazio e já formata.
+  const [rg, setRg] = useState(defaultValues?.rg ?? "");
   const [platoonId, setPlatoonId] = useState(defaultValues?.platoonId ?? "");
 
   const selectedCourse = courses.find((c) => c.id === courseId);
@@ -95,7 +99,15 @@ export default function AlunoForm({ defaultValues, id, courses }: Props) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">RG *</label>
-          <input name="rg" defaultValue={defaultValues?.rg} required className="input" />
+          <input
+            name="rg"
+            value={rg}
+            onChange={(e) => setRg(maskRG(e.target.value))}
+            inputMode="numeric"
+            placeholder="XX.XXX-X"
+            required
+            className="input"
+          />
         </div>
 
         <div>
