@@ -13,10 +13,10 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
             <Image
-              src="/brasao-apm.png"
+              src="/brasao-apm-sm.png"
               alt="Brasão APM/ES"
-              width={120}
-              height={140}
+              width={116}
+              height={160}
               className="object-contain drop-shadow-md"
               priority
             />

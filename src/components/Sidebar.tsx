@@ -97,7 +97,7 @@ export default function Sidebar({
       <div className="flex items-center justify-center h-16 border-b border-[#16304f] px-3">
         <div className="flex items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brasao-apm.png" alt="APM/ES" style={{ height: 38, width: "auto", objectFit: "contain", flexShrink: 0 }} />
+          <img src="/brasao-apm-sm.png" alt="APM/ES" style={{ height: 38, width: "auto", objectFit: "contain", flexShrink: 0 }} />
           <div>
             <h1 className="text-white font-bold text-lg leading-tight">SiGeCon</h1>
             <p className="text-blue-300 text-xs leading-tight">Sistema de Gestão de Conduta</p>
