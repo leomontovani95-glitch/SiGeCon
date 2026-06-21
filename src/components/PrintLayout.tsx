@@ -30,7 +30,7 @@ export default function PrintLayout({ title, children, extraPages, extraStyles, 
         {escola && <p className="linha4">{escola}</p>}
       </div>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/brasao-apm.png" alt="APM/ES" className="print-header-logo" width={68} height={68} loading="eager" />
+      <img src="/brasao-apm-sm.png" alt="APM/ES" className="print-header-logo" width={68} height={68} loading="eager" />
     </div>
   );
 

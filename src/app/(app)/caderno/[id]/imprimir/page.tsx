@@ -271,7 +271,7 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
           <p className="linha4">{escolaHeaderLabel(escola)}</p>
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brasao-apm.png" alt="APM/ES" className="print-header-logo" width={68} height={68} />
+        <img src="/brasao-apm-sm.png" alt="APM/ES" className="print-header-logo" width={68} height={68} />
       </div>
 
       {/* Bloco de identificação */}
