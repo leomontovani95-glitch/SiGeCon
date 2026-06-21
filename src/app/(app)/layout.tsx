@@ -21,6 +21,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       where: { status: { in: ["AGUARDANDO_PARECER", "JUSTIFICATIVA_APRESENTADA"] }, ...schoolFilter },
     });
     if (n > 0) badgeCounts["/despachos"] = n;
+  } else if (role === "CHEFE_DIVISAO_ACADEMICA") {
+    // O Chefe da Divisão Acadêmica só decide CPIs encaminhadas pela Escola.
+    const n = await prisma.communication.count({
+      where: { status: "AGUARDANDO_DECISAO_DIVISAO" },
+    });
+    if (n > 0) badgeCounts["/despachos"] = n;
+  } else if (role === "ADMINISTRADOR") {
+    const n = await prisma.communication.count({
+      where: { status: { in: ["AGUARDANDO_DECISAO", "AGUARDANDO_DECISAO_DIVISAO"] }, ...schoolFilter },
+    });
+    if (n > 0) badgeCounts["/despachos"] = n;
   } else if ((COMANDANTES as string[]).includes(role)) {
     const n = await prisma.communication.count({
       where: { status: "AGUARDANDO_DECISAO", ...schoolFilter },
@@ -28,7 +39,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     if (n > 0) badgeCounts["/despachos"] = n;
   } else if ((VIEWERS_APM as string[]).includes(role)) {
     const n = await prisma.communication.count({
-      where: { status: { in: ["AGUARDANDO_PARECER", "JUSTIFICATIVA_APRESENTADA", "AGUARDANDO_DECISAO"] } },
+      where: { status: { in: ["AGUARDANDO_PARECER", "JUSTIFICATIVA_APRESENTADA", "AGUARDANDO_DECISAO", "AGUARDANDO_DECISAO_DIVISAO"] } },
     });
     if (n > 0) badgeCounts["/despachos"] = n;
   }

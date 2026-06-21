@@ -180,13 +180,13 @@ function TabelaTipo({ items, label, note, isTdTac, bar, barText, title }: { item
               <td className="cd-col-proto" style={{ fontFamily: "monospace", fontSize: "6pt" }}>
                 {item.communication.protocolNumber}
               </td>
-              <td className="cd-col-enq" style={{ color: "#1e3a8a" }}>
+              <td className="cd-col-enq" style={{ color: "#000" }}>
                 {isTdTac
                   ? item.recordType
                   : fmtEnq(item.communication.article, item.communication.item, item.communication.letter)}
               </td>
               <td className="cd-col-data">{format(new Date(item.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
-              <td className="cd-col-obs" style={{ color: "#666" }}>{obsCell(item)}</td>
+              <td className="cd-col-obs" style={{ color: "#000" }}>{obsCell(item)}</td>
               <td className="cd-col-pont" style={{ fontWeight: "bold" }}>
                 {item.score != null
                   ? (["Referência Elogiosa", "Elogio publicado em BI"].includes(item.recordType)
@@ -352,11 +352,6 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
         </div>
       ))}
 
-      {/* Rodapé */}
-      <div style={{ fontSize: "7pt", marginTop: 2, marginBottom: 4, textAlign: "right" }}>
-        <span>LAVRADO EM: {format(new Date(), "dd/MM/yyyy", { locale: ptBR })}</span>
-      </div>
-
       {/* Assinatura — função sempre preenchida; nome em branco se não houver
           titular ativo na função no momento da geração. */}
       <div className="print-signatures" style={{ marginTop: 45 }}>
@@ -465,16 +460,16 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
         </div>
         <div className="cd-meta-row">
           <div className="print-field">
-            <label>Data de publicação</label>
-            <span>{caderno.publicationDate ? format(new Date(caderno.publicationDate), "dd/MM/yyyy", { locale: ptBR }) : "Não publicado"}</span>
+            <label>Situação</label>
+            <span>{caderno.status === "PUBLICADO" ? "Publicado" : "Rascunho"}</span>
           </div>
           <div className="print-field" style={{ textAlign: "center" }}>
             <label>Total de registros</label>
             <span>{totalRegistros}</span>
           </div>
           <div className="print-field" style={{ textAlign: "right" }}>
-            <label>Situação</label>
-            <span>{caderno.status === "PUBLICADO" ? "Publicado" : "Rascunho"}</span>
+            <label>Data de publicação</label>
+            <span>{caderno.publicationDate ? format(new Date(caderno.publicationDate), "dd/MM/yyyy", { locale: ptBR }) : "Não publicado"}</span>
           </div>
         </div>
         {/* Quantidade de cada tipo (omitindo os zerados), centralizado */}

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/db";
-import { verifySession, canEmitOpinion, canDecide, canChangeBookDecision, ESFO_CFO_RANK, cursosPermitidosParaCPI, escolaNoEscopo } from "@/lib/dal";
+import { verifySession, canEmitOpinion, canDecide, canDecideAsCommander, canDecideAsDivision, canChangeBookDecision, ESFO_CFO_RANK, cursosPermitidosParaCPI, escolaNoEscopo } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
 import { criarComProtocoloUnico } from "@/lib/protocolo";
 import { comTransacaoRetry, adicionarAoCaderno } from "@/lib/caderno";
@@ -365,10 +365,12 @@ export async function tomarCienciaSemDefesa(_prev: State, formData: FormData): P
   if (comm.status !== "AGUARDANDO_CIENCIA")
     return { error: "Esta comunicação não aguarda ciência." };
 
-  // Sem defesa (ou Referência Elogiosa, cuja única opção é tomar ciência): não há
-  // o que o Oficial avaliar em parecer, então a comunicação segue DIRETO para a
-  // decisão do Comandante da escola, registrando a mensagem padrão de ciência.
+  // Referência Elogiosa: após a ciência, segue para o PARECER do Oficial da
+  // escola (que recomenda homologação ou arquivamento) e só depois vai à decisão
+  // do Comandante. CPI sem defesa não tem parecer a avaliar e segue DIRETO ao
+  // Comandante. Em ambos os casos registra a mensagem padrão de ciência.
   const ehElogiosa = comm.type.name.toLowerCase().includes("elogiosa");
+  const proximoStatus = ehElogiosa ? "AGUARDANDO_PARECER" : "AGUARDANDO_DECISAO";
   const mensagemPadrao = ehElogiosa
     ? "O aluno tomou ciência da Referência Elogiosa."
     : "O aluno tomou ciência da comunicação e optou por não apresentar defesa.";
@@ -379,11 +381,11 @@ export async function tomarCienciaSemDefesa(_prev: State, formData: FormData): P
     });
     await prisma.communication.update({
       where: { id: communicationId },
-      data: { status: "AGUARDANDO_DECISAO" },
+      data: { status: proximoStatus },
     });
     await auditLog(session.userId, "CIENCIA_SEM_DEFESA", "Communication", communicationId,
       ehElogiosa
-        ? "Ciência da Referência Elogiosa — encaminhado ao Comandante para decisão"
+        ? "Ciência da Referência Elogiosa — encaminhado ao Oficial para parecer"
         : "Ciência sem defesa — encaminhado ao Comandante para decisão");
   } catch (e) {
     logger.error("tomarCienciaSemDefesa", e, { communicationId });
@@ -544,7 +546,49 @@ export async function emitirParecer(_prev: State, formData: FormData): Promise<S
   redirect(`/comunicacoes/${communicationId}`);
 }
 
-// ── Proferir decisão (Comandante) ─────────────────────────────────────────
+// ── Encaminhar CPI ao Chefe da Divisão Acadêmica ──────────────────────────
+// Quando o Comandante da Escola se julga impedido de decidir uma CPI, encaminha
+// o caso (com motivo obrigatório) à decisão do Chefe da Divisão Acadêmica.
+// Exclusivo de CPIs — não se aplica a Referência Elogiosa.
+export async function encaminharParaDivisao(_prev: State, formData: FormData): Promise<State> {
+  const session = await verifySession();
+  if (!canDecideAsCommander(session.role, session.additionalRoles))
+    return { error: "Sem permissão para encaminhar à Divisão Acadêmica." };
+
+  const communicationId = String(formData.get("communicationId") ?? "");
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!reason) return { error: "Informe o motivo do encaminhamento." };
+
+  const comm = await prisma.communication.findUnique({
+    where: { id: communicationId },
+    select: { status: true, type: { select: { name: true } }, course: { select: { school: true } } },
+  });
+  if (!comm) return { error: "Comunicação não encontrada." };
+  if (!escolaNoEscopo(session, comm.course.school))
+    return { error: "Sem permissão: comunicação de outra escola." };
+  if (!comm.type.name.toUpperCase().startsWith("CPI"))
+    return { error: "Encaminhamento à Divisão Acadêmica é exclusivo de CPIs." };
+  if (comm.status !== "AGUARDANDO_DECISAO")
+    return { error: "Esta comunicação não está aguardando decisão do Comandante." };
+
+  try {
+    await prisma.communication.update({
+      where: { id: communicationId },
+      data: {
+        status: "AGUARDANDO_DECISAO_DIVISAO",
+        divisionForwardReason: reason,
+        divisionForwardedAt: new Date(),
+      },
+    });
+    await auditLog(session.userId, "ENCAMINHAR_DIVISAO", "Communication", communicationId, reason);
+  } catch (e) {
+    logger.error("encaminharParaDivisao", e, { communicationId });
+    return { error: "Erro ao encaminhar. Tente novamente." };
+  }
+  redirect(`/comunicacoes/${communicationId}`);
+}
+
+// ── Proferir decisão (Comandante ou Chefe da Divisão Acadêmica) ────────────
 export async function proferirDecisao(_prev: State, formData: FormData): Promise<State> {
   const session = await verifySession();
   if (!canDecide(session.role, session.additionalRoles)) return { error: "Sem permissão para proferir decisão." };
@@ -564,8 +608,19 @@ export async function proferirDecisao(_prev: State, formData: FormData): Promise
   if (!commOriginal) return { error: "Comunicação não encontrada." };
   if (!escolaNoEscopo(session, commOriginal.course.school))
     return { error: "Sem permissão: comunicação de outra escola." };
-  if (commOriginal.status !== "AGUARDANDO_DECISAO")
+  // Quem decide depende de para quem a CPI está endereçada:
+  //  - AGUARDANDO_DECISAO          → Comandante da Escola (ou Admin)
+  //  - AGUARDANDO_DECISAO_DIVISAO  → Chefe da Divisão Acadêmica (ou Admin),
+  //    somente após o Comandante encaminhar.
+  if (commOriginal.status === "AGUARDANDO_DECISAO") {
+    if (!canDecideAsCommander(session.role, session.additionalRoles))
+      return { error: "Sem permissão para proferir decisão." };
+  } else if (commOriginal.status === "AGUARDANDO_DECISAO_DIVISAO") {
+    if (!canDecideAsDivision(session.role, session.additionalRoles))
+      return { error: "Apenas o Chefe da Divisão Acadêmica decide CPIs encaminhadas." };
+  } else {
     return { error: "Esta comunicação não está aguardando decisão." };
+  }
   const originalArticle = commOriginal?.article ?? null;
   const originalItem    = commOriginal?.item    ?? null;
   const originalLetter  = commOriginal?.letter  ?? null;

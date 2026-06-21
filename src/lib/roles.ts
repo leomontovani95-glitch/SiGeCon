@@ -82,6 +82,28 @@ export function canDecide(role: string, additionalRoles?: string) {
   return all.some((r) => (COMANDANTES as string[]).includes(r));
 }
 
+// Decisão de CPI: por padrão decide o Comandante da Escola (da sua escola). Ao se
+// julgar impedido, ele encaminha a CPI ao Chefe da Divisão Acadêmica, e SÓ nesse
+// caso o Chefe profere a decisão. ADMINISTRADOR acumula os dois papéis.
+export const COMMANDER_DECIDERS: UserRole[] = [
+  "ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO",
+];
+export const DIVISION_DECIDERS: UserRole[] = [
+  "ADMINISTRADOR", "CHEFE_DIVISAO_ACADEMICA",
+];
+
+// Decide os casos comuns (status AGUARDANDO_DECISAO) e pode encaminhar à Divisão.
+export function canDecideAsCommander(role: string, additionalRoles?: string) {
+  const all = effectiveRoles({ role, additionalRoles });
+  return all.some((r) => (COMMANDER_DECIDERS as string[]).includes(r));
+}
+
+// Decide apenas as CPIs encaminhadas pela Escola (status AGUARDANDO_DECISAO_DIVISAO).
+export function canDecideAsDivision(role: string, additionalRoles?: string) {
+  const all = effectiveRoles({ role, additionalRoles });
+  return all.some((r) => (DIVISION_DECIDERS as string[]).includes(r));
+}
+
 export function canRegisterCommunication(role: string) {
   return role !== "ALUNO";
 }

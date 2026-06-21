@@ -26,6 +26,7 @@ function resolveStatusLabel(c: {
     JUSTIFICATIVA_APRESENTADA: "Defesa Apresentada",
     AGUARDANDO_PARECER: "Ag. Parecer",
     AGUARDANDO_DECISAO: "Ag. Decisão",
+    AGUARDANDO_DECISAO_DIVISAO: "Ag. Decisão (Div. Acadêmica)",
     ARQUIVADA: "Arquivada",
   };
   return map[c.status] ?? c.status.replace(/_/g, " ");

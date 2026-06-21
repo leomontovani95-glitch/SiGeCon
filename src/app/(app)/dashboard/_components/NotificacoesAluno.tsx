@@ -15,6 +15,7 @@ type Notificacao = {
 const STATUS_LABELS: Record<string, string> = {
   AGUARDANDO_PARECER: "Encaminhado para parecer",
   AGUARDANDO_DECISAO: "Aguardando decisão do Cmt.",
+  AGUARDANDO_DECISAO_DIVISAO: "Aguardando decisão da Div. Acadêmica",
   DECIDIDA:           "Decisão registrada",
   PUBLICADA_CADERNO:  "Publicado em caderno",
 };

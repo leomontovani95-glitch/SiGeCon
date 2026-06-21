@@ -29,6 +29,7 @@ function resolveStatusLabel(c: {
     JUSTIFICATIVA_APRESENTADA: "Defesa Apresentada",
     AGUARDANDO_PARECER:        "Ag. Parecer",
     AGUARDANDO_DECISAO:        "Ag. Decisão",
+    AGUARDANDO_DECISAO_DIVISAO:"Ag. Decisão (Div. Acadêmica)",
     ARQUIVADA:                 "Arquivada",
   };
   return map[c.status] ?? c.status.replace(/_/g, " ");
@@ -317,6 +318,7 @@ export default async function RelatoriosPage({
               <option value="JUSTIFICATIVA_APRESENTADA">Defesa Apresentada</option>
               <option value="AGUARDANDO_PARECER">Ag. Parecer</option>
               <option value="AGUARDANDO_DECISAO">Ag. Decisão</option>
+              <option value="AGUARDANDO_DECISAO_DIVISAO">Ag. Decisão (Div. Acadêmica)</option>
               <option value="DECIDIDA_PUBLICADA">Decidida/Publicada</option>
               <option value="DECIDIDA_NAO_PUBLICADA">Decidida/Não publicada</option>
               <option value="ARQUIVADA_DEC">Arquivada</option>

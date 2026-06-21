@@ -41,7 +41,7 @@ async function getDashboardAluno(userId: string) {
   const notaProvisoria = provisItems.length > 0 ? calcularNotaPublicada([...pubItems, ...provisItems]) : nota;
 
   const trintaDiasAtras = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const STATUSES_NOTIF = ["AGUARDANDO_PARECER", "AGUARDANDO_DECISAO", "DECIDIDA", "PUBLICADA_CADERNO"];
+  const STATUSES_NOTIF = ["AGUARDANDO_PARECER", "AGUARDANDO_DECISAO", "AGUARDANDO_DECISAO_DIVISAO", "DECIDIDA", "PUBLICADA_CADERNO"];
   const notificacoes = comms
     .filter((c) => STATUSES_NOTIF.includes(c.status) && new Date(c.updatedAt) > trintaDiasAtras)
     .map((c) => ({
@@ -58,14 +58,13 @@ async function getDashboardAluno(userId: string) {
     notaProvisoria,
     temProvisorio: provisItems.length > 0,
     pendenteCiencia: comms.filter((c) => c.status === "AGUARDANDO_CIENCIA" || c.status === "AGUARDANDO_DEFESA").length,
-    prazoVencido: comms.filter((c) => c.status === "PRAZO_EXPIRADO").length,
     aguardandoParecer: comms.filter((c) => c.status === "AGUARDANDO_PARECER").length,
     decididas: comms.filter((c) => ["DECIDIDA", "PUBLICADA_CADERNO"].includes(c.status)).length,
     favoraveis: favoraveisPublicados,
     publicadas: pubItems.length,
     totalCPIs: comms.filter((c) => c.type.name.startsWith("CPI")).length,
     pendentes: comms.filter((c) =>
-      ["AGUARDANDO_CIENCIA", "AGUARDANDO_DEFESA", "PRAZO_EXPIRADO"].includes(c.status)
+      ["AGUARDANDO_CIENCIA", "AGUARDANDO_DEFESA"].includes(c.status)
     ),
     notificacoes,
   };
@@ -84,7 +83,7 @@ async function getDashboardGeral(role: string, userId: string, cf: Record<string
   const prazoCorte = new Date(agora.getTime() - 2 * 24 * 60 * 60 * 1000);
 
   const [
-    totalCPIs, aguardandoCiencia, aguardandoDefesa, prazoVencido,
+    totalCPIs, aguardandoCiencia, aguardandoDefesa,
     aguardandoParecer, aguardandoDecisao, cpisDecididasAgPublicacao, referencias, cadernosPublicados,
     commsComPrazo,
   ] = await Promise.all([
@@ -95,9 +94,10 @@ async function getDashboardGeral(role: string, userId: string, cf: Record<string
     } }),
     prisma.communication.count({ where: { ...filtroReporter, ...cf, ...adaptationFilter, status: "AGUARDANDO_CIENCIA" } }),
     prisma.communication.count({ where: { ...filtroReporter, ...cf, ...adaptationFilter, status: "AGUARDANDO_DEFESA" } }),
-    prisma.communication.count({ where: { ...filtroReporter, ...cf, ...adaptationFilter, status: "PRAZO_EXPIRADO" } }),
     prisma.communication.count({ where: { ...filtroReporter, ...cf, ...adaptationFilter, status: "AGUARDANDO_PARECER" } }),
-    prisma.communication.count({ where: { ...filtroReporter, ...cf, ...adaptationFilter, status: "AGUARDANDO_DECISAO" } }),
+    // Aguardando decisão: do Comandante da Escola OU do Chefe da Divisão
+    // Acadêmica (CPIs encaminhadas). Ambos ainda sem decisão.
+    prisma.communication.count({ where: { ...filtroReporter, ...cf, ...adaptationFilter, status: { in: ["AGUARDANDO_DECISAO", "AGUARDANDO_DECISAO_DIVISAO"] } } }),
     prisma.communication.count({ where: {
       ...filtroReporter, ...cf, ...adaptationFilter, status: "DECIDIDA",
       type: { name: { in: ["CPI 1","CPI 2","CPI 3"] } },
@@ -116,7 +116,7 @@ async function getDashboardGeral(role: string, userId: string, cf: Record<string
     prisma.communication.findMany({
       where: {
         ...cf,
-        status: { in: ["AGUARDANDO_CIENCIA", "AGUARDANDO_DEFESA", "PRAZO_EXPIRADO"] },
+        status: { in: ["AGUARDANDO_CIENCIA", "AGUARDANDO_DEFESA"] },
         defenseDeadline: { lt: prazoCorte },
       },
       include: { student: true, type: { select: { name: true } } },
@@ -192,7 +192,7 @@ async function getDashboardGeral(role: string, userId: string, cf: Record<string
   return {
     cards: {
       totalCPIs, aguardandoCienciaDefesa: aguardandoCiencia + aguardandoDefesa,
-      prazoVencido, aguardandoParecer, aguardandoDecisao, cpisDecididasAgPublicacao,
+      aguardandoParecer, aguardandoDecisao, cpisDecididasAgPublicacao,
       referencias, cpisPublicadas, elogiososPublicados, cadernosPublicados,
       cpisArquivadas, elogiososArquivados,
     },
@@ -222,7 +222,7 @@ export default async function DashboardPage({
       );
     }
 
-    const { aluno, nota, notaProvisoria, temProvisorio, pendenteCiencia, prazoVencido, aguardandoParecer, decididas, favoraveis, publicadas, totalCPIs, pendentes, notificacoes } = dados;
+    const { aluno, nota, notaProvisoria, temProvisorio, pendenteCiencia, aguardandoParecer, decididas, favoraveis, publicadas, totalCPIs, pendentes, notificacoes } = dados;
     const faixa = faixaNota(nota);
     const emRisco = zonaDeRisco(nota);
 
@@ -280,7 +280,6 @@ export default async function DashboardPage({
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
           {[
             { label: "Aguardando minha ciência/defesa", value: pendenteCiencia,    color: "bg-yellow-500",  urgent: pendenteCiencia > 0 },
-            { label: "Prazo de defesa vencido",         value: prazoVencido,       color: "bg-red-600",     urgent: prazoVencido > 0 },
             { label: "Registro ag. parecer",            value: aguardandoParecer,  color: "bg-purple-600",  urgent: false },
             { label: "Registros decididos",             value: decididas,          color: "bg-green-600",   urgent: false },
             { label: "Registros favoráveis",            value: favoraveis,         color: "bg-teal-600",    urgent: false },
@@ -316,8 +315,8 @@ export default async function DashboardPage({
                         </p>
                       )}
                     </div>
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${c.status === "PRAZO_EXPIRADO" ? "bg-red-200 text-red-900" : "bg-orange-200 text-orange-900"}`}>
-                      {c.status === "PRAZO_EXPIRADO" ? "Prazo de defesa vencido" : "Aguardando sua ciência/defesa"}
+                    <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-orange-200 text-orange-900">
+                      Aguardando sua ciência/defesa
                     </span>
                   </Link>
                 );
@@ -402,21 +401,20 @@ export default async function DashboardPage({
   });
 
   const cardsEmTramite = [
-    { label: "CPIs Registradas",              value: data.cards.totalCPIs,                 color: "bg-blue-600",   href: commUrl(undefined, "CPI") },
+    { label: "CPIs Registradas",              value: data.cards.totalCPIs,                 color: "bg-[#41bf84]",  href: commUrl(undefined, "CPI") },
     { label: "Ag. Ciência/Defesa do Aluno",   value: data.cards.aguardandoCienciaDefesa,   color: "bg-yellow-500", href: commUrl("AGUARDANDO_CIENCIA") },
-    { label: "Prazo Vencido",                 value: data.cards.prazoVencido,              color: "bg-red-600",    href: commUrl("PRAZO_EXPIRADO") },
     { label: "Aguardando Parecer",            value: data.cards.aguardandoParecer,         color: "bg-purple-600", href: commUrl("AGUARDANDO_PARECER") },
-    { label: "Aguardando Decisão",            value: data.cards.aguardandoDecisao,         color: "bg-indigo-600", href: commUrl("AGUARDANDO_DECISAO") },
-    { label: "CPIs decididas ag. publicação", value: data.cards.cpisDecididasAgPublicacao, color: "bg-green-600",  href: commUrl("DECIDIDA_NAO_PUBLICADA_TODAS", "CPI") },
-    { label: "Ref. elogiosa/Elogio",          value: data.cards.referencias,               color: "bg-teal-600",   href: commUrl(undefined, "FAVORAVEL") },
+    { label: "Aguardando Decisão",            value: data.cards.aguardandoDecisao,         color: "bg-indigo-600", href: commUrl("AGUARDANDO_DECISAO_TODAS") },
+    { label: "CPIs decididas ag. publicação", value: data.cards.cpisDecididasAgPublicacao, color: "bg-[#ff9203]",  href: commUrl("DECIDIDA_NAO_PUBLICADA_TODAS", "CPI") },
+    { label: "Ref. elogiosa/Elogio",          value: data.cards.referencias,               color: "bg-[#12e62b]",  href: commUrl("EM_TRAMITE_NAO_PUBLICADA", "FAVORAVEL") },
   ];
 
   const cardsTramitadas = [
-    { label: "CPIs c/ sanção publicadas",                       value: data.cards.cpisPublicadas,      color: "bg-slate-700",   href: commUrl("DECIDIDA_PUBLICADA",      "CPI") },
-    { label: "Ref. elogiosa/Elogio homologados publicados",      value: data.cards.elogiososPublicados, color: "bg-emerald-700", href: commUrl("DECIDIDA_PUBLICADA",      "FAVORAVEL") },
-    { label: "Cadernos publicados",                             value: data.cards.cadernosPublicados,  color: "bg-cyan-700",    href: situacao !== "ativos" ? `/caderno?situacao=${situacao}` : "/caderno" },
+    { label: "CPIs c/ sanção publicadas",                       value: data.cards.cpisPublicadas,      color: "bg-[#fc0f0f]",   href: commUrl("DECIDIDA_PUBLICADA",      "CPI") },
+    { label: "Ref. elogiosa/Elogio homologados publicados",      value: data.cards.elogiososPublicados, color: "bg-[#07e03a]",   href: commUrl("DECIDIDA_PUBLICADA",      "FAVORAVEL") },
+    { label: "Cadernos publicados",                             value: data.cards.cadernosPublicados,  color: "bg-[#16acde]",   href: situacao !== "ativos" ? `/caderno?situacao=${situacao}` : "/caderno" },
     { label: "CPIs arquivadas (sem desconto)",                  value: data.cards.cpisArquivadas,      color: "bg-slate-500",   href: commUrl("ARQUIVADA_PUBLICADA",     "CPI") },
-    { label: "Ref. elogiosa/Elogio arquivados (sem acréscimo)", value: data.cards.elogiososArquivados, color: "bg-emerald-500", href: commUrl("ARQUIVADA_PUBLICADA",     "FAVORAVEL") },
+    { label: "Ref. elogiosa/Elogio arquivados (sem acréscimo)", value: data.cards.elogiososArquivados, color: "bg-slate-500",   href: commUrl("ARQUIVADA_PUBLICADA",     "FAVORAVEL") },
   ];
 
   const agora = new Date();
@@ -468,7 +466,7 @@ export default async function DashboardPage({
       {/* Em trâmite */}
       <div className="mb-6">
         <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Em trâmite</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
           {cardsEmTramite.map((card) => (
             <Link key={card.label} href={card.href} className={`${card.color} rounded-xl p-4 text-white hover:brightness-110 transition-[filter] cursor-pointer`}>
               <p className="text-3xl font-bold">{card.value}</p>

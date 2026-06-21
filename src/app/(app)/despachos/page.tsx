@@ -24,12 +24,14 @@ const STATUS_LABELS: Record<string, string> = {
   AGUARDANDO_PARECER:          "Ag. Parecer",
   JUSTIFICATIVA_APRESENTADA:   "Defesa Apresentada",
   AGUARDANDO_DECISAO:          "Ag. Decisão",
+  AGUARDANDO_DECISAO_DIVISAO:  "Ag. Decisão (Div. Acadêmica)",
 };
 
 const STATUS_COLORS: Record<string, string> = {
   AGUARDANDO_PARECER:          "bg-purple-100 text-purple-700",
   JUSTIFICATIVA_APRESENTADA:   "bg-orange-100 text-orange-700",
   AGUARDANDO_DECISAO:          "bg-indigo-100 text-indigo-700",
+  AGUARDANDO_DECISAO_DIVISAO:  "bg-sky-100 text-sky-700",
 };
 
 const DECISORES = COMANDANTES as string[];
@@ -45,6 +47,10 @@ export default async function DespachoPage({
   const isParecerista = (PARECERISTAS as string[]).includes(role);
   const isDecisor     = DECISORES.includes(role);
   const isViewer      = (VIEWERS_APM as string[]).includes(role);
+  // O Chefe da Divisão Acadêmica só decide CPIs encaminhadas pela Escola; o
+  // Administrador acumula os dois papéis de decisão.
+  const isChefeDivisao = role === "CHEFE_DIVISAO_ACADEMICA";
+  const isAdmin        = role === "ADMINISTRADOR";
 
   if (!isParecerista && !isDecisor && !isViewer) redirect("/acesso-negado");
 
@@ -69,10 +75,14 @@ export default async function DespachoPage({
 
   // Filtro de status por perfil
   const statusFilter = isViewer
-    ? { status: { in: ["AGUARDANDO_PARECER", "JUSTIFICATIVA_APRESENTADA", "AGUARDANDO_DECISAO"] } }
+    ? { status: { in: ["AGUARDANDO_PARECER", "JUSTIFICATIVA_APRESENTADA", "AGUARDANDO_DECISAO", "AGUARDANDO_DECISAO_DIVISAO"] } }
     : isParecerista
       ? { status: { in: ["AGUARDANDO_PARECER", "JUSTIFICATIVA_APRESENTADA"] } }
-      : { status: "AGUARDANDO_DECISAO" };
+      : isChefeDivisao
+        ? { status: "AGUARDANDO_DECISAO_DIVISAO" }
+        : isAdmin
+          ? { status: { in: ["AGUARDANDO_DECISAO", "AGUARDANDO_DECISAO_DIVISAO"] } }
+          : { status: "AGUARDANDO_DECISAO" };
 
   const comunicacoes = await prisma.communication.findMany({
     where: { ...statusFilter, ...cursoFilter },

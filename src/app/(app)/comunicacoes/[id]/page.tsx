@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { verifySession, canEmitOpinion, canChangeBookDecision, escolaNoEscopo, getSchoolFilter } from "@/lib/dal";
+import { verifySession, canEmitOpinion, canChangeBookDecision, canDecideAsCommander, canDecideAsDivision, escolaNoEscopo, getSchoolFilter } from "@/lib/dal";
 import { formatCadernoNumero } from "@/lib/utils";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
@@ -16,6 +16,7 @@ const STATUS_LABELS: Record<string, string> = {
   JUSTIFICATIVA_APRESENTADA: "Justificativa/Defesa Apresentada",
   PRAZO_EXPIRADO: "Prazo Expirado", AGUARDANDO_PARECER: "Aguardando Parecer",
   PARECER_EMITIDO: "Parecer Emitido", AGUARDANDO_DECISAO: "Aguardando Decisão do Comandante",
+  AGUARDANDO_DECISAO_DIVISAO: "Aguardando Decisão do Chefe da Divisão Acadêmica",
   DECIDIDA: "Decidida", ARQUIVADA: "Arquivada", PUBLICADA_CADERNO: "Publicada em Caderno",
   FINALIZADA: "Finalizada", DEVOLVIDA: "Devolvida para Complementação",
 };
@@ -102,6 +103,13 @@ export default async function ComunicacaoPage({
       date: comm.opinions[0].createdAt as Date | null,
       done: true,
       color: "bg-purple-500",
+      hideComunicante: true,
+    }] : []),
+    ...(comm.divisionForwardedAt ? [{
+      label: "Encaminhada à Divisão Acadêmica",
+      date: comm.divisionForwardedAt as Date | null,
+      done: true,
+      color: "bg-sky-500",
       hideComunicante: true,
     }] : []),
     ...(comm.decisions.length > 0 ? [{
@@ -344,6 +352,19 @@ export default async function ComunicacaoPage({
         </div>
       )}
 
+      {!ehComunicante && comm.divisionForwardReason && (
+        <div className="bg-sky-50 rounded-xl border border-sky-200 p-4 mb-4">
+          <h2 className="text-xs font-semibold text-sky-700 uppercase tracking-wide mb-2">Encaminhamento à Divisão Acadêmica</h2>
+          <p className="text-sm text-gray-700 whitespace-pre-wrap">{comm.divisionForwardReason}</p>
+          {comm.divisionForwardedAt && (
+            <p className="text-xs text-gray-400 mt-2">
+              Encaminhada pelo Comandante da Escola em {format(new Date(comm.divisionForwardedAt), "dd/MM/yyyy", { locale: ptBR })}
+              {comm.status === "AGUARDANDO_DECISAO_DIVISAO" ? " — aguardando decisão do Chefe da Divisão Acadêmica." : "."}
+            </p>
+          )}
+        </div>
+      )}
+
       {!ehComunicante && comm.opinions.length > 0 && (
         <div className="bg-purple-50 rounded-xl border border-purple-200 p-4 mb-4">
           <h2 className="text-xs font-semibold text-purple-700 uppercase tracking-wide mb-2">Parecer</h2>
@@ -476,10 +497,13 @@ export default async function ComunicacaoPage({
           typeScore: comm.type.score,
           halfCpi1: comm.halfCpi1,
           item: comm.item,
+          divisionForwardReason: comm.divisionForwardReason,
         }}
         session={{ role: session.role, userId: session.userId, email: session.email }}
         alunoEhEssePerfil={alunoEhEssePerfil}
         mostraFormDefesa={mostraFormDefesa}
+        podeDecidirComandante={canDecideAsCommander(session.role, session.additionalRoles)}
+        podeDecidirDivisao={canDecideAsDivision(session.role, session.additionalRoles)}
         tipos={tiposComunicacao}
         manualRules={manualRules.map((r) => ({
           id: r.id,

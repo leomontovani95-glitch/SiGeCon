@@ -16,6 +16,7 @@ const STATUS_MAP: Record<string, string> = {
   AGUARDANDO_DEFESA: "Ag. Ciência/Defesa",
   PRAZO_EXPIRADO: "Prazo Expirado",
   AGUARDANDO_PARECER: "Ag. Parecer", AGUARDANDO_DECISAO: "Ag. Decisão",
+  AGUARDANDO_DECISAO_DIVISAO: "Ag. Decisão (Div. Acadêmica)",
   DECIDIDA: "Decidida", ARQUIVADA: "Arquivada",
   PUBLICADA_CADERNO: "Publicada em Caderno", FINALIZADA: "Finalizada",
 };

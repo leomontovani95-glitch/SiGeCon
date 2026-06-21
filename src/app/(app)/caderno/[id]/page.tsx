@@ -109,9 +109,10 @@ function TabelaGrupo({ items, thBase, tdBase, tipo }: { items: GrupoItem[]; thBa
   );
 }
 
-export default async function CadernoDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CadernoDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string>> }) {
   const session = await verifySession();
   const { id } = await params;
+  const sp = await searchParams;
   const caderno = await prisma.disciplinaryBook.findUnique({
     where: { id },
     include: {
@@ -175,6 +176,50 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
 
   const totalReenquadrados = reenquadrados.length;
 
+  // ── Paginação da VISUALIZAÇÃO (40 registros por página) ──────────────────
+  // Um caderno pode ter centenas de registros; aqui limitamos para a página não
+  // ficar enorme. Os cartões de resumo continuam somando o caderno inteiro; só a
+  // listagem é paginada. Achatamos os itens na MESMA ordem de exibição das
+  // seções e mostramos a fatia da página atual, mantendo a estrutura por seção.
+  // (Revisar/Publicar segue com rolagem; o PDF gera todas as páginas.)
+  const PAGE_SIZE = 40;
+  const totalRegistros = caderno.items.length;
+  const totalPages = Math.max(1, Math.ceil(totalRegistros / PAGE_SIZE));
+  const pageRaw = parseInt(sp.page ?? "1", 10);
+  const page = isNaN(pageRaw) ? 1 : Math.min(Math.max(pageRaw, 1), totalPages);
+  const inicio = (page - 1) * PAGE_SIZE;
+  const fim = inicio + PAGE_SIZE;
+
+  const ordenados = [
+    ...gruposCPI.flatMap((g) => g.items),
+    ...reenquadrados,
+    ...tdTacItems,
+    ...gruposElogio.flatMap((g) => g.items),
+    ...arquivados,
+  ];
+  const idsPagina = new Set(ordenados.slice(inicio, fim).map((i) => i.id));
+  const naPagina = <T extends { id: string }>(arr: T[]) => arr.filter((i) => idsPagina.has(i.id));
+
+  const reenquadradosView = naPagina(reenquadrados);
+  const arquivadosView    = naPagina(arquivados);
+  const tdTacView         = naPagina(tdTacItems);
+  const gruposCPIView     = gruposCPI.map((g) => ({ tipo: g.tipo, items: naPagina(g.items), total: g.items.length })).filter((g) => g.items.length > 0);
+  const gruposElogioView  = gruposElogio.map((g) => ({ tipo: g.tipo, items: naPagina(g.items), total: g.items.length })).filter((g) => g.items.length > 0);
+
+  // Texto do cabeçalho de seção: total do grupo no caderno e, quando o grupo
+  // está dividido entre páginas, quantos aparecem nesta página.
+  const contagemSecao = (total: number, nesta: number) =>
+    total === nesta
+      ? `${total} registro${total !== 1 ? "s" : ""}`
+      : `${total} registro${total !== 1 ? "s" : ""} · ${nesta} nesta página`;
+
+  // Janela compacta de números de página (primeira, última e vizinhas da atual).
+  const pageNums: (number | "…")[] = [];
+  for (let p = 1; p <= totalPages; p++) {
+    if (p === 1 || p === totalPages || Math.abs(p - page) <= 2) pageNums.push(p);
+    else if (pageNums[pageNums.length - 1] !== "…") pageNums.push("…");
+  }
+
   // Colunas base compartilhadas
   const thBase = "text-left px-3 py-2.5 font-medium whitespace-nowrap text-xs";
   const tdBase = "px-3 py-2 text-xs";
@@ -229,12 +274,12 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
       <div className="space-y-8">
 
         {/* CPIs */}
-        {gruposCPI.map(({ tipo, items }) => (
+        {gruposCPIView.map(({ tipo, items, total }) => (
           <div key={tipo}>
             <h2 className="text-base font-bold mb-1 flex items-center gap-2" style={{ color: coresTipo(tipo).title }}>
               <span className="inline-block w-2 h-2 rounded-full" style={{ background: coresTipo(tipo).title }} />
               {tipo}
-              <span className="text-xs font-normal text-gray-400">({items.length} registro{items.length !== 1 ? "s" : ""})</span>
+              <span className="text-xs font-normal text-gray-400">({contagemSecao(total, items.length)})</span>
             </h2>
             {TIPO_NOTE[tipo] && (
               <p className="text-xs text-gray-500 mb-2 ml-4 italic">{TIPO_NOTE[tipo]}</p>
@@ -244,12 +289,12 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
         ))}
 
         {/* Reenquadramentos */}
-        {reenquadrados.length > 0 && (
+        {reenquadradosView.length > 0 && (
           <div>
             <h2 className="text-base font-bold text-orange-700 mb-2 flex items-center gap-2">
               <span className="inline-block w-2 h-2 rounded-full bg-orange-400" />
               Reenquadramento
-              <span className="text-xs font-normal text-gray-400">({reenquadrados.length} registro{reenquadrados.length !== 1 ? "s" : ""})</span>
+              <span className="text-xs font-normal text-gray-400">({contagemSecao(reenquadrados.length, reenquadradosView.length)})</span>
             </h2>
             <div className="bg-white rounded-xl border border-orange-200 overflow-x-auto">
               <table className="w-full text-sm">
@@ -267,7 +312,7 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {reenquadrados.map((item, idx) => (
+                  {reenquadradosView.map((item, idx) => (
                     <tr key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-orange-50"}>
                       <td className={`${tdBase} font-mono whitespace-nowrap`}>
                         <Link href={`/comunicacoes/${item.communicationId}`} className="text-blue-700 hover:underline">
@@ -300,12 +345,12 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
         )}
 
         {/* TD / TAC */}
-        {tdTacItems.length > 0 && (
+        {tdTacView.length > 0 && (
           <div>
             <h2 className="text-base font-bold text-orange-800 mb-2 flex items-center gap-2">
               <span className="inline-block w-2 h-2 rounded-full bg-orange-600" />
               TD / TAC — Transgressões Disciplinares e Termos de Ajuste de Conduta
-              <span className="text-xs font-normal text-gray-400">({tdTacItems.length} registro{tdTacItems.length !== 1 ? "s" : ""})</span>
+              <span className="text-xs font-normal text-gray-400">({contagemSecao(tdTacItems.length, tdTacView.length)})</span>
             </h2>
             <div className="bg-white rounded-xl border border-orange-200 overflow-x-auto">
               <table className="w-full text-sm">
@@ -322,7 +367,7 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-orange-100">
-                  {tdTacItems.map((item, idx) => (
+                  {tdTacView.map((item, idx) => (
                     <tr key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-orange-50"}>
                       <td className={`${tdBase} font-mono whitespace-nowrap`}>
                         <a href={`/comunicacoes/${item.communicationId}`} className="text-blue-700 hover:underline">
@@ -352,24 +397,24 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
         )}
 
         {/* Referências Elogiosas e Elogios em BI */}
-        {gruposElogio.map(({ tipo, items }) => (
+        {gruposElogioView.map(({ tipo, items, total }) => (
           <div key={tipo}>
             <h2 className="text-base font-bold mb-1 flex items-center gap-2" style={{ color: coresTipo(tipo).title }}>
               <span className="inline-block w-2 h-2 rounded-full" style={{ background: coresTipo(tipo).title }} />
               {tipo}
-              <span className="text-xs font-normal text-gray-400">({items.length} registro{items.length !== 1 ? "s" : ""})</span>
+              <span className="text-xs font-normal text-gray-400">({contagemSecao(total, items.length)})</span>
             </h2>
             <TabelaGrupo items={items} thBase={thBase} tdBase={tdBase} tipo={tipo} />
           </div>
         ))}
 
         {/* Arquivamentos */}
-        {arquivados.length > 0 && (
+        {arquivadosView.length > 0 && (
           <div>
             <h2 className="text-base font-bold text-gray-600 mb-2 flex items-center gap-2">
               <span className="inline-block w-2 h-2 rounded-full bg-gray-400" />
               Arquivamentos
-              <span className="text-xs font-normal text-gray-400">({arquivados.length} registro{arquivados.length !== 1 ? "s" : ""})</span>
+              <span className="text-xs font-normal text-gray-400">({contagemSecao(arquivados.length, arquivadosView.length)})</span>
             </h2>
             <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
               <table className="w-full text-sm">
@@ -386,7 +431,7 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {arquivados.map((item, idx) => (
+                  {arquivadosView.map((item, idx) => (
                     <tr key={item.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
                       <td className={`${tdBase} font-mono whitespace-nowrap`}>
                         <Link href={`/comunicacoes/${item.communicationId}`} className="text-blue-700 hover:underline">
@@ -419,6 +464,42 @@ export default async function CadernoDetailPage({ params }: { params: Promise<{ 
           </div>
         )}
       </div>
+
+      {/* Paginação da visualização (40 por página) */}
+      {totalPages > 1 && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs text-gray-500">
+            Mostrando {inicio + 1}–{Math.min(fim, totalRegistros)} de {totalRegistros} registros · Página {page} de {totalPages}
+          </p>
+          <nav className="flex items-center gap-1">
+            {page > 1 && (
+              <Link href={`/caderno/${id}?page=${page - 1}`} className="px-2.5 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+                ← Anterior
+              </Link>
+            )}
+            {pageNums.map((p, i) =>
+              p === "…" ? (
+                <span key={`gap-${i}`} className="px-2 text-xs text-gray-400">…</span>
+              ) : (
+                <Link
+                  key={p}
+                  href={`/caderno/${id}?page=${p}`}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                    p === page ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  {p}
+                </Link>
+              )
+            )}
+            {page < totalPages && (
+              <Link href={`/caderno/${id}?page=${page + 1}`} className="px-2.5 py-1 rounded-lg text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+                Próxima →
+              </Link>
+            )}
+          </nav>
+        </div>
+      )}
 
       {/* Rodapé */}
       <div className="mt-4 text-xs text-gray-500">

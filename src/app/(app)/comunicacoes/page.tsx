@@ -17,6 +17,7 @@ const STATUS_LABELS_BASE: Record<string, string> = {
   AGUARDANDO_PARECER:          "Ag. Parecer",
   PARECER_EMITIDO:             "Parecer Emitido",
   AGUARDANDO_DECISAO:          "Ag. Decisão",
+  AGUARDANDO_DECISAO_DIVISAO:  "Ag. Decisão (Div. Acadêmica)",
   DECIDIDA:                    "Decidida",
   ARQUIVADA:                   "Arquivada",
   PUBLICADA_CADERNO:           "Pub. Caderno",
@@ -30,6 +31,7 @@ const STATUS_COLORS_BASE: Record<string, string> = {
   PRAZO_EXPIRADO:      "bg-red-100 text-red-700",
   AGUARDANDO_PARECER:  "bg-purple-100 text-purple-700",
   AGUARDANDO_DECISAO:  "bg-indigo-100 text-indigo-700",
+  AGUARDANDO_DECISAO_DIVISAO: "bg-sky-100 text-sky-700",
   DECIDIDA:            "bg-green-100 text-green-700",
   ARQUIVADA:           "bg-gray-100 text-gray-700",
   PUBLICADA_CADERNO:   "bg-teal-100 text-teal-700",
@@ -65,13 +67,15 @@ function derivedStatus(c: CommItem): { key: string; label: string; color: string
 const FILTER_OPTIONS = [
   { value: "",                        label: "Todos os status" },
   { value: "AGUARDANDO_CIENCIA",      label: "Ag. Ciência/Defesa" },
-  { value: "PRAZO_EXPIRADO",          label: "Prazo Expirado" },
   { value: "JUSTIFICATIVA_APRESENTADA", label: "Defesa Apresentada" },
   { value: "AGUARDANDO_PARECER",      label: "Ag. Parecer" },
-  { value: "AGUARDANDO_DECISAO",      label: "Ag. Decisão" },
+  { value: "AGUARDANDO_DECISAO_TODAS", label: "Ag. Decisão (Escola + Div. Acadêmica)" },
+  { value: "AGUARDANDO_DECISAO",      label: "Ag. Decisão (Comandante da Escola)" },
+  { value: "AGUARDANDO_DECISAO_DIVISAO", label: "Ag. Decisão (Div. Acadêmica)" },
   { value: "DECIDIDA_PUBLICADA",      label: "Decidida/Publicada" },
   { value: "DECIDIDA_NAO_PUBLICADA",  label: "Decidida/Não publicada" },
   { value: "DECIDIDA_NAO_PUBLICADA_TODAS", label: "Decididas ag. publicação (c/ arquivadas)" },
+  { value: "EM_TRAMITE_NAO_PUBLICADA", label: "Em trâmite/Não publicada" },
   { value: "ARQUIVADA_NAO_PUBLICADA", label: "Arquivada/Não publicada" },
   { value: "ARQUIVADA_PUBLICADA",     label: "Arquivada/Publicada" },
 ];
@@ -99,6 +103,16 @@ function buildStatusWhere(status: string): Record<string, unknown> | null {
       // card "CPIs decididas ag. publicação" e o conjunto que vai ao caderno.
       return {
         status: "DECIDIDA",
+        disciplinaryBookItems: { none: { disciplinaryBook: { status: "PUBLICADO" } } },
+      };
+    case "AGUARDANDO_DECISAO_TODAS":
+      // Aguardando decisão do Comandante da Escola ou do Chefe da Divisão
+      // Acadêmica (CPIs encaminhadas) — espelha o card do painel.
+      return { status: { in: ["AGUARDANDO_DECISAO", "AGUARDANDO_DECISAO_DIVISAO"] } };
+    case "EM_TRAMITE_NAO_PUBLICADA":
+      // Qualquer status que não seja publicado em caderno: Ag. Parecer,
+      // Ag. Decisão, Decidida/Não publicada e Arquivada/Não publicada.
+      return {
         disciplinaryBookItems: { none: { disciplinaryBook: { status: "PUBLICADO" } } },
       };
     case "ARQUIVADA_NAO_PUBLICADA":

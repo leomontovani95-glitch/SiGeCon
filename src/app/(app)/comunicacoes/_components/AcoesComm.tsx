@@ -5,6 +5,7 @@ import {
   tomarCienciaSemDefesa,
   tomarCienciaAdaptacao,
   proferirDecisao,
+  encaminharParaDivisao,
 } from "../actions";
 import { pontuacaoAutomatica } from "@/lib/pontuacao";
 
@@ -70,11 +71,13 @@ type CommInfo = {
   typeScore: number;
   halfCpi1: boolean;
   item: string | null;
+  divisionForwardReason: string | null;
 };
 type SessionInfo = { role: string; userId: string; email: string };
 
 export default function AcoesComm({
   comm, session, alunoEhEssePerfil, mostraFormDefesa, manualRules, tipos,
+  podeDecidirComandante, podeDecidirDivisao,
 }: {
   comm: CommInfo;
   session: SessionInfo;
@@ -82,6 +85,8 @@ export default function AcoesComm({
   mostraFormDefesa: boolean;
   manualRules: ManualRule[];
   tipos: Tipo[];
+  podeDecidirComandante: boolean;
+  podeDecidirDivisao: boolean;
 }) {
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [arquivoErro, setArquivoErro] = useState("");
@@ -121,11 +126,17 @@ export default function AcoesComm({
   const [semDefState, semDefAction, semDefPending] = useActionState(tomarCienciaSemDefesa, undefined);
   const [adaptacaoState, adaptacaoAction, adaptacaoPending] = useActionState(tomarCienciaAdaptacao, undefined);
   const [decisaoState, decisaoAction, decisaoPending] = useActionState(proferirDecisao, undefined);
+  const [encState, encAction, encPending] = useActionState(encaminharParaDivisao, undefined);
+  const [mostrarEncaminhar, setMostrarEncaminhar] = useState(false);
 
   const canTakeAck = alunoEhEssePerfil && comm.status === "AGUARDANDO_CIENCIA";
-  const canDecide =
-    ["ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA"].includes(session.role) &&
-    comm.status === "AGUARDANDO_DECISAO";
+  // CPI comum aguarda o Comandante; CPI encaminhada aguarda o Chefe da Divisão.
+  const isCPI = comm.typeName.toUpperCase().startsWith("CPI");
+  const decidindoComoComandante = podeDecidirComandante && comm.status === "AGUARDANDO_DECISAO";
+  const decidindoComoDivisao = podeDecidirDivisao && comm.status === "AGUARDANDO_DECISAO_DIVISAO";
+  const canDecide = decidindoComoComandante || decidindoComoDivisao;
+  // Encaminhar à Divisão: só o Comandante, em CPI aguardando a sua decisão.
+  const podeEncaminhar = decidindoComoComandante && isCPI;
 
   const baseUrl = `/comunicacoes/${comm.id}`;
 
@@ -208,7 +219,7 @@ export default function AcoesComm({
         <div className="bg-green-50 border border-green-200 rounded-xl p-5">
           <h3 className="font-semibold text-green-900 mb-2">Ciência da Referência Elogiosa</h3>
           <p className="text-sm text-gray-600 mb-4">
-            Esta é uma Referência Elogiosa. Tome ciência para registrar o seu conhecimento e encaminhar para a homologação do Comandante da Escola.
+            Esta é uma Referência Elogiosa. Tome ciência para registrar o seu conhecimento e encaminhar ao Oficial da Escola para parecer e, em seguida, à homologação do Comandante da Escola.
           </p>
           <form action={semDefAction}>
             <input type="hidden" name="communicationId" value={comm.id} />
@@ -333,10 +344,20 @@ export default function AcoesComm({
         </div>
       )}
 
-      {/* ── DECISÃO (Comandante) ─────────────────────────────── */}
+      {/* ── DECISÃO (Comandante da Escola ou Chefe da Divisão Acadêmica) ── */}
       {canDecide && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-5">
-          <h3 className="font-semibold text-green-900 mb-3">Decisão do Comandante da Escola</h3>
+          <h3 className="font-semibold text-green-900 mb-3">
+            {decidindoComoDivisao ? "Decisão do Chefe da Divisão Acadêmica" : "Decisão do Comandante da Escola"}
+          </h3>
+          {decidindoComoDivisao && comm.divisionForwardReason && (
+            <div className="bg-white border border-blue-200 rounded-lg p-3 mb-3">
+              <p className="text-xs font-semibold text-blue-800 uppercase tracking-wide mb-1">
+                Motivo do encaminhamento pelo Comandante da Escola
+              </p>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{comm.divisionForwardReason}</p>
+            </div>
+          )}
           <form action={decisaoAction} className="space-y-3">
             <input type="hidden" name="communicationId" value={comm.id} />
             <div>
@@ -503,10 +524,50 @@ export default function AcoesComm({
             {decisaoState?.error && (
               <p className="text-sm text-red-600">{decisaoState.error}</p>
             )}
-            <button type="submit" disabled={decisaoPending || !!arquivoErroDecisao} className="btn-primary">
-              {decisaoPending ? "Registrando..." : "Registrar Decisão"}
-            </button>
+            <div className="flex flex-wrap gap-3 items-center">
+              <button type="submit" disabled={decisaoPending || !!arquivoErroDecisao} className="btn-primary">
+                {decisaoPending ? "Registrando..." : "Registrar Decisão"}
+              </button>
+              {podeEncaminhar && (
+                <button
+                  type="button"
+                  onClick={() => setMostrarEncaminhar((v) => !v)}
+                  className="btn-secondary"
+                >
+                  Encaminhar para o Chefe da Divisão Acadêmica
+                </button>
+              )}
+            </div>
           </form>
+
+          {/* Encaminhamento à Divisão Acadêmica — formulário próprio (fora do
+              formulário de decisão) com motivo obrigatório. */}
+          {podeEncaminhar && mostrarEncaminhar && (
+            <form action={encAction} className="mt-4 pt-4 border-t border-green-200 space-y-3">
+              <input type="hidden" name="communicationId" value={comm.id} />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Motivo do encaminhamento ao Chefe da Divisão Acadêmica <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  name="reason"
+                  rows={4}
+                  required
+                  className="input"
+                  placeholder="Descreva por que está encaminhando esta CPI à decisão do Chefe da Divisão Acadêmica (ex.: impedimento/suspeição)."
+                />
+              </div>
+              {encState?.error && <p className="text-sm text-red-600">{encState.error}</p>}
+              <div className="flex gap-3">
+                <button type="submit" disabled={encPending} className="btn-primary">
+                  {encPending ? "Encaminhando..." : "Confirmar encaminhamento"}
+                </button>
+                <button type="button" onClick={() => setMostrarEncaminhar(false)} className="btn-secondary">
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       )}
 
