@@ -101,7 +101,7 @@ export default function PrintLayout({ title, children, extraPages, extraStyles, 
         }
         .print-header-logo {
           height: 60pt;
-          width: 60pt;
+          width: auto;
           object-fit: contain;
           flex-shrink: 0;
           display: block;
