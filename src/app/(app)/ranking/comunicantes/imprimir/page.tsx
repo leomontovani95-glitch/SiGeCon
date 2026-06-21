@@ -142,9 +142,15 @@ export default async function RankingComunicantesImprimirPage({
 
   const extraStyles = `
     @media print { @page { size: A4 landscape; } }
-    .rc-table { width: 100%; border-collapse: collapse; font-size: 8pt; }
-    .rc-table th { background: #1e3a5f; color: white; padding: 5px 6px; text-align: left; font-size: 7.5pt; text-transform: uppercase; border: 1px solid #000; }
-    .rc-table td { padding: 4px 6px; border: 1px solid #000; }
+    .rc-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 8pt; border: 1px solid #000; border-radius: 6px; }
+    .rc-table th { background: #1e3a5f; color: white; padding: 5px 6px; text-align: left; font-size: 7.5pt; text-transform: uppercase; border-right: 1px solid #000; border-bottom: 1px solid #000; }
+    .rc-table td { padding: 4px 6px; border-right: 1px solid #000; border-bottom: 1px solid #000; }
+    .rc-table tr > *:last-child { border-right: none; }
+    .rc-table tbody tr:last-child td { border-bottom: none; }
+    .rc-table thead th:first-child { border-top-left-radius: 5px; }
+    .rc-table thead th:last-child { border-top-right-radius: 5px; }
+    .rc-table tbody tr:last-child td:first-child { border-bottom-left-radius: 5px; }
+    .rc-table tbody tr:last-child td:last-child { border-bottom-right-radius: 5px; }
     .rc-table tr:nth-child(even) td { background: #f9fafb; }
     .rc-num { font-family: monospace; }
   `;

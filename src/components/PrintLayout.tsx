@@ -154,9 +154,15 @@ export default function PrintLayout({ title, children, extraPages, extraStyles, 
         .print-protocol { font-family: monospace; font-size: 11pt; font-weight: bold; color: #1e3a5f; }
         .print-signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 40px; break-inside: avoid; page-break-inside: avoid; }
         .print-sig-line { border-top: 1px solid #000; padding-top: 6px; text-align: center; font-size: 9pt; }
-        .print-table { width: 100%; border-collapse: collapse; font-size: 9pt; }
-        .print-table th { background: #1e3a5f; color: white; padding: 6px 8px; text-align: left; font-size: 8pt; border: 1px solid #000; }
-        .print-table td { padding: 5px 8px; border: 1px solid #000; }
+        .print-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 9pt; border: 1px solid #000; border-radius: 6px; }
+        .print-table th { background: #1e3a5f; color: white; padding: 6px 8px; text-align: left; font-size: 8pt; border-right: 1px solid #000; border-bottom: 1px solid #000; }
+        .print-table td { padding: 5px 8px; border-right: 1px solid #000; border-bottom: 1px solid #000; }
+        .print-table tr > *:last-child { border-right: none; }
+        .print-table tbody tr:last-child td { border-bottom: none; }
+        .print-table thead th:first-child { border-top-left-radius: 5px; }
+        .print-table thead th:last-child { border-top-right-radius: 5px; }
+        .print-table tbody tr:last-child td:first-child { border-bottom-left-radius: 5px; }
+        .print-table tbody tr:last-child td:last-child { border-bottom-right-radius: 5px; }
         .print-table tr:nth-child(even) td { background: #f9fafb; }
         .print-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 8pt; font-weight: bold; }
         .badge-desfav { background: #fee2e2; color: #991b1b; }
