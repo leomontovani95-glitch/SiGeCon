@@ -406,9 +406,9 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
       @page { size: A4 portrait; margin: 6mm 5mm 6mm 5mm; }
       .print-page, .extra-page { padding: 2mm 3mm 4mm 3mm !important; }
     }
-    .cd-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 7pt; table-layout: fixed; border: 1px solid #d1d5db; border-radius: 6px; }
-    .cd-table th { padding: 4px 5px; font-size: 6.5pt; text-align: center; text-transform: uppercase; font-weight: bold; overflow: hidden; white-space: nowrap; border-right: 1px solid #d1d5db; border-bottom: 1px solid #d1d5db; }
-    .cd-table td { padding: 3px 4px; border-right: 1px solid #d1d5db; border-bottom: 1px solid #d1d5db; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; text-align: center; }
+    .cd-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 7pt; table-layout: fixed; border: 1px solid #000; border-radius: 6px; }
+    .cd-table th { padding: 4px 5px; font-size: 6.5pt; text-align: center; text-transform: uppercase; font-weight: bold; overflow: hidden; white-space: nowrap; border-right: 1px solid #000; border-bottom: 1px solid #000; }
+    .cd-table td { padding: 3px 4px; border-right: 1px solid #000; border-bottom: 1px solid #000; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; text-align: center; }
     .cd-table tr > *:last-child { border-right: none; }
     .cd-table tbody tr:last-child td { border-bottom: none; }
     .cd-table thead th:first-child { border-top-left-radius: 5px; }
@@ -427,14 +427,17 @@ export default async function ImprimirCadernoPage({ params }: { params: Promise<
     .aacp-table { width: 100%; border-collapse: collapse; font-size: 7.5pt; table-layout: fixed; }
     .aacp-table th { background: #1e3a5f; color: white; padding: 4px 5px; font-size: 7pt; text-align: left; border: 1px solid #000; }
     .aacp-table td { padding: 2px 5px; border: 1px solid #000; vertical-align: middle; }
-    .cd-title-block { text-align: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #ccc; }
+    .cd-title-block { text-align: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #000; }
     .cd-title-block p { margin: 0 0 3px 0; color: #1e3a5f; font-weight: bold; letter-spacing: 0.5px; line-height: 1.3; }
     .cd-title-block .cd-curso   { font-size: 11pt; }
     .cd-title-block .cd-caderno { font-size: 12.5pt; margin-top: 5px; }
     .cd-meta-row { display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: flex-end; gap: 16px; }
     .cd-meta-row .print-field { margin-bottom: 0; }
-    .cd-counts { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 2px 0; margin-top: 7px; padding-top: 5px; border-top: 1px solid #e5e7eb; }
-    .cd-count { font-size: 8pt; color: #6b7280; white-space: nowrap; padding: 0 12px; border-right: 1px solid #d1d5db; }
+    /* Cabeçalho do caderno em preto: rótulos (negrito), valores e os contadores. */
+    .cd-meta-row .print-field label { color: #000; }
+    .cd-meta-row .print-field span { color: #000; }
+    .cd-counts { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 2px 0; margin-top: 7px; padding-top: 5px; border-top: 1px solid #000; }
+    .cd-count { font-size: 8pt; color: #000; white-space: nowrap; padding: 0 12px; border-right: 1px solid #000; }
     .cd-count:last-child { border-right: none; }
     .cd-count strong { font-size: 9.5pt; color: #1e3a5f; margin-right: 2px; }
     .cd-header-section { margin-bottom: 4px !important; }
