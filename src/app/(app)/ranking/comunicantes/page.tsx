@@ -187,13 +187,38 @@ export default async function RankingComunicantesPage({
     );
   }
 
+  // Parâmetros de exportação (PDF/CSV): refletem busca, tipo e ordenação atuais.
+  const exportParams = new URLSearchParams({
+    ...(busca   ? { busca }   : {}),
+    ...(tipo    ? { tipo }    : {}),
+    ...(sortBy  !== "total" ? { sortBy }  : {}),
+    ...(sortDir !== "desc"  ? { sortDir } : {}),
+  }).toString();
+
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Ranking de Comunicantes</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Usuários e alunos que mais apareceram como comunicante. Clique em qualquer título para ordenar.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Ranking de Comunicantes</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Usuários e alunos que mais apareceram como comunicante. Clique em qualquer título para ordenar.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Link
+            href={`/ranking/comunicantes/imprimir${exportParams ? `?${exportParams}` : ""}`}
+            target="_blank"
+            className="bg-[#1e3a5f] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#16304f] transition-colors flex items-center gap-2"
+          >
+            <span>📄</span> Gerar PDF
+          </Link>
+          <a
+            href={`/api/export/comunicantes${exportParams ? `?${exportParams}` : ""}`}
+            className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition-colors flex items-center gap-2"
+          >
+            <span>⬇</span> Exportar CSV
+          </a>
+        </div>
       </div>
 
       {/* Filtros */}
