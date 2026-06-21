@@ -28,6 +28,9 @@ export default async function UsuarioPage({ params }: { params: Promise<{ id: st
   const session = await verifySession();
   const { id } = await params;
 
+  // Alunos não acessam fichas de usuários (dados cadastrais do efetivo).
+  if (session.role === "ALUNO") notFound();
+
   const usuario = await prisma.user.findUnique({ where: { id } });
   if (!usuario || usuario.role === "ALUNO") notFound();
 

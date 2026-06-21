@@ -66,6 +66,9 @@ export default async function AlunoPage({
   ]);
   if (!aluno) notFound();
 
+  // Alunos não podem ver a ficha cadastral de outros alunos (só a própria).
+  if (session.role === "ALUNO" && aluno.userId !== session.userId) notFound();
+
   // Matrículas da mesma pessoa (mesmo RG) — atual + cursos anteriores (ascensão).
   // Cada matrícula tem histórico próprio; todas permanecem acessíveis.
   const { records: matriculas, currentId } = await getMatriculas(aluno.rg);

@@ -72,6 +72,10 @@ export default async function ComunicacaoPage({
   // apoio (Chefe de Curso e Setor de Protocolo).
   const vistaRestrita = ehComunicante || temVistaRestritaComunicacao(session.role);
 
+  // Alunos não navegam para fichas cadastrais (de usuários ou de alunos): os
+  // nomes aparecem como texto simples, sem link.
+  const isAluno = session.role === "ALUNO";
+
   const cadernoPublicado = comm.status === "PUBLICADA_CADERNO"
     ? await prisma.disciplinaryBook.findFirst({
         where: { status: "PUBLICADO", items: { some: { communicationId: comm.id } } },
@@ -178,7 +182,11 @@ export default async function ComunicacaoPage({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-2">
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Aluno / Comunicado</h2>
-          <Link href={`/alunos/${comm.student.id}`} className="font-semibold text-gray-900 hover:text-[#1e3a5f] hover:underline">{comm.student.warName}</Link>
+          {isAluno ? (
+            <span className="font-semibold text-gray-900">{comm.student.warName}</span>
+          ) : (
+            <Link href={`/alunos/${comm.student.id}`} className="font-semibold text-gray-900 hover:text-[#1e3a5f] hover:underline">{comm.student.warName}</Link>
+          )}
           <p className="text-sm text-gray-600">{comm.student.fullName}</p>
           <p className="text-sm text-gray-500">{comm.student.course.name} — Nº {comm.courseNumber}</p>
           {comm.student.platoon && <p className="text-sm text-gray-500">{comm.student.platoon.name}</p>}
@@ -195,7 +203,7 @@ export default async function ComunicacaoPage({
           <p className="text-sm text-gray-700">
             <span className="font-medium">Comunicante:</span>{" "}
             {comm.communicantName ? (
-              comm.communicantUserId ? (
+              comm.communicantUserId && !isAluno ? (
                 <Link
                   href={comm.communicantUser?.role === "ALUNO" && comm.communicantUser.student?.id
                     ? `/alunos/${comm.communicantUser.student.id}`
@@ -207,6 +215,8 @@ export default async function ComunicacaoPage({
               ) : (
                 comm.communicantName
               )
+            ) : isAluno ? (
+              comm.reporter.warName
             ) : (
               <Link href={`/usuarios/${comm.reporter.id}`} className="text-[#1e3a5f] hover:underline">
                 {comm.reporter.warName}
