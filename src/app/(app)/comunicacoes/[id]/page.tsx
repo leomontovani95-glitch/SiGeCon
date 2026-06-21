@@ -466,6 +466,7 @@ export default async function ComunicacaoPage({
                   currentScore={comm.finalScore}
                   typeScore={comm.type.score}
                   halfCpi1={comm.halfCpi1}
+                  adaptationPeriod={comm.adaptationPeriod}
                   tipos={tiposComunicacao}
                   manualRules={manualRules.map((r) => ({
                     id: r.id,

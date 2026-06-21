@@ -609,7 +609,7 @@ export async function proferirDecisao(_prev: State, formData: FormData): Promise
   // (para a pontuação automática).
   const commOriginal = await prisma.communication.findUnique({
     where: { id: communicationId },
-    select: { article: true, item: true, letter: true, halfCpi1: true, status: true, type: { select: { score: true } }, course: { select: { school: true } } },
+    select: { article: true, item: true, letter: true, halfCpi1: true, status: true, adaptationPeriod: true, type: { select: { score: true } }, course: { select: { school: true } } },
   });
   if (!commOriginal) return { error: "Comunicação não encontrada." };
   if (!escolaNoEscopo(session, commOriginal.course.school))
@@ -665,6 +665,8 @@ export async function proferirDecisao(_prev: State, formData: FormData): Promise
     const padrao = pontuacaoAutomatica(commOriginal.type.score, commOriginal.halfCpi1);
     finalScore = scoreOverride ?? padrao;
   }
+  // Período de Adaptação: a comunicação nunca pontua, qualquer que seja a decisão.
+  if (commOriginal.adaptationPeriod) finalScore = 0;
   commUpdate.finalScore = finalScore;
 
   // Processar anexos da decisão (opcionais)
@@ -755,7 +757,7 @@ export async function alterarDecisao(_prev: State, formData: FormData): Promise<
 
   const comm = await prisma.communication.findUnique({
     where: { id: communicationId },
-    select: { status: true, article: true, item: true, letter: true, halfCpi1: true, type: { select: { score: true } }, course: { select: { school: true } } },
+    select: { status: true, article: true, item: true, letter: true, halfCpi1: true, adaptationPeriod: true, type: { select: { score: true } }, course: { select: { school: true } } },
   });
   if (!comm) return { error: "Comunicação não encontrada." };
   if (!escolaNoEscopo(session, comm.course.school))
@@ -801,6 +803,9 @@ export async function alterarDecisao(_prev: State, formData: FormData): Promise<
     finalScore = scoreOverride ?? padrao;
     itemUpdate.originalArticle = null; itemUpdate.originalItem = null; itemUpdate.originalLetter = null;
   }
+  // Período de Adaptação: a comunicação NUNCA pontua (sem desconto nem acréscimo),
+  // qualquer que seja a decisão (arquivar, reenquadrar, punir/homologar).
+  if (comm.adaptationPeriod) finalScore = 0;
   commUpdate.finalScore = finalScore;
   itemUpdate.score = finalScore;
 

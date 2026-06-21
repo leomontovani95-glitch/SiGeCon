@@ -17,13 +17,14 @@ type Props = {
   currentScore: number | null;
   typeScore: number;
   halfCpi1: boolean;
+  adaptationPeriod: boolean;
   tipos: Tipo[];
   manualRules: ManualRule[];
 };
 
 export default function AlterarDecisaoBtn({
   communicationId, protocolo, recordType, isElogiosa,
-  currentDecision, currentText, currentObservation, currentScore, typeScore, halfCpi1, tipos, manualRules,
+  currentDecision, currentText, currentObservation, currentScore, typeScore, halfCpi1, adaptationPeriod, tipos, manualRules,
 }: Props) {
   const [aberto, setAberto] = useState(false);
   const [state, formAction, pending] = useActionState(alterarDecisao, undefined);
@@ -147,8 +148,17 @@ export default function AlterarDecisaoBtn({
             />
           </div>
 
-          {/* Pontuação: padrão de Tipos de Comunicação, editável pelo Comandante. */}
-          {decisao === "Arquivamento" ? (
+          {/* Pontuação: padrão de Tipos de Comunicação, editável pelo Comandante.
+              Em Período de Adaptação, a pontuação é sempre 0 e não pode mudar. */}
+          {adaptationPeriod ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Pontuação final</label>
+              <input type="hidden" name="finalScore" value="0" />
+              <p className="text-xs text-blue-800 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
+                Comunicação registrada em <strong>Período de Adaptação</strong>: a pontuação permanece <strong>0,0</strong> e não pode ser alterada — não há desconto nem acréscimo na nota de conduta, independentemente da decisão (arquivar, reenquadrar, punir/homologar).
+              </p>
+            </div>
+          ) : decisao === "Arquivamento" ? (
             <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
               Arquivamento não desconta nem acresce a nota de conduta.
             </p>
