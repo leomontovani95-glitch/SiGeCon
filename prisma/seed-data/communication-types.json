@@ -1,0 +1,65 @@
+[
+  {
+    "name": "TD Grave",
+    "description": "Transgressão Disciplinar Grave — 3,0 pontos",
+    "score": 3,
+    "scoreNature": "DESFAVORAVEL",
+    "active": true
+  },
+  {
+    "name": "TD Média",
+    "description": "Transgressão Disciplinar Média — 2,0 pontos",
+    "score": 2,
+    "scoreNature": "DESFAVORAVEL",
+    "active": true
+  },
+  {
+    "name": "Elogio publicado em BI",
+    "description": "Elogio publicado em Boletim Interno",
+    "score": 1,
+    "scoreNature": "FAVORAVEL",
+    "active": true
+  },
+  {
+    "name": "TD Leve",
+    "description": "Transgressão Disciplinar Leve — 1,0 ponto",
+    "score": 1,
+    "scoreNature": "DESFAVORAVEL",
+    "active": true
+  },
+  {
+    "name": "CPI 3",
+    "description": "CPI de terceiro grau",
+    "score": 0.6,
+    "scoreNature": "DESFAVORAVEL",
+    "active": true
+  },
+  {
+    "name": "CPI 2",
+    "description": "CPI de segundo grau",
+    "score": 0.4,
+    "scoreNature": "DESFAVORAVEL",
+    "active": true
+  },
+  {
+    "name": "CPI 1",
+    "description": "CPI de primeiro grau",
+    "score": 0.2,
+    "scoreNature": "DESFAVORAVEL",
+    "active": true
+  },
+  {
+    "name": "Referência Elogiosa",
+    "description": "Referência elogiosa registrada",
+    "score": 0.2,
+    "scoreNature": "FAVORAVEL",
+    "active": true
+  },
+  {
+    "name": "TAC",
+    "description": "Termo de Ajuste de Conduta",
+    "score": 0,
+    "scoreNature": "DESFAVORAVEL",
+    "active": true
+  }
+]
