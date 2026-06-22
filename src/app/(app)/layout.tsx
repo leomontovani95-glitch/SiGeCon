@@ -71,10 +71,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen print:block">
-      <div className="print:hidden">
-        <Sidebar role={role} additionalRoles={session.additionalRoles} rank={userRank} warName={session.warName} badgeCounts={badgeCounts} canCreateComm={canCreateComm} />
-      </div>
-      <main className="flex-1 overflow-auto bg-gray-50 print:overflow-visible print:w-full">
+      <Sidebar role={role} additionalRoles={session.additionalRoles} rank={userRank} warName={session.warName} badgeCounts={badgeCounts} canCreateComm={canCreateComm} />
+      {/* pt-14 reserva o espaço da barra superior fixa no celular; no desktop
+          (md+) e na impressão não há barra superior, então pt-0. */}
+      <main className="flex-1 overflow-auto bg-gray-50 pt-14 md:pt-0 print:overflow-visible print:w-full print:pt-0">
         {children}
       </main>
     </div>

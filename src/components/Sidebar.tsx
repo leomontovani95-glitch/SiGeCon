@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 type NavItem = {
   href: string;
@@ -92,18 +93,65 @@ export default function Sidebar({
     (!item.cfoOnly || canCreateComm)
   );
 
+  // Estado da gaveta de menu no celular. No desktop (md+) a barra é fixa e este
+  // estado não tem efeito visual. Fecha ao tocar num item (onClick nos links).
+  const [aberto, setAberto] = useState(false);
+
   return (
-    <div className="flex flex-col w-64 bg-[#1e3a5f] min-h-screen h-full">
-      <div className="flex items-center justify-center h-16 border-b border-[#16304f] px-3">
-        <div className="flex items-center gap-2.5">
+    <>
+      {/* Barra superior — só no celular (md:hidden). Abre a gaveta de menu. */}
+      <div className="md:hidden fixed top-0 inset-x-0 h-14 z-30 bg-[#1e3a5f] flex items-center justify-between px-4 print:hidden">
+        <div className="flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brasao-apm-sm.png" alt="APM/ES" style={{ height: 38, width: "auto", objectFit: "contain", flexShrink: 0 }} />
-          <div>
-            <h1 className="text-white font-bold text-lg leading-tight">SiGeCon</h1>
-            <p className="text-blue-300 text-xs leading-tight">Sistema de Gestão de Conduta</p>
-          </div>
+          <img src="/brasao-apm-sm.png" alt="APM/ES" style={{ height: 30, width: "auto", objectFit: "contain", flexShrink: 0 }} />
+          <span className="text-white font-bold text-base">SiGeCon</span>
         </div>
+        <button
+          type="button"
+          onClick={() => setAberto(true)}
+          aria-label="Abrir menu"
+          aria-expanded={aberto}
+          aria-controls="menu-lateral"
+          className="text-white text-2xl leading-none px-2 py-1 rounded hover:bg-[#253f66] focus:outline-none focus:ring-2 focus:ring-blue-300"
+        >
+          ☰
+        </button>
       </div>
+
+      {/* Fundo escurecido — só no celular, quando a gaveta está aberta. */}
+      {aberto && (
+        <div
+          className="md:hidden fixed inset-0 z-40 bg-black/50 print:hidden"
+          onClick={() => setAberto(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Painel de navegação. No celular é uma gaveta (fixed, desliza pela
+          esquerda); no desktop (md+) volta a ser a barra fixa de sempre. */}
+      <div
+        id="menu-lateral"
+        className={`flex flex-col w-64 bg-[#1e3a5f] min-h-screen h-full fixed inset-y-0 left-0 z-50 transition-transform duration-200 md:static md:z-auto md:translate-x-0 print:hidden ${aberto ? "translate-x-0" : "-translate-x-full"}`}
+      >
+        <div className="relative flex items-center justify-center h-16 border-b border-[#16304f] px-3">
+          <div className="flex items-center gap-2.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brasao-apm-sm.png" alt="APM/ES" style={{ height: 38, width: "auto", objectFit: "contain", flexShrink: 0 }} />
+            <div>
+              <h1 className="text-white font-bold text-lg leading-tight">SiGeCon</h1>
+              <p className="text-blue-300 text-xs leading-tight">Sistema de Gestão de Conduta</p>
+            </div>
+          </div>
+          {/* Fechar — só no celular. */}
+          <button
+            type="button"
+            onClick={() => setAberto(false)}
+            aria-label="Fechar menu"
+            className="md:hidden absolute right-2 top-1/2 -translate-y-1/2 text-blue-200 text-2xl leading-none px-2 py-1 rounded hover:bg-[#253f66] focus:outline-none focus:ring-2 focus:ring-blue-300"
+          >
+            ✕
+          </button>
+        </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {visibleNav.map((item) => {
@@ -113,6 +161,7 @@ export default function Sidebar({
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => setAberto(false)}
               className={`flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 active ? "bg-[#2a4d7a] text-white" : "text-blue-100 hover:bg-[#253f66] hover:text-white"
               }`}
@@ -150,6 +199,7 @@ export default function Sidebar({
           </button>
         </form>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

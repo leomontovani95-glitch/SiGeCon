@@ -130,7 +130,7 @@ export default async function CadernoPage({
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -196,7 +196,7 @@ export default async function CadernoPage({
             Esses registros têm decisão do Comandante mas não estão em nenhum caderno rascunho.
             Para incluí-los, acesse o caderno rascunho correspondente e clique em &quot;Incluir&quot;.
           </p>
-          <div className="bg-white rounded-xl border border-yellow-200 overflow-hidden">
+          <div className="bg-white rounded-xl border border-yellow-200 overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-yellow-50 border-b border-yellow-200">
                 <tr>
