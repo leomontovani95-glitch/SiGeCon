@@ -22,7 +22,8 @@ out/
 .DS_Store
 Thumbs.db
 
-# Arquivos enviados pelos usuários
+# Arquivos enviados pelos usuários (servidos com auth via /api/anexo, fora de public/)
+/uploads/
 public/uploads/
 
 # Logs

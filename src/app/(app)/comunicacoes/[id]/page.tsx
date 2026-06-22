@@ -248,7 +248,7 @@ export default async function ComunicacaoPage({
                 {provas.map((a) => (
                   <a
                     key={a.id}
-                    href={a.filePath}
+                    href={`/api/anexo/${a.id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 text-xs font-medium text-[#1e3a5f] bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 hover:bg-blue-100 transition-colors"
@@ -345,7 +345,7 @@ export default async function ComunicacaoPage({
                     {d.attachments.map((a) => (
                       <a
                         key={a.id}
-                        href={a.filePath}
+                        href={`/api/anexo/${a.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 text-xs font-medium text-[#1e3a5f] bg-white border border-[#1e3a5f] rounded-lg px-3 py-1.5 hover:bg-blue-50 transition-colors"
@@ -395,7 +395,7 @@ export default async function ComunicacaoPage({
                   {o.attachments.map((a) => (
                     <a
                       key={a.id}
-                      href={a.filePath}
+                      href={`/api/anexo/${a.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 text-xs font-medium text-purple-700 bg-white border border-purple-300 rounded-lg px-3 py-1.5 hover:bg-purple-50 transition-colors"
@@ -429,7 +429,7 @@ export default async function ComunicacaoPage({
                   {d.attachments.map((a) => (
                     <a
                       key={a.id}
-                      href={a.filePath}
+                      href={`/api/anexo/${a.id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 text-xs font-medium text-green-700 bg-white border border-green-300 rounded-lg px-3 py-1.5 hover:bg-green-50 transition-colors"

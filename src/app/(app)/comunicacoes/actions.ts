@@ -5,6 +5,7 @@ import path from "path";
 import { prisma } from "@/lib/db";
 import { verifySession, canEmitOpinion, canDecide, canDecideAsCommander, canDecideAsDivision, canChangeBookDecision, ESFO_CFO_RANK, cursosPermitidosParaCPI, escolaNoEscopo } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
+import { uploadsDir } from "@/lib/uploads";
 import { criarComProtocoloUnico } from "@/lib/protocolo";
 import { comTransacaoRetry, adicionarAoCaderno } from "@/lib/caderno";
 import { logger } from "@/lib/logger";
@@ -157,7 +158,7 @@ export async function registrarComunicacao(_prev: State, formData: FormData): Pr
   // Salvar anexos (meios de prova) vinculados à comunicação
   if (arquivosProva.length > 0) {
     try {
-      const dir = path.join(process.cwd(), "public", "uploads", commId);
+      const dir = path.join(uploadsDir(), commId);
       await mkdir(dir, { recursive: true });
       for (const arquivo of arquivosProva) {
         const ext = arquivo.name.split(".").pop() ?? "bin";
@@ -323,7 +324,7 @@ export async function tomarCienciaComDefesa(_prev: State, formData: FormData): P
 
     // Salvar cada arquivo como Attachment vinculado à defesa
     if (arquivos.length > 0) {
-      const dir = path.join(process.cwd(), "public", "uploads", communicationId);
+      const dir = path.join(uploadsDir(), communicationId);
       await mkdir(dir, { recursive: true });
       for (const arquivo of arquivos) {
         const ext = arquivo.name.split(".").pop() ?? "bin";
@@ -524,7 +525,7 @@ export async function emitirParecer(_prev: State, formData: FormData): Promise<S
 
   // Salvar anexos vinculados ao parecer
   if (arquivosParecer.length > 0) {
-    const dir = path.join(process.cwd(), "public", "uploads", communicationId);
+    const dir = path.join(uploadsDir(), communicationId);
     await mkdir(dir, { recursive: true });
     for (const arquivo of arquivosParecer) {
       const ext = arquivo.name.split(".").pop() ?? "bin";
@@ -687,7 +688,7 @@ export async function proferirDecisao(_prev: State, formData: FormData): Promise
 
   // Salvar anexos vinculados à decisão
   if (arquivosDecisao.length > 0) {
-    const dir = path.join(process.cwd(), "public", "uploads", communicationId);
+    const dir = path.join(uploadsDir(), communicationId);
     await mkdir(dir, { recursive: true });
     for (const arquivo of arquivosDecisao) {
       const ext = arquivo.name.split(".").pop() ?? "bin";
