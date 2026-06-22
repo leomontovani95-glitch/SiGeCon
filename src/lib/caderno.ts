@@ -1,13 +1,12 @@
 "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { isUniqueViolation, isBancoOcupado } from "@/lib/db-erros";
 
-function isUniqueViolation(e: unknown): boolean {
-  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
-}
-
-// Executa uma transação interativa e a repete caso colida em alguma constraint
-// @unique (ex.: número de caderno gerado concorrentemente para o mesmo curso).
+// Executa uma transação interativa e a repete em dois casos de concorrência:
+// (1) colisão de constraint @unique (ex.: número de caderno gerado ao mesmo tempo
+// para o mesmo curso) e (2) "banco ocupado" (lock de escrita do SQLite). No caso
+// do lock, espera um pouco entre tentativas (backoff) para dar vez ao escritor.
 export async function comTransacaoRetry<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
   tentativas = 5,
@@ -16,7 +15,11 @@ export async function comTransacaoRetry<T>(
     try {
       return await prisma.$transaction(fn);
     } catch (e) {
-      if (isUniqueViolation(e) && t < tentativas) continue;
+      const ocupado = isBancoOcupado(e);
+      if ((isUniqueViolation(e) || ocupado) && t < tentativas) {
+        if (ocupado) await new Promise((r) => setTimeout(r, t * 50));
+        continue;
+      }
       throw e;
     }
   }

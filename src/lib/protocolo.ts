@@ -1,6 +1,6 @@
 "server-only";
-import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { isUniqueViolation, isBancoOcupado } from "@/lib/db-erros";
 
 const prefixos: Record<string, string> = {
   "CPI 0": "CPI",
@@ -40,9 +40,11 @@ export async function gerarProtocolo(typeName: string, courseName: string, adapt
   return `${base}${String(seq).padStart(4, "0")}${sufixo}`;
 }
 
-// Gera o protocolo e tenta gravar; em caso de colisão do índice @unique
-// (dois registros concorrentes pegando o mesmo número), recalcula e tenta de
-// novo. Fecha a janela entre ler o último número e gravar o novo.
+// Gera o protocolo e tenta gravar, repetindo em dois casos de concorrência:
+// (1) colisão do índice @unique — dois registros concorrentes pegando o mesmo
+// número → recalcula e tenta de novo (fecha a janela entre ler o último e gravar);
+// (2) "banco ocupado" (lock de escrita do SQLite) → espera um pouco (backoff) e
+// repete com o mesmo número.
 export async function criarComProtocoloUnico<T>(
   typeName: string,
   courseName: string,
@@ -55,9 +57,11 @@ export async function criarComProtocoloUnico<T>(
     try {
       return await criar(protocolNumber);
     } catch (e) {
-      const colisao =
-        e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
-      if (colisao && t < tentativas) continue;
+      const ocupado = isBancoOcupado(e);
+      if ((isUniqueViolation(e) || ocupado) && t < tentativas) {
+        if (ocupado) await new Promise((r) => setTimeout(r, t * 50));
+        continue;
+      }
       throw e;
     }
   }

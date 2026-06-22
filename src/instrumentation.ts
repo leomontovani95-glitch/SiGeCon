@@ -14,6 +14,15 @@ export async function register() {
   const { processarPrazosExpirados } = await import("./lib/processar-prazos");
   const { logger } = await import("./lib/logger");
 
+  // SQLite para uso concorrente: WAL (persistente) + busy_timeout (best-effort).
+  const { aplicarPragmasSQLite } = await import("./lib/db");
+  try {
+    await aplicarPragmasSQLite();
+    logger.info("SQLite: PRAGMAs aplicados (journal_mode=WAL, busy_timeout=5000)");
+  } catch (e) {
+    logger.warn("SQLite: falha ao aplicar PRAGMAs (WAL/busy_timeout)", e);
+  }
+
   // Guarda de re-entrância: evita execuções sobrepostas no mesmo processo
   // (ex.: a do boot com a primeira do intervalo, ou um ciclo que demore).
   let rodando = false;
