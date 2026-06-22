@@ -5,16 +5,7 @@ import { redirect } from "next/navigation";
 import { calcularNotaPublicada, faixaNota } from "@/lib/score";
 import { abreviarPelotao, escolaHeaderLabel } from "@/lib/utils";
 import PrintLayout from "@/components/PrintLayout";
-
-const ORDENS_VALIDAS = ["desc", "asc", "numAsc", "numDesc"] as const;
-type Ordem = typeof ORDENS_VALIDAS[number];
-
-const ORDEM_LABELS: Record<Ordem, string> = {
-  desc:    "Nota (maior → menor)",
-  asc:     "Nota (menor → maior)",
-  numAsc:  "Número (crescente)",
-  numDesc: "Número (decrescente)",
-};
+import { compararRanking, normalizarOrdemRanking, ORDEM_RANKING_LABELS } from "@/lib/ranking-ordem";
 
 const FAIXAS = ["Excelente", "Bom", "Regular", "Atenção", "Reprovado"] as const;
 const FAIXA_CORES: Record<string, string> = {
@@ -35,7 +26,7 @@ export default async function RankingImprimirPage({
 
   const sp = await searchParams;
   const cursoId = sp.cursoId ?? "";
-  const ordem: Ordem = ORDENS_VALIDAS.includes(sp.ordem as Ordem) ? (sp.ordem as Ordem) : "desc";
+  const ordem = normalizarOrdemRanking(sp.ordem);
   const situacao = normalizeSituacaoCurso(sp.situacao);
 
   const school = getSchoolFilter(session.role, session.escola);
@@ -80,14 +71,7 @@ export default async function RankingImprimirPage({
       platoonName:  a.platoon?.name ?? null,
       nota:         calcularNotaPublicada(pubPorAluno.get(a.id) ?? []),
     }))
-    .sort((a, b) => {
-      if (ordem === "numAsc" || ordem === "numDesc") {
-        const na = parseInt(a.courseNumber, 10) || 0;
-        const nb = parseInt(b.courseNumber, 10) || 0;
-        return ordem === "numAsc" ? na - nb : nb - na;
-      }
-      return ordem === "asc" ? a.nota - b.nota : b.nota - a.nota;
-    });
+    .sort(compararRanking(ordem));
 
   const cursoSelecionado = cursosDisponiveis.find((c) => c.id === cursoId);
   const labelEscopo = school === "ESFAP" ? "EsFAP" : school === "ESFO" ? "EsFO" : "Todos os cursos";
@@ -104,7 +88,7 @@ export default async function RankingImprimirPage({
       <div className="print-section">
         <h2>Ranking de Conduta</h2>
         <p style={{ fontSize: "9pt", color: "#000", marginBottom: "10px" }}>
-          {escopo} · {ranking.length} aluno(s) · ordenação: {ORDEM_LABELS[ordem]} · notas baseadas nos cadernos publicados
+          {escopo} · {ranking.length} aluno(s) · ordenação: {ORDEM_RANKING_LABELS[ordem]} · notas baseadas nos cadernos publicados
         </p>
 
         {/* Resumo por faixa */}

@@ -131,7 +131,9 @@ export default async function RankingComunicantesImprimirPage({
     const bv = getSortValue(b, sortBy);
     const dir = sortDir === "asc" ? 1 : -1;
     if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
-    return String(av).localeCompare(String(bv), "pt-BR") * dir;
+    // numeric: ordem natural (pelotão "2º" antes de "10º"; "CFO 2" antes de "CFO 10"),
+    // em vez de alfabética, que colocaria "10" antes de "2".
+    return String(av).localeCompare(String(bv), "pt-BR", { numeric: true }) * dir;
   });
 
   const labelEscopo = school === "ESFAP" ? "EsFAP" : school === "ESFO" ? "EsFO" : "Todas as escolas";

@@ -7,10 +7,9 @@ import { calcularNotaPublicada, faixaNota } from "@/lib/score";
 import { abreviarPelotao } from "@/lib/utils";
 import Link from "next/link";
 import FaixaNotaChart from "./_components/FaixaNotaChart";
+import { compararRanking, normalizarOrdemRanking, type OrdemRanking } from "@/lib/ranking-ordem";
 
 const PER_PAGE = 50;
-const ORDENS_VALIDAS = ["desc", "asc", "numAsc", "numDesc"] as const;
-type Ordem = typeof ORDENS_VALIDAS[number];
 
 export default async function RankingPage({
   searchParams,
@@ -22,7 +21,7 @@ export default async function RankingPage({
 
   const sp = await searchParams;
   const cursoId = sp.cursoId ?? "";
-  const ordem: Ordem = ORDENS_VALIDAS.includes(sp.ordem as Ordem) ? (sp.ordem as Ordem) : "desc";
+  const ordem: OrdemRanking = normalizarOrdemRanking(sp.ordem);
   const pagina = Math.max(1, parseInt(sp.pagina ?? "1") || 1);
   const busca = (sp.busca ?? "").trim().toLowerCase();
   const situacao = normalizeSituacaoCurso(sp.situacao);
@@ -76,14 +75,7 @@ export default async function RankingPage({
       platoonName:  a.platoon?.name ?? null,
       nota:         calcularNotaPublicada(pubPorAluno.get(a.id) ?? []),
     }))
-    .sort((a, b) => {
-      if (ordem === "numAsc" || ordem === "numDesc") {
-        const na = parseInt(a.courseNumber, 10) || 0;
-        const nb = parseInt(b.courseNumber, 10) || 0;
-        return ordem === "numAsc" ? na - nb : nb - na;
-      }
-      return ordem === "asc" ? a.nota - b.nota : b.nota - a.nota;
-    });
+    .sort(compararRanking(ordem));
 
   const FAIXAS_CORES: Record<string, string> = {
     Excelente: "#166534",
@@ -143,6 +135,27 @@ export default async function RankingPage({
     let end   = start + WINDOW - 1;
     if (end > totalPaginas) { end = totalPaginas; start = Math.max(1, end - WINDOW + 1); }
     return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  }
+
+  // Cabeçalho de coluna clicável: alterna asc/desc e mostra a seta na coluna ativa
+  // (↑ asc, ↓ desc, ↕ inativa). Chamado como função (padrão do projeto).
+  function thOrdenavel(label: string, asc: OrdemRanking, desc: OrdemRanking, className = "") {
+    const isAsc = ordem === asc;
+    const isDesc = ordem === desc;
+    const proxima = isAsc ? desc : asc; // inativa→asc, asc→desc, desc→asc
+    const seta = isAsc ? "↑" : isDesc ? "↓" : "↕";
+    return (
+      <th className={`px-3 py-3 font-medium ${className}`}>
+        <Link
+          href={mkUrl({ ordem: proxima, pagina: 1 })}
+          className="inline-flex items-center gap-1 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-300 rounded"
+          aria-label={`Ordenar por ${label}`}
+        >
+          <span>{label}</span>
+          <span aria-hidden="true" className={isAsc || isDesc ? "opacity-100" : "opacity-40"}>{seta}</span>
+        </Link>
+      </th>
+    );
   }
 
   return (
@@ -248,37 +261,15 @@ export default async function RankingPage({
         <FaixaNotaChart data={faixaNotaData} />
       </div>
 
-      {/* Controles de ordenação */}
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500 font-medium">Ordenar por:</span>
-          <div className="flex rounded-lg overflow-hidden border border-gray-200 text-xs font-medium">
-            <Link href={mkUrl({ ordem: "desc", pagina: 1 })}
-              className={`px-3 py-2 transition-colors ${ordem === "desc" ? "bg-[#1e3a5f] text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
-              Nota ↓
-            </Link>
-            <Link href={mkUrl({ ordem: "asc", pagina: 1 })}
-              className={`px-3 py-2 transition-colors border-l border-gray-200 ${ordem === "asc" ? "bg-[#1e3a5f] text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
-              Nota ↑
-            </Link>
-            <Link href={mkUrl({ ordem: "numAsc", pagina: 1 })}
-              className={`px-3 py-2 transition-colors border-l border-gray-200 ${ordem === "numAsc" ? "bg-[#1e3a5f] text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
-              Nº ↑
-            </Link>
-            <Link href={mkUrl({ ordem: "numDesc", pagina: 1 })}
-              className={`px-3 py-2 transition-colors border-l border-gray-200 ${ordem === "numDesc" ? "bg-[#1e3a5f] text-white" : "bg-white text-gray-600 hover:bg-gray-50"}`}>
-              Nº ↓
-            </Link>
-          </div>
-        </div>
-
-        {totalPaginas > 1 && (
+      {/* Info de paginação (a ordenação agora é feita clicando nos cabeçalhos da tabela) */}
+      {totalPaginas > 1 && (
+        <div className="flex justify-end mb-4">
           <p className="text-xs text-gray-500">
             Página <strong>{paginaAtual}</strong> de <strong>{totalPaginas}</strong>
             {" · "}mostrando {inicio + 1}–{Math.min(inicio + PER_PAGE, totalAlunos)} de {totalAlunos}
           </p>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Tabela */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto mb-5">
@@ -286,14 +277,13 @@ export default async function RankingPage({
           <thead className="bg-[#1e3a5f] text-white">
             <tr>
               <th className="text-center px-3 py-3 font-medium w-12">Pos.</th>
-              <th className="text-left px-3 py-3 font-medium w-16">Nº</th>
-              <th className="text-left px-3 py-3 font-medium">Nome de Guerra</th>
-              {!cursoId && cursosDisponiveis.length > 1 && (
-                <th className="text-left px-3 py-3 font-medium">Curso</th>
-              )}
-              <th className="text-left px-3 py-3 font-medium">Pelotão</th>
-              <th className="text-center px-3 py-3 font-medium w-20">Nota</th>
-              <th className="text-left px-3 py-3 font-medium w-28">Classificação</th>
+              {thOrdenavel("Nº", "numAsc", "numDesc", "text-left w-16")}
+              {thOrdenavel("Nome de Guerra", "nomeAsc", "nomeDesc", "text-left")}
+              {!cursoId && cursosDisponiveis.length > 1 &&
+                thOrdenavel("Curso", "cursoAsc", "cursoDesc", "text-left")}
+              {thOrdenavel("Pelotão", "pelAsc", "pelDesc", "text-left")}
+              {thOrdenavel("Nota", "asc", "desc", "text-center w-20")}
+              {thOrdenavel("Classificação", "classAsc", "classDesc", "text-left w-28")}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
