@@ -36,8 +36,12 @@ export default async function EditarAlunoPage({ params }: { params: Promise<{ id
   // "Editar" sempre atua sobre a matrícula ATUAL (curso vigente), nunca sobre um
   // histórico anterior — mesmo quando a edição é acionada a partir da ficha de um
   // cadastro antigo (ascensão de curso). Os históricos anteriores são imutáveis.
-  const { currentId } = await getMatriculas(aluno.rg);
-  if (currentId && currentId !== aluno.id) redirect(`/alunos/${currentId}/editar`);
+  const { records, currentId } = await getMatriculas(aluno.rg);
+  // Redireciona para a matrícula atual apenas quando todos os registros com o
+  // mesmo RG pertencem à mesma pessoa (ascensão de curso). Se houver nomes
+  // divergentes, é colisão de RG entre pessoas distintas — não redireciona.
+  const mesmaPessoa = records.every((r) => r.fullName === aluno.fullName);
+  if (mesmaPessoa && currentId && currentId !== aluno.id) redirect(`/alunos/${currentId}/editar`);
 
   // Inclui também o curso atual (mesmo inativo) para que apareça no seletor de
   // curso. Respeita o escopo de escola do usuário nos cursos ativos.

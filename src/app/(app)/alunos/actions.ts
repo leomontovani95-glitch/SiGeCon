@@ -69,6 +69,26 @@ export async function salvarAluno(id: string | null, _prev: State, formData: For
 
   const rank = rankDeAluno(course.name);
 
+  // Verifica duplicidade de RG e NF entre alunos existentes. Bloqueia apenas
+  // quando o cadastro já encontrado pertence a um nome diferente (colisão real);
+  // mesma pessoa com dois cadastros (ascensão) passa normalmente.
+  const [rgDup, nfDup] = await Promise.all([
+    prisma.student.findFirst({
+      where: { rg, ...(id ? { id: { not: id } } : {}) },
+      select: { fullName: true, courseNumber: true, course: { select: { name: true } } },
+    }),
+    prisma.student.findFirst({
+      where: { functionalNumber, ...(id ? { id: { not: id } } : {}) },
+      select: { fullName: true, courseNumber: true, course: { select: { name: true } } },
+    }),
+  ]);
+  if (rgDup && rgDup.fullName !== fullName) {
+    return { error: `RG ${rg} já está cadastrado para ${rgDup.fullName} — Nº ${rgDup.courseNumber} / ${rgDup.course.name}. Verifique se é a mesma pessoa antes de prosseguir.` };
+  }
+  if (nfDup && nfDup.fullName !== fullName) {
+    return { error: `Número Funcional ${functionalNumber} já está cadastrado para ${nfDup.fullName} — Nº ${nfDup.courseNumber} / ${nfDup.course.name}. Verifique se é a mesma pessoa antes de prosseguir.` };
+  }
+
   try {
     if (id) {
       const existing = await prisma.student.findUnique({ where: { id }, select: { userId: true } });

@@ -204,7 +204,7 @@ export default async function DespachoPage({
                           <td className="px-3 py-2.5 text-xs font-medium text-gray-900 whitespace-nowrap">
                             <Link href={`/alunos/${c.student.id}`} className="hover:text-[#1e3a5f] hover:underline">{c.student.warName}</Link>
                           </td>
-                          <td className="px-3 py-2.5 font-mono text-xs text-gray-500 whitespace-nowrap">{c.courseNumber}</td>
+                          <td className="px-3 py-2.5 font-mono text-xs text-gray-500 whitespace-nowrap">{c.student.courseNumber}</td>
                           <td className="px-3 py-2.5 text-xs text-gray-500 whitespace-nowrap">
                             {format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}
                           </td>

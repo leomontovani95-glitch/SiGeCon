@@ -92,6 +92,7 @@ export async function getMatriculas(rg: string) {
     where: { rg },
     select: {
       id: true,
+      fullName: true,
       userId: true,
       courseNumber: true,
       createdAt: true,
