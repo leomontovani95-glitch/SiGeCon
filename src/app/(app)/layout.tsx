@@ -1,6 +1,7 @@
 import { verifySession, getSchoolFilter, COMANDANTES, PARECERISTAS, VIEWERS_APM, ESFO_CFO_RANK } from "@/lib/dal";
 import { prisma } from "@/lib/db";
 import Sidebar from "@/components/Sidebar";
+import Breadcrumb from "@/components/Breadcrumb";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await verifySession();
@@ -75,6 +76,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* pt-14 reserva o espaço da barra superior fixa no celular; no desktop
           (md+) e na impressão não há barra superior, então pt-0. */}
       <main className="flex-1 overflow-auto bg-gray-50 pt-14 md:pt-0 print:overflow-visible print:w-full print:pt-0">
+        <Breadcrumb />
         {children}
       </main>
     </div>

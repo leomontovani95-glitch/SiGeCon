@@ -232,7 +232,7 @@ export default async function RankingPage({
               {cursosDisponiveis.map((curso) => (
                 <Link
                   key={curso.id}
-                  href={mkUrl({ cursoId: curso.id, pagina: 1 })}
+                  href={mkUrl({ cursoId: cursoId === curso.id ? "" : curso.id, pagina: 1 })}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     cursoId === curso.id ? "bg-[#1e3a5f] text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                   }`}

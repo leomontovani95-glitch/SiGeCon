@@ -305,7 +305,8 @@ export default async function ComunicacoesPage({ searchParams }: { searchParams:
   }
 
   function pillHref(novoCursoId: string) {
-    return buildUrl({ cursoId: novoCursoId, col: "", dir: "" });
+    const target = novoCursoId === cursoId ? "" : novoCursoId;
+    return buildUrl({ cursoId: target, col: "", dir: "" });
   }
 
   // Situação do curso: trocar reinicia curso selecionado e paginação.

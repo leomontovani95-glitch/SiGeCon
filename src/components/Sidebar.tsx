@@ -155,7 +155,15 @@ export default function Sidebar({
 
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {visibleNav.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href + "/");
+          const active =
+            pathname === item.href ||
+            (pathname.startsWith(item.href + "/") &&
+              !visibleNav.some(
+                (other) =>
+                  other.href !== item.href &&
+                  other.href.startsWith(item.href + "/") &&
+                  (pathname === other.href || pathname.startsWith(other.href + "/")),
+              ));
           const count = item.hasBadge ? (badgeCounts[item.href] ?? 0) : 0;
           return (
             <Link

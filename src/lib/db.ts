@@ -9,7 +9,7 @@ export function dbFilePath(): string | null {
   const rawUrl = process.env.DATABASE_URL ?? "";
   if (!rawUrl.startsWith("file:")) return null;
   const filePath = rawUrl.replace("file:", "").replace("./", "");
-  return path.resolve(process.cwd(), filePath);
+  return path.resolve(/*turbopackIgnore: true*/ process.cwd(), filePath);
 }
 
 function createPrismaClient() {
