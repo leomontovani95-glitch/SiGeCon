@@ -1,15 +1,11 @@
 "use client";
-import { useActionState, useState, useRef, useCallback } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { registrarElogioBi } from "../actions";
+import BuscaAlunoLista, { type AlunoInfo } from "./BuscaAlunoLista";
 
 type Curso = { id: string; name: string };
 type Regra = { id: string; article: string; item: string | null; letter: string | null; description: string };
-type AlunoInfo = {
-  id: string; warName: string; fullName: string;
-  courseNumber: string; course: string; platoon: string | null;
-  rg: string; functionalNumber: string | null;
-};
 
 const BGPM_NUMS = Array.from({ length: 55 }, (_, i) => String(i + 1).padStart(3, "0"));
 
@@ -17,36 +13,12 @@ export default function ElogioBiForm({ cursos, regras }: { cursos: Curso[]; regr
   const [state, formAction, pending] = useActionState(registrarElogioBi, undefined);
 
   const [cursoId, setCursoId]     = useState("");
-  const [numCurso, setNumCurso]   = useState("");
   const [aluno, setAluno]         = useState<AlunoInfo | null>(null);
-  const [buscando, setBuscando]   = useState(false);
-  const [erroAluno, setErroAluno] = useState("");
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const regraAutoFill = regras.length === 1 ? regras[0] : null;
   const [ruleId, setRuleId]       = useState(() => regraAutoFill?.id ?? "");
   const [bgpmNum, setBgpmNum]     = useState("");
   const [bgpmAno, setBgpmAno]     = useState(String(new Date().getFullYear()));
-
-  const buscarAluno = useCallback(async (num: string) => {
-    if (!num.trim()) { setAluno(null); setErroAluno(""); return; }
-    setBuscando(true); setErroAluno("");
-    try {
-      const params = new URLSearchParams({ q: num.trim() });
-      if (cursoId) params.set("courseId", cursoId);
-      const res  = await fetch(`/api/alunos/por-numero?${params}`);
-      const data = await res.json();
-      if (data.aluno) { setAluno(data.aluno); setErroAluno(""); }
-      else            { setAluno(null); setErroAluno("Nenhum aluno encontrado."); }
-    } catch { setErroAluno("Erro ao buscar aluno."); }
-    finally  { setBuscando(false); }
-  }, [cursoId]);
-
-  function handleNumChange(val: string) {
-    setNumCurso(val);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => buscarAluno(val), 600);
-  }
 
   const formOk = !!aluno && !!cursoId && !!ruleId && !!bgpmNum && !!bgpmAno;
 
@@ -63,7 +35,7 @@ export default function ElogioBiForm({ cursos, regras }: { cursos: Curso[]; regr
           <select
             name="courseId"
             value={cursoId}
-            onChange={(e) => { setCursoId(e.target.value); setAluno(null); setNumCurso(""); setErroAluno(""); }}
+            onChange={(e) => { setCursoId(e.target.value); setAluno(null); }}
             className="input"
             required
           >
@@ -74,43 +46,7 @@ export default function ElogioBiForm({ cursos, regras }: { cursos: Curso[]; regr
       </fieldset>
 
       {/* Identificação do aluno */}
-      <fieldset className={`border rounded-lg p-4 ${cursoId ? "border-blue-200 bg-blue-50" : "border-gray-200 bg-gray-50 opacity-60"}`}>
-        <legend className="text-sm font-semibold text-blue-800 px-2">Identificação do Aluno</legend>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Número de curso ou nome de guerra <span className="text-red-500">*</span>
-            </label>
-            <input
-              value={numCurso}
-              onChange={(e) => handleNumChange(e.target.value)}
-              placeholder={cursoId ? "Ex: 001 ou SILVA" : "Selecione o curso primeiro"}
-              disabled={!cursoId}
-              className="input disabled:cursor-not-allowed"
-              autoComplete="off"
-            />
-            {buscando   && <p className="text-xs text-blue-600 mt-1">Buscando...</p>}
-            {erroAluno  && <p className="text-xs text-red-600 mt-1">{erroAluno}</p>}
-          </div>
-          {aluno && (<>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">Nome de guerra</label>
-              <p className="input bg-gray-50 font-semibold text-gray-900">{aluno.warName}</p></div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">Nome completo</label>
-              <p className="input bg-gray-50 text-gray-700">{aluno.fullName}</p></div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">Curso</label>
-              <p className="input bg-gray-50 text-gray-700">{aluno.course}</p></div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">Número de curso</label>
-              <p className="input bg-gray-50 text-gray-700">{aluno.courseNumber}</p></div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">Pelotão</label>
-              <p className="input bg-gray-50 text-gray-700">{aluno.platoon ?? "—"}</p></div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">RG</label>
-              <p className="input bg-gray-50 text-gray-700">{aluno.rg}</p></div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">NF</label>
-              <p className="input bg-gray-50 text-gray-700">{aluno.functionalNumber ?? "—"}</p></div>
-          </>)}
-        </div>
-        <input type="hidden" name="studentId" value={aluno?.id ?? ""} />
-      </fieldset>
+      <BuscaAlunoLista key={cursoId} courseId={cursoId} enabled={!!cursoId} onChange={setAluno} />
 
       {/* Dispositivo Legal */}
       <input type="hidden" name="manualRuleId" value={ruleId} />

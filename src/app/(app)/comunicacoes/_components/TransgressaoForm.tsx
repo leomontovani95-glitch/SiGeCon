@@ -1,14 +1,10 @@
 "use client";
-import { useActionState, useState, useRef, useCallback } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { registrarTransgressao } from "../actions";
+import BuscaAlunoLista, { type AlunoInfo } from "./BuscaAlunoLista";
 
 type Curso = { id: string; name: string };
-type AlunoInfo = {
-  id: string; warName: string; fullName: string;
-  courseNumber: string; course: string; platoon: string | null;
-  rg: string; functionalNumber: string | null;
-};
 
 // Pontuação de fallback caso o tipo não esteja cadastrado em Tipos de Comunicação.
 const TD_FALLBACK: Record<string, number> = { "TD Leve": 1.0, "TD Média": 2.0, "TD Grave": 3.0 };
@@ -29,11 +25,7 @@ export default function TransgressaoForm({ cursos, tdScores }: { cursos: Curso[]
   const TD_TIPOS = TD_LABELS.map((t) => ({ ...t, score: defaultScore(t.value) }));
 
   const [cursoId, setCursoId]         = useState("");
-  const [numCurso, setNumCurso]       = useState("");
   const [aluno, setAluno]             = useState<AlunoInfo | null>(null);
-  const [buscando, setBuscando]       = useState(false);
-  const [erroAluno, setErroAluno]     = useState("");
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [isTac, setIsTac]             = useState(false);
   const [tdTipo, setTdTipo]           = useState("");
@@ -78,26 +70,6 @@ export default function TransgressaoForm({ cursos, tdScores }: { cursos: Curso[]
     setScoreModificado(def > 0 && parseFloat(val) !== def);
   }
 
-  const buscarAluno = useCallback(async (num: string) => {
-    if (!num.trim()) { setAluno(null); setErroAluno(""); return; }
-    setBuscando(true); setErroAluno("");
-    try {
-      const params = new URLSearchParams({ q: num.trim() });
-      if (cursoId) params.set("courseId", cursoId);
-      const res  = await fetch(`/api/alunos/por-numero?${params}`);
-      const data = await res.json();
-      if (data.aluno) { setAluno(data.aluno); setErroAluno(""); }
-      else            { setAluno(null); setErroAluno("Nenhum aluno encontrado."); }
-    } catch { setErroAluno("Erro ao buscar aluno."); }
-    finally { setBuscando(false); }
-  }, [cursoId]);
-
-  function handleNumChange(val: string) {
-    setNumCurso(val);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => buscarAluno(val), 600);
-  }
-
   const selecionouTipo = isTac ? !!tacEquiv : !!tdTipo;
   const formOk = !!aluno && !!cursoId && selecionouTipo && !!score && parseFloat(score) > 0 && !!bgpmNum && !!bgpmAno;
 
@@ -114,7 +86,7 @@ export default function TransgressaoForm({ cursos, tdScores }: { cursos: Curso[]
           <select
             name="courseId"
             value={cursoId}
-            onChange={(e) => { setCursoId(e.target.value); setAluno(null); setNumCurso(""); setErroAluno(""); }}
+            onChange={(e) => { setCursoId(e.target.value); setAluno(null); }}
             className="input"
             required
           >
@@ -125,42 +97,7 @@ export default function TransgressaoForm({ cursos, tdScores }: { cursos: Curso[]
       </fieldset>
 
       {/* Identificação do aluno */}
-      <fieldset className={`border rounded-lg p-4 ${cursoId ? "border-blue-200 bg-blue-50" : "border-gray-200 bg-gray-50 opacity-60"}`}>
-        <legend className="text-sm font-semibold text-blue-800 px-2">Identificação do Aluno</legend>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Número de curso ou nome de guerra *</label>
-            <input
-              value={numCurso}
-              onChange={(e) => handleNumChange(e.target.value)}
-              placeholder={cursoId ? "Ex: 001 ou SILVA" : "Selecione o curso primeiro"}
-              disabled={!cursoId}
-              className="input disabled:cursor-not-allowed"
-              autoComplete="off"
-            />
-            {buscando  && <p className="text-xs text-blue-600 mt-1">Buscando...</p>}
-            {erroAluno && <p className="text-xs text-red-600 mt-1">{erroAluno}</p>}
-          </div>
-          {aluno && (<>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">Nome de guerra</label>
-              <p className="input bg-gray-50 font-semibold text-gray-900">{aluno.warName}</p></div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">Nome completo</label>
-              <p className="input bg-gray-50 text-gray-700">{aluno.fullName}</p></div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">Curso</label>
-              <p className="input bg-gray-50 text-gray-700">{aluno.course}</p></div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">Número de curso</label>
-              <p className="input bg-gray-50 text-gray-700">{aluno.courseNumber}</p></div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">Pelotão</label>
-              <p className="input bg-gray-50 text-gray-700">{aluno.platoon ?? "—"}</p></div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">RG</label>
-              <p className="input bg-gray-50 text-gray-700">{aluno.rg}</p></div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">NF</label>
-              <p className="input bg-gray-50 text-gray-700">{aluno.functionalNumber ?? "—"}</p></div>
-          </>)}
-        </div>
-        {aluno  && <input type="hidden" name="studentId" value={aluno.id} />}
-        {!aluno && <input type="hidden" name="studentId" value="" />}
-      </fieldset>
+      <BuscaAlunoLista key={cursoId} courseId={cursoId} enabled={!!cursoId} onChange={setAluno} />
 
       {/* Tipo de transgressão */}
       <fieldset className="border border-orange-200 rounded-lg p-4 bg-orange-50">

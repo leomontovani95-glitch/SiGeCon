@@ -1,5 +1,5 @@
 "use client";
-import { useActionState, useState, useRef, useCallback, useMemo } from "react";
+import { useActionState, useState, useRef, useMemo } from "react";
 import Link from "next/link";
 
 const POSTOS = [
@@ -11,6 +11,7 @@ const POSTOS = [
 import { registrarComunicacao } from "../actions";
 import { dataLocalISO } from "@/lib/utils";
 import ResultadosPessoa from "./ResultadosPessoa";
+import BuscaAlunoLista, { type AlunoInfo } from "./BuscaAlunoLista";
 
 type Tipo  = { id: string; name: string; score: number };
 type Regra = {
@@ -18,11 +19,6 @@ type Regra = {
   description: string; theme: string | null;
   defaultCommunicationType: string | null; defaultScore: number | null;
   halfCpi1: boolean;
-};
-type AlunoInfo = {
-  id: string; warName: string; fullName: string;
-  courseNumber: string; course: string; platoon: string | null;
-  rg: string; functionalNumber: string | null;
 };
 type Curso = { id: string; name: string };
 type CommResult = {
@@ -65,6 +61,26 @@ function alineas(regras: Regra[], article: string, item: string) {
   return regras
     .filter((r) => r.article === article && r.item === item)
     .sort((a, b) => (a.letter ?? "").localeCompare(b.letter ?? ""));
+}
+
+// Remove acentos e caixa para busca tolerante ("agressao" acha "agressão").
+function normalizar(s: string) {
+  return s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+}
+
+// Filtra dispositivos por palavra-chave em artigo, tema, inciso, alínea e
+// descrição da conduta. Todos os termos digitados precisam casar (AND), o que
+// permite refinar ("celular formatura"). Exige ao menos 2 caracteres.
+function buscarRegras(regras: Regra[], query: string) {
+  const q = normalizar(query).trim();
+  if (q.length < 2) return [];
+  const termos = q.split(/\s+/).filter(Boolean);
+  return regras.filter((r) => {
+    const alvo = normalizar(
+      `art ${r.article} ${r.theme ?? ""} inc ${r.item ?? ""} al ${r.letter ?? ""} ${r.description}`,
+    );
+    return termos.every((t) => alvo.includes(t));
+  });
 }
 
 // ── sub-componente de testemunha ──────────────────────────────────────────
@@ -208,13 +224,9 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
   // Curso selecionado (quando lista é fornecida)
   const [cursoSelecionadoId, setCursoSelecionadoId] = useState("");
 
-  // Aluno
-  const [numCurso, setNumCurso] = useState("");
+  // Aluno — a busca (com lista de sugestões) vive em BuscaAlunoLista; aqui
+  // guardamos apenas a seleção, usada para habilitar o envio.
   const [aluno, setAluno] = useState<AlunoInfo | null>(null);
-  const [buscando, setBuscando] = useState(false);
-  const [erroAluno, setErroAluno] = useState("");
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const alunoAbortRef = useRef<AbortController | null>(null);
 
   // Comunicante
   const commDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -242,6 +254,11 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
     return items.length === 1 ? (items[0] as string) : "";
   });
   const [ruleId, setRuleId] = useState(() => (regras.length === 1 ? regras[0].id : ""));
+
+  // Dispositivo legal — modo de seleção: cascata (artigo→inciso→alínea) ou
+  // busca por palavra-chave. Ambos chegam na mesma regra.
+  const [dispMode, setDispMode] = useState<"cascata" | "busca">("cascata");
+  const [dispQuery, setDispQuery] = useState("");
 
   // Tipo (controlado para auto-fill). A pontuação não é mais informada aqui —
   // é automática (vem do tipo cadastrado em Tipos de Comunicação).
@@ -274,6 +291,7 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
   const listaIncisos  = useMemo(() => incisos(regras, artigo), [regras, artigo]);
   const listaAlineas  = useMemo(() => alineas(regras, artigo, inciso), [regras, artigo, inciso]);
   const regraAtual    = useMemo(() => regras.find((r) => r.id === ruleId) ?? null, [regras, ruleId]);
+  const resultadosBusca = useMemo(() => buscarRegras(regras, dispQuery), [regras, dispQuery]);
 
   // ── auto-fill ao selecionar alínea ───────────────────────────────────
   function selecionarRegra(r: Regra) {
@@ -286,6 +304,16 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
     }
   }
 
+  // ── seleção via busca por palavra-chave ──────────────────────────────
+  // Sincroniza a cascata (artigo/inciso) com a regra escolhida, para que os
+  // menus reflitam a seleção caso o usuário volte ao modo cascata.
+  function selecionarRegraPorBusca(r: Regra) {
+    setArtigo(r.article);
+    setInciso(r.item ?? "");
+    selecionarRegra(r);
+    setDispQuery("");
+  }
+
   // ── reset em cascata ─────────────────────────────────────────────────
   function handleArtigoChange(val: string) {
     setArtigo(val); setInciso(""); setRuleId(""); setTypeId("");
@@ -295,34 +323,6 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
     // Auto-selecionar se há uma única alínea (ex: Art. 170)
     const lista = alineas(regras, artigo, val);
     if (lista.length === 1) selecionarRegra(lista[0]);
-  }
-
-  // ── busca de aluno ───────────────────────────────────────────────────
-  const buscarAluno = useCallback(async (num: string) => {
-    if (!num.trim()) { setAluno(null); setErroAluno(""); return; }
-    alunoAbortRef.current?.abort();
-    const ac = new AbortController();
-    alunoAbortRef.current = ac;
-    setBuscando(true); setErroAluno("");
-    try {
-      const params = new URLSearchParams({ q: num.trim() });
-      if (cursoSelecionadoId) params.set("courseId", cursoSelecionadoId);
-      const res = await fetch(`/api/alunos/por-numero?${params}`, { signal: ac.signal });
-      const data = await res.json();
-      if (data.aluno) { setAluno(data.aluno); setErroAluno(""); }
-      else { setAluno(null); setErroAluno("Nenhum aluno encontrado com este número ou nome de guerra."); }
-    } catch (e) {
-      if ((e as Error).name === "AbortError") return;
-      setErroAluno("Erro ao buscar aluno.");
-    } finally {
-      if (alunoAbortRef.current === ac) setBuscando(false);
-    }
-  }, [cursoSelecionadoId]);
-
-  function handleNumChange(val: string) {
-    setNumCurso(val);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => buscarAluno(val), 600);
   }
 
   async function buscarComunicante(q: string) {
@@ -384,12 +384,7 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
             </label>
             <select
               value={cursoSelecionadoId}
-              onChange={(e) => {
-                setCursoSelecionadoId(e.target.value);
-                setAluno(null);
-                setNumCurso("");
-                setErroAluno("");
-              }}
+              onChange={(e) => { setCursoSelecionadoId(e.target.value); setAluno(null); }}
               className="input"
             >
               <option value="">— Selecione o curso —</option>
@@ -402,44 +397,7 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
       )}
 
       {/* ── IDENTIFICAÇÃO DO ALUNO ─────────────────────────────────── */}
-      <fieldset className={`border rounded-lg p-4 ${cursoOk ? "border-blue-200 bg-blue-50" : "border-gray-200 bg-gray-50 opacity-60"}`}>
-        <legend className="text-sm font-semibold text-blue-800 px-2">Identificação do Aluno</legend>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Número de curso ou nome de guerra *</label>
-            <input
-              value={numCurso}
-              onChange={(e) => handleNumChange(e.target.value)}
-              placeholder={cursoOk ? "Ex: 001 ou SILVA" : "Selecione o curso primeiro"}
-              disabled={!cursoOk}
-              className="input disabled:cursor-not-allowed"
-              autoComplete="off"
-            />
-            {buscando && <p className="text-xs text-blue-600 mt-1">Buscando...</p>}
-            {erroAluno && <p className="text-xs text-red-600 mt-1">{erroAluno}</p>}
-          </div>
-          {aluno && (
-            <>
-              <div><label className="block text-xs font-medium text-gray-600 mb-1">Nome de guerra</label>
-                <p className="input bg-gray-50 font-semibold text-gray-900">{aluno.warName}</p></div>
-              <div><label className="block text-xs font-medium text-gray-600 mb-1">Nome completo</label>
-                <p className="input bg-gray-50 text-gray-700">{aluno.fullName}</p></div>
-              <div><label className="block text-xs font-medium text-gray-600 mb-1">Curso</label>
-                <p className="input bg-gray-50 text-gray-700">{aluno.course}</p></div>
-              <div><label className="block text-xs font-medium text-gray-600 mb-1">Número de curso</label>
-                <p className="input bg-gray-50 text-gray-700">{aluno.courseNumber}</p></div>
-              <div><label className="block text-xs font-medium text-gray-600 mb-1">Pelotão</label>
-                <p className="input bg-gray-50 text-gray-700">{aluno.platoon ?? "—"}</p></div>
-              <div><label className="block text-xs font-medium text-gray-600 mb-1">RG</label>
-                <p className="input bg-gray-50 text-gray-700">{aluno.rg}</p></div>
-              <div><label className="block text-xs font-medium text-gray-600 mb-1">NF (Número Funcional)</label>
-                <p className="input bg-gray-50 text-gray-700">{aluno.functionalNumber ?? "—"}</p></div>
-            </>
-          )}
-        </div>
-        {aluno && <input type="hidden" name="studentId" value={aluno.id} />}
-        {!aluno && <input type="hidden" name="studentId" value="" />}
-      </fieldset>
+      <BuscaAlunoLista key={cursoSelecionadoId} courseId={cursoSelecionadoId} enabled={cursoOk} onChange={setAluno} />
 
       {/* ── PERÍODO DE ADAPTAÇÃO ──────────────────────────────────── */}
       <fieldset className={`border rounded-lg p-4 ${adaptationPeriod ? "border-orange-300 bg-orange-50" : "border-gray-200 bg-gray-50"}`}>
@@ -496,68 +454,133 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
             {dispositivoCompleto && <span className="ml-2 text-green-700 font-normal text-xs">✓ selecionado</span>}
           </legend>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-3">
-            {/* 1) ARTIGO */}
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Artigo *</label>
-              <select
-                value={artigo}
-                onChange={(e) => handleArtigoChange(e.target.value)}
-                className="input"
-                required
+          {/* Abas: cascata (artigo→inciso→alínea) x busca por palavra-chave */}
+          <div className="flex gap-1 mt-2 mb-3">
+            {([["cascata", "Por artigo / inciso"], ["busca", "Buscar por palavra-chave"]] as const).map(([m, label]) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setDispMode(m)}
+                className={`text-xs font-medium px-3 py-1.5 rounded-md transition-colors ${
+                  dispMode === m ? "bg-[#1e3a5f] text-white" : "bg-white border border-gray-300 text-gray-600 hover:bg-gray-100"
+                }`}
               >
-                <option value="">Selecione o artigo</option>
-                {listaArtigos.map((a) => (
-                  <option key={a.article} value={a.article}>
-                    Art. {a.article}{a.theme ? ` — ${a.theme}` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
+                {label}
+              </button>
+            ))}
+          </div>
 
-            {/* 2) INCISO */}
-            {artigo && (
+          {/* MODO CASCATA */}
+          {dispMode === "cascata" && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* 1) ARTIGO */}
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Inciso *</label>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Artigo *</label>
                 <select
-                  value={inciso}
-                  onChange={(e) => handleIncisoChange(e.target.value)}
+                  value={artigo}
+                  onChange={(e) => handleArtigoChange(e.target.value)}
                   className="input"
                   required
                 >
-                  <option value="">Selecione o inciso</option>
-                  {listaIncisos.map((i) => (
-                    <option key={i} value={i}>Inciso {i}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {/* 3) ALÍNEA / CONDUTA */}
-            {artigo && inciso && listaAlineas.length > 1 && (
-              <div className="sm:col-span-1">
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  {listaAlineas[0].letter ? "Alínea / Conduta *" : "Conduta *"}
-                </label>
-                <select
-                  value={ruleId}
-                  onChange={(e) => {
-                    const r = regras.find((x) => x.id === e.target.value);
-                    if (r) selecionarRegra(r);
-                  }}
-                  className="input"
-                  required
-                >
-                  <option value="">Selecione a conduta</option>
-                  {listaAlineas.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.letter ? `Al. ${r.letter} — ` : ""}{r.description}
+                  <option value="">Selecione o artigo</option>
+                  {listaArtigos.map((a) => (
+                    <option key={a.article} value={a.article}>
+                      Art. {a.article}{a.theme ? ` — ${a.theme}` : ""}
                     </option>
                   ))}
                 </select>
               </div>
-            )}
-          </div>
+
+              {/* 2) INCISO */}
+              {artigo && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Inciso *</label>
+                  <select
+                    value={inciso}
+                    onChange={(e) => handleIncisoChange(e.target.value)}
+                    className="input"
+                    required
+                  >
+                    <option value="">Selecione o inciso</option>
+                    {listaIncisos.map((i) => (
+                      <option key={i} value={i}>Inciso {i}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* 3) ALÍNEA / CONDUTA */}
+              {artigo && inciso && listaAlineas.length > 1 && (
+                <div className="sm:col-span-1">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    {listaAlineas[0].letter ? "Alínea / Conduta *" : "Conduta *"}
+                  </label>
+                  <select
+                    value={ruleId}
+                    onChange={(e) => {
+                      const r = regras.find((x) => x.id === e.target.value);
+                      if (r) selecionarRegra(r);
+                    }}
+                    className="input"
+                    required
+                  >
+                    <option value="">Selecione a conduta</option>
+                    {listaAlineas.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.letter ? `Al. ${r.letter} — ` : ""}{r.description}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* MODO BUSCA POR PALAVRA-CHAVE */}
+          {dispMode === "busca" && (
+            <div className="space-y-2">
+              <input
+                value={dispQuery}
+                onChange={(e) => setDispQuery(e.target.value)}
+                placeholder="Digite uma palavra-chave da conduta (ex: celular, formatura, agressão)..."
+                className="input text-sm"
+                autoComplete="off"
+              />
+              {dispQuery.trim().length >= 2 && resultadosBusca.length === 0 && (
+                <p className="text-xs text-gray-500">Nenhuma conduta encontrada. Tente outra palavra ou use &quot;Por artigo / inciso&quot;.</p>
+              )}
+              {resultadosBusca.length > 0 && (
+                <>
+                  <ul className="max-h-72 overflow-y-auto divide-y divide-gray-100 border border-gray-200 rounded-lg bg-white">
+                    {resultadosBusca.slice(0, 40).map((r) => (
+                      <li key={r.id}>
+                        <button
+                          type="button"
+                          onClick={() => selecionarRegraPorBusca(r)}
+                          className={`w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors ${
+                            r.id === ruleId ? "bg-green-50" : ""
+                          }`}
+                        >
+                          <p className="text-xs font-semibold text-[#1e3a5f]">
+                            Art. {r.article}
+                            {r.item && `, Inc. ${r.item}`}
+                            {r.letter && `, Al. ${r.letter}`}
+                            {r.theme ? ` — ${r.theme}` : ""}
+                          </p>
+                          <p className="text-sm text-gray-700">{r.description}</p>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {resultadosBusca.length > 40 && (
+                    <p className="text-xs text-gray-400">
+                      Mostrando 40 de {resultadosBusca.length} resultados. Refine a busca com mais palavras.
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {regraAtual && (
             <div className="mt-3 bg-white border border-green-200 rounded-lg px-4 py-3">
@@ -571,10 +594,10 @@ export default function ComunicacaoForm({ tipos, regras, cursos, comunicanteFixo
             </div>
           )}
 
-          {!dispositivoCompleto && artigo && (
+          {dispMode === "cascata" && !dispositivoCompleto && artigo && (
             <p className="text-xs text-orange-700 mt-2">Complete a seleção do inciso e alínea para prosseguir.</p>
           )}
-          {!artigo && (
+          {dispMode === "cascata" && !artigo && (
             <p className="text-xs text-gray-500 mt-2">Selecione o artigo para iniciar.</p>
           )}
         </fieldset>

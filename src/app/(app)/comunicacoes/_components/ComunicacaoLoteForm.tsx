@@ -64,7 +64,7 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
   // Alunos selecionados
   const [alunos, setAlunos] = useState<AlunoInfo[]>([]);
   const [searchQ, setSearchQ] = useState("");
-  const [searchResult, setSearchResult] = useState<AlunoInfo | null>(null);
+  const [searchResults, setSearchResults] = useState<AlunoInfo[]>([]);
   const [buscando, setBuscando] = useState(false);
   const [erroAluno, setErroAluno] = useState("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -131,7 +131,7 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
 
   // Busca de aluno
   const buscarAluno = useCallback(async (q: string) => {
-    if (!q.trim() || !cursoId) { setSearchResult(null); setErroAluno(""); return; }
+    if (!q.trim() || !cursoId) { setSearchResults([]); setErroAluno(""); return; }
     alunoAbortRef.current?.abort();
     const ac = new AbortController();
     alunoAbortRef.current = ac;
@@ -139,8 +139,9 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
     try {
       const res = await fetch(`/api/alunos/por-numero?q=${encodeURIComponent(q.trim())}&courseId=${cursoId}`, { signal: ac.signal });
       const data = await res.json();
-      setSearchResult(data.aluno ?? null);
-      if (!data.aluno) setErroAluno("Aluno não encontrado.");
+      const lista: AlunoInfo[] = data.alunos ?? [];
+      setSearchResults(lista);
+      if (lista.length === 0) setErroAluno("Aluno não encontrado.");
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
       setErroAluno("Erro ao buscar.");
@@ -151,7 +152,7 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
 
   function handleSearchChange(val: string) {
     setSearchQ(val);
-    setSearchResult(null);
+    setSearchResults([]);
     setErroAluno("");
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => buscarAluno(val), 600);
@@ -160,7 +161,7 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
   function adicionarAluno(a: AlunoInfo) {
     if (alunos.some((x) => x.id === a.id)) { setErroAluno("Aluno já adicionado."); return; }
     setAlunos((prev) => [...prev, a]);
-    setSearchQ(""); setSearchResult(null); setErroAluno("");
+    setErroAluno("");
   }
   function removerAluno(id: string) { setAlunos((prev) => prev.filter((a) => a.id !== id)); }
 
@@ -288,7 +289,7 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
           <label className="block text-xs font-medium text-gray-600 mb-1">Selecione o curso dos alunos <span className="text-red-500">*</span></label>
           <select
             value={cursoId}
-            onChange={(e) => { setCursoId(e.target.value); setAlunos([]); setSearchQ(""); setSearchResult(null); }}
+            onChange={(e) => { setCursoId(e.target.value); setAlunos([]); setSearchQ(""); setSearchResults([]); }}
             className="input"
           >
             <option value="">— Selecione o curso —</option>
@@ -320,22 +321,29 @@ export default function ComunicacaoLoteForm({ tipos, regras, cursos }: { tipos: 
           />
           {buscando && <p className="text-xs text-blue-600 mt-1">Buscando...</p>}
           {erroAluno && <p className="text-xs text-red-600 mt-1">{erroAluno}</p>}
-          {searchResult && (
-            <div className="mt-2 flex items-center gap-3 bg-white border border-blue-200 rounded-lg px-3 py-2">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900">{searchResult.warName}</p>
-                <p className="text-xs text-gray-500">{searchResult.fullName} — Nº {searchResult.courseNumber}{searchResult.platoon ? ` — ${searchResult.platoon}` : ""}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => adicionarAluno(searchResult)}
-                className={`text-xs font-medium text-white px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
-                  isRef ? "bg-teal-600 hover:bg-teal-700" : "bg-[#1e3a5f] hover:bg-[#16304f]"
-                }`}
-              >
-                + Adicionar
-              </button>
-            </div>
+          {searchResults.filter((r) => !alunos.some((a) => a.id === r.id)).length > 0 && (
+            <ul className="mt-2 border border-gray-200 rounded-lg bg-white divide-y divide-gray-100 max-h-60 overflow-y-auto">
+              {searchResults
+                .filter((r) => !alunos.some((a) => a.id === r.id))
+                .map((r) => (
+                  <li key={r.id} className="flex items-center gap-3 px-3 py-2">
+                    <span className="text-xs font-mono bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded whitespace-nowrap">{r.courseNumber}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{r.warName}</p>
+                      <p className="text-xs text-gray-500 truncate">{r.fullName}{r.platoon ? ` — ${r.platoon}` : ""}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => adicionarAluno(r)}
+                      className={`text-xs font-medium text-white px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
+                        isRef ? "bg-teal-600 hover:bg-teal-700" : "bg-[#1e3a5f] hover:bg-[#16304f]"
+                      }`}
+                    >
+                      + Adicionar
+                    </button>
+                  </li>
+                ))}
+            </ul>
           )}
         </div>
 
