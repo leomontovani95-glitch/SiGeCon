@@ -38,8 +38,9 @@ export async function salvarAluno(id: string | null, _prev: State, formData: For
     return { error: "Sem permissão para cadastrar novos alunos." };
   }
 
-  const fullName         = String(formData.get("fullName") ?? "").trim();
-  const warName          = String(formData.get("warName") ?? "").trim();
+  // Nomes padronizados em MAIÚSCULO para uniformizar abas e documentos.
+  const fullName         = String(formData.get("fullName") ?? "").trim().toUpperCase();
+  const warName          = String(formData.get("warName") ?? "").trim().toUpperCase();
   const courseId         = String(formData.get("courseId") ?? "").trim();
   const platoonId        = String(formData.get("platoonId") ?? "").trim() || null;
   // Padroniza para dois dígitos: "1" -> "01", "10" -> "10".

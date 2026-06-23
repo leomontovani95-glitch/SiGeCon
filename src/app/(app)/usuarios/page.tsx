@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { verifyRole, canManageUserRole, USER_MANAGERS, VIEWERS_APM } from "@/lib/dal";
+import { verifyRole, canManageUserScoped, USER_MANAGERS, VIEWERS_APM, compareUsersForDisplay } from "@/lib/dal";
 import Link from "next/link";
 import ExcluirUsuarioBtn from "./_components/ExcluirUsuarioBtn";
 
@@ -36,11 +36,11 @@ export default async function UsuariosPage({
   const situacao = sp.situacao === "inativos" ? "inativos" : "ativos";
   const ativo = situacao === "ativos";
 
-  // Alunos ficam apenas na aba Alunos — usuários são apenas o efetivo formado
-  const usuarios = await prisma.user.findMany({
+  // Alunos ficam apenas na aba Alunos — usuários são apenas o efetivo formado.
+  // Ordenados por função (maior "poder" primeiro), depois escola e nome.
+  const usuarios = (await prisma.user.findMany({
     where: { role: { not: "ALUNO" }, active: ativo },
-    orderBy: { fullName: "asc" },
-  });
+  })).sort(compareUsersForDisplay);
 
   const tabs = [
     { key: "ativos", label: "Ativos" },
@@ -119,7 +119,7 @@ export default async function UsuariosPage({
                   </span>
                 </td>
                 <td className="px-4 py-3 flex gap-4">
-                  {canManageUserRole(session.role, u.role) ? (
+                  {canManageUserScoped(session, u) ? (
                     <Link href={`/usuarios/${u.id}/editar`} className="text-[#1e3a5f] hover:underline text-xs">
                       Editar
                     </Link>
@@ -128,7 +128,7 @@ export default async function UsuariosPage({
                   )}
                   <ExcluirUsuarioBtn
                     id={u.id}
-                    canDelete={canManageUserRole(session.role, u.role) && u.id !== session.userId}
+                    canDelete={canManageUserScoped(session, u) && u.id !== session.userId}
                   />
                 </td>
               </tr>

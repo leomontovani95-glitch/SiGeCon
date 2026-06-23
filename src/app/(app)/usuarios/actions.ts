@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
-import { verifyRole, canManageUserRole, USER_MANAGERS, getSchoolFilter } from "@/lib/dal";
+import { verifyRole, canManageUserRole, canManageUserScoped, USER_MANAGERS, getSchoolFilter, canAssignAnySchool } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 import { maskRG } from "@/lib/utils";
@@ -16,8 +16,9 @@ function senhaInicial(functionalNumber: string, rg: string): string {
 export async function salvarUsuario(id: string | null, _prev: State, formData: FormData): Promise<State> {
   const session = await verifyRole(...USER_MANAGERS);
 
-  const fullName         = String(formData.get("fullName")         ?? "").trim();
-  const warName          = String(formData.get("warName")          ?? "").trim();
+  // Nomes padronizados em MAIÚSCULO para uniformizar abas e documentos.
+  const fullName         = String(formData.get("fullName")         ?? "").trim().toUpperCase();
+  const warName          = String(formData.get("warName")          ?? "").trim().toUpperCase();
   const rank             = String(formData.get("rank")             ?? "").trim();
   // Padrão XX.XXX-X só nos cadastros novos; edição preserva o RG já salvo.
   const rgInput          = String(formData.get("rg")              ?? "").trim();
@@ -36,19 +37,19 @@ export async function salvarUsuario(id: string | null, _prev: State, formData: F
   if (!canManageUserRole(session.role, role)) {
     return { error: "Você não tem permissão para atribuir essa função." };
   }
-  // Isolamento por escola: gestor com escopo só gerencia/cria usuários da própria escola.
-  const escopo = getSchoolFilter(session.role, session.escola);
+  // Atribuição/edição por escola: só Comandante de Escola para cima troca a
+  // escola livremente ou usa "TODAS". Os demais (Subcomandante/Oficial/Chefe de
+  // Curso) ficam restritos à própria escola — tanto a que atribuem quanto a dos
+  // usuários que podem editar. escopo nulo = sem restrição de escola.
+  const escopo = canAssignAnySchool(session.role) ? null : getSchoolFilter(session.role, session.escola);
   if (escopo && escola !== escopo) {
-    return { error: `Você só pode gerenciar usuários da escola ${escopo}.` };
+    return { error: `Você só pode cadastrar/editar usuários da escola ${escopo}.` };
   }
-  // Se for edição, verifica se o ator pode gerir a função atual e a escola do usuário
+  // Se for edição, verifica se o ator pode gerir a função E a escola do usuário.
   if (id) {
     const target = await prisma.user.findUnique({ where: { id }, select: { role: true, escola: true } });
     if (!target) return { error: "Usuário não encontrado." };
-    if (!canManageUserRole(session.role, target.role)) {
-      return { error: "Você não tem permissão para editar este usuário." };
-    }
-    if (escopo && target.escola !== escopo) {
+    if (!canManageUserScoped(session, target)) {
       return { error: "Você não tem permissão para editar usuários de outra escola." };
     }
   }
@@ -110,12 +111,8 @@ export async function resetarSenha(userId: string, _prev: ResetState, _fd: FormD
   const session = await verifyRole(...USER_MANAGERS);
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return { error: "Usuário não encontrado." };
-  if (!canManageUserRole(session.role, user.role)) {
+  if (!canManageUserScoped(session, user)) {
     return { error: "Você não tem permissão para redefinir a senha deste usuário." };
-  }
-  const escopoReset = getSchoolFilter(session.role, session.escola);
-  if (escopoReset && user.escola !== escopoReset) {
-    return { error: "Você não tem permissão para redefinir a senha de usuários de outra escola." };
   }
   if (!user.functionalNumber) return { error: "Número Funcional não cadastrado. Não é possível redefinir a senha automaticamente." };
   const novaSenha = senhaInicial(user.functionalNumber, user.rg);
@@ -131,11 +128,7 @@ export async function excluirUsuario(id: string, _prev: { error: string } | unde
   if (session.userId === id) return { error: "Não é possível excluir o próprio usuário." };
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) return { error: "Usuário não encontrado." };
-  if (!canManageUserRole(session.role, user.role)) {
-    return { error: "Você não tem permissão para excluir este usuário." };
-  }
-  const escopoExcluir = getSchoolFilter(session.role, session.escola);
-  if (escopoExcluir && user.escola !== escopoExcluir) {
+  if (!canManageUserScoped(session, user)) {
     return { error: "Você não tem permissão para excluir usuários de outra escola." };
   }
   if (user.role === "ADMINISTRADOR") {

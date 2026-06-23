@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { verifyRole, canManageUserRole, manageableRoles, USER_MANAGERS } from "@/lib/dal";
+import { verifyRole, canManageUserScoped, manageableRoles, USER_MANAGERS, assignableSchools } from "@/lib/dal";
 import { notFound, redirect } from "next/navigation";
 import UsuarioForm from "../../_components/UsuarioForm";
 import ResetarSenhaBtn from "../../_components/ResetarSenhaBtn";
@@ -10,10 +10,12 @@ export default async function EditarUsuarioPage({ params }: { params: Promise<{ 
   const usuario = await prisma.user.findUnique({ where: { id } });
   if (!usuario) notFound();
 
-  if (!canManageUserRole(session.role, usuario.role)) redirect("/acesso-negado");
+  // Bloqueia edição de usuário de outra escola (exceto Comandante de Escola ↑).
+  if (!canManageUserScoped(session, usuario)) redirect("/acesso-negado");
 
   const allowedRoles = manageableRoles(session.role);
-  const podeResetar = canManageUserRole(session.role, usuario.role);
+  const allowedSchools = assignableSchools(session.role, session.escola);
+  const podeResetar = canManageUserScoped(session, usuario);
 
   return (
     <div className="p-6 max-w-2xl">
@@ -21,6 +23,7 @@ export default async function EditarUsuarioPage({ params }: { params: Promise<{ 
       <UsuarioForm
         id={usuario.id}
         allowedRoles={allowedRoles}
+        allowedSchools={allowedSchools}
         defaultValues={{
           fullName: usuario.fullName,
           warName: usuario.warName,

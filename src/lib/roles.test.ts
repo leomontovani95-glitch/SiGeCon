@@ -8,6 +8,10 @@ import {
   canManageUserRole,
   manageableRoles,
   getSchoolFilter,
+  canAssignAnySchool,
+  assignableSchools,
+  canManageUserScoped,
+  compareUsersForDisplay,
   escolaNoEscopo,
   cursosPermitidosParaCPI,
   temVistaRestritaComunicacao,
@@ -115,6 +119,67 @@ describe("getSchoolFilter", () => {
     expect(getSchoolFilter("PROTOCOLO", "ESFAP")).toBe("ESFAP");
     expect(getSchoolFilter("PROTOCOLO", "TODAS")).toBeNull();
     expect(getSchoolFilter("ADMINISTRADOR", "TODAS")).toBeNull();
+  });
+});
+
+describe("canAssignAnySchool / assignableSchools (atribuição de escola)", () => {
+  it("Comandante de Escola para cima pode atribuir qualquer escola/TODAS", () => {
+    for (const r of ["ADMINISTRADOR", "CHEFE_DIVISAO_ACADEMICA", "COMANDANTE_ESFAP", "COMANDANTE_ESFO"]) {
+      expect(canAssignAnySchool(r)).toBe(true);
+      expect(assignableSchools(r, "ESFAP")).toEqual(["TODAS", "ESFAP", "ESFO"]);
+    }
+  });
+  it("Subcomandante/Oficial NÃO trocam de escola — restritos à própria", () => {
+    expect(canAssignAnySchool("SUBCOMANDANTE_ESFAP")).toBe(false);
+    expect(canAssignAnySchool("OFICIAL_ESFO")).toBe(false);
+    expect(assignableSchools("OFICIAL_ESFAP", "TODAS")).toEqual(["ESFAP"]);
+    expect(assignableSchools("SUBCOMANDANTE_ESFO", null)).toEqual(["ESFO"]);
+  });
+  it("papel sem direito de gestão não atribui escola alguma livremente", () => {
+    expect(canAssignAnySchool("ALUNO")).toBe(false);
+    expect(canAssignAnySchool("PROTOCOLO")).toBe(false);
+  });
+});
+
+describe("canManageUserScoped (gestão de usuário por função + escola)", () => {
+  it("Oficial da EsFO NÃO edita Chefe de Curso/Protocolo da EsFAP", () => {
+    const oficialEsfo = { role: "OFICIAL_ESFO", escola: "ESFO" };
+    expect(canManageUserScoped(oficialEsfo, { role: "CHEFE_CURSO", escola: "ESFAP" })).toBe(false);
+    expect(canManageUserScoped(oficialEsfo, { role: "PROTOCOLO", escola: "ESFAP" })).toBe(false);
+  });
+  it("Oficial da EsFO edita usuários da própria escola (nível para baixo)", () => {
+    const oficialEsfo = { role: "OFICIAL_ESFO", escola: "ESFO" };
+    expect(canManageUserScoped(oficialEsfo, { role: "CHEFE_CURSO", escola: "ESFO" })).toBe(true);
+    expect(canManageUserScoped(oficialEsfo, { role: "PROTOCOLO", escola: "ESFO" })).toBe(true);
+  });
+  it("Comandante de Escola para cima edita usuários de qualquer escola", () => {
+    const cmtEsfap = { role: "COMANDANTE_ESFAP", escola: "ESFAP" };
+    expect(canManageUserScoped(cmtEsfap, { role: "OFICIAL_ESFO", escola: "ESFO" })).toBe(true);
+    expect(canManageUserScoped({ role: "ADMINISTRADOR", escola: "TODAS" }, { role: "PROTOCOLO", escola: "ESFAP" })).toBe(true);
+  });
+  it("nunca permite gerir função acima do próprio nível, mesmo na própria escola", () => {
+    expect(canManageUserScoped({ role: "OFICIAL_ESFO", escola: "ESFO" }, { role: "COMANDANTE_ESFO", escola: "ESFO" })).toBe(false);
+  });
+});
+
+describe("compareUsersForDisplay (ordem por função/escola)", () => {
+  const u = (role: string, escola: string | null, fullName = "X") => ({ role, escola, fullName });
+  it("ordena do maior para o menor poder", () => {
+    const lista = [
+      u("PROTOCOLO", "ESFAP"), u("OFICIAL_ESFO", "ESFO"), u("ADMINISTRADOR", "TODAS"),
+      u("COMANDANTE_ESFAP", "ESFAP"), u("CHEFE_DIVISAO_ACADEMICA", "TODAS"),
+    ].sort(compareUsersForDisplay);
+    expect(lista.map((x) => x.role)).toEqual([
+      "ADMINISTRADOR", "CHEFE_DIVISAO_ACADEMICA", "COMANDANTE_ESFAP", "OFICIAL_ESFO", "PROTOCOLO",
+    ]);
+  });
+  it("Chefe de Curso da EsFO vem antes do da EsFAP", () => {
+    const lista = [u("CHEFE_CURSO", "ESFAP", "A"), u("CHEFE_CURSO", "ESFO", "B")].sort(compareUsersForDisplay);
+    expect(lista.map((x) => x.escola)).toEqual(["ESFO", "ESFAP"]);
+  });
+  it("Administrador sempre primeiro", () => {
+    const lista = [u("COMANDANTE_APM", "TODAS"), u("ADMINISTRADOR", "TODAS")].sort(compareUsersForDisplay);
+    expect(lista[0].role).toBe("ADMINISTRADOR");
   });
 });
 

@@ -51,11 +51,11 @@ export default function AlunoForm({ defaultValues, id, courses }: Props) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Nome completo *</label>
-          <input name="fullName" defaultValue={defaultValues?.fullName} required className="input" />
+          <input name="fullName" defaultValue={defaultValues?.fullName} required className="input" style={{ textTransform: "uppercase" }} />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Nome de guerra *</label>
-          <input name="warName" defaultValue={defaultValues?.warName} required className="input" />
+          <input name="warName" defaultValue={defaultValues?.warName} required className="input" style={{ textTransform: "uppercase" }} />
         </div>
 
         <div>

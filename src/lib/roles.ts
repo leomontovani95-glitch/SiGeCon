@@ -219,6 +219,81 @@ export function getSchoolFilter(role: string, escolaUsuario?: string | null): st
   return null;
 }
 
+// ── Atribuição de escola ao criar/editar usuário ─────────────────────────────
+// Apenas Comandante de Escola para cima (nível de ator <= 2: COMANDANTE_ESFAP/
+// ESFO, CHEFE_DIVISAO_ACADEMICA, ADMINISTRADOR) pode trocar a escola livremente
+// ou atribuir "TODAS". Subcomandante, Oficial e Chefe de Curso ficam restritos
+// à própria escola. NÃO altera getSchoolFilter (que governa a VISIBILIDADE de
+// dados); aqui o que importa é o que cada ator pode ATRIBUIR.
+export function canAssignAnySchool(actorRole: string): boolean {
+  const level = USER_ACTOR_LEVEL[actorRole as UserRole];
+  return level !== undefined && level <= 2;
+}
+
+// Escolas que o ator pode atribuir a um usuário no formulário. Comandante para
+// cima vê todas; os demais ficam restritos à própria escola (escopo de papel).
+export function assignableSchools(actorRole: string, actorEscola?: string | null): string[] {
+  if (canAssignAnySchool(actorRole)) return ["TODAS", "ESFAP", "ESFO"];
+  const escopo = getSchoolFilter(actorRole, actorEscola);
+  return escopo ? [escopo] : ["TODAS", "ESFAP", "ESFO"];
+}
+
+// Pode gerir (editar/excluir/resetar senha) ESTE usuário específico: precisa
+// poder gerir a função (nível) E respeitar a escola. Usuário vinculado a uma
+// escola não age sobre usuários de outra escola; só Comandante de Escola para
+// cima (canAssignAnySchool) atua em qualquer escola. Ex.: Oficial da EsFO não
+// edita Chefe de Curso/Protocolo vinculado à EsFAP.
+export function canManageUserScoped(
+  actor: { role: string; escola?: string | null },
+  target: { role: string; escola?: string | null },
+): boolean {
+  if (!canManageUserRole(actor.role, target.role)) return false;
+  if (canAssignAnySchool(actor.role)) return true;
+  const escopo = getSchoolFilter(actor.role, actor.escola);
+  if (!escopo) return true; // ator sem escopo de escola definido
+  return target.escola === escopo;
+}
+
+// ── Ordem de exibição na lista de usuários ───────────────────────────────────
+// Do maior "poder" para o menor. Usado para ordenar a aba Usuários.
+export const USER_DISPLAY_ORDER: Record<string, number> = {
+  ADMINISTRADOR:           0,
+  COMANDANTE_APM:          1,
+  SUBCOMANDANTE_APM:       2,
+  CHEFE_DIVISAO_ACADEMICA: 3,
+  COMANDANTE_ESFAP:        4,
+  COMANDANTE_ESFO:         5,
+  SUBCOMANDANTE_ESFAP:     6,
+  SUBCOMANDANTE_ESFO:      7,
+  OFICIAL_ESFAP:           8,
+  OFICIAL_ESFO:            9,
+  CHEFE_CURSO:             10,
+  PROTOCOLO:               11,
+};
+
+// Desempate por escola dentro da mesma função: EsFO tem preferência (ex.: Chefe
+// de Curso da EsFO aparece antes do da EsFAP); "Todas"/sem escola por último.
+function escolaOrdemExibicao(escola?: string | null): number {
+  if (escola === "ESFO") return 0;
+  if (escola === "ESFAP") return 1;
+  return 2;
+}
+
+// Comparador: função (poder) → escola (EsFO primeiro) → nome. Ordena pelo papel
+// PRIMÁRIO, então o Administrador vem primeiro mesmo acumulando outras funções.
+export function compareUsersForDisplay(
+  a: { role: string; escola?: string | null; fullName: string },
+  b: { role: string; escola?: string | null; fullName: string },
+): number {
+  const ra = USER_DISPLAY_ORDER[a.role] ?? 99;
+  const rb = USER_DISPLAY_ORDER[b.role] ?? 99;
+  if (ra !== rb) return ra - rb;
+  const sa = escolaOrdemExibicao(a.escola);
+  const sb = escolaOrdemExibicao(b.escola);
+  if (sa !== sb) return sa - sb;
+  return a.fullName.localeCompare(b.fullName, "pt-BR");
+}
+
 // True se a escola da comunicação (course.school) está dentro do escopo do
 // usuário. Escopo nulo (ADMIN/Div.Acadêmica/APM/global) acessa qualquer escola.
 export function escolaNoEscopo(

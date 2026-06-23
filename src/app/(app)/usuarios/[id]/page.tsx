@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { verifySession, canManageUserRole, USER_MANAGERS } from "@/lib/dal";
+import { verifySession, canManageUserScoped, USER_MANAGERS } from "@/lib/dal";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
@@ -35,7 +35,7 @@ export default async function UsuarioPage({ params }: { params: Promise<{ id: st
   if (!usuario || usuario.role === "ALUNO") notFound();
 
   const canEdit = (USER_MANAGERS as string[]).includes(session.role)
-    && canManageUserRole(session.role, usuario.role);
+    && canManageUserScoped(session, usuario);
 
   const camposPrincipais = [
     { label: "Nome completo",   value: usuario.fullName,      wide: true },

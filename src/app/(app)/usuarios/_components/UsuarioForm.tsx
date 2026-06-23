@@ -29,17 +29,31 @@ const ROLES = [
   { value: "ALUNO",                   label: "Aluno" },
 ];
 
+const ESCOLAS = [
+  { value: "TODAS", label: "Todas (EsFAP e EsFO)" },
+  { value: "ESFAP", label: "EsFAP (CHS / CFSd)" },
+  { value: "ESFO",  label: "EsFO (CFO)" },
+];
+
 type Props = {
   defaultValues?: Record<string, string>;
   additionalRolesDefault?: string[];
   id?: string;
   allowedRoles?: string[];
+  allowedSchools?: string[];
 };
 
-export default function UsuarioForm({ defaultValues, additionalRolesDefault = [], id, allowedRoles }: Props) {
+export default function UsuarioForm({ defaultValues, additionalRolesDefault = [], id, allowedRoles, allowedSchools }: Props) {
   const visibleRoles = allowedRoles
     ? ROLES.filter((r) => allowedRoles.includes(r.value))
     : ROLES;
+  const visibleSchools = allowedSchools
+    ? ESCOLAS.filter((e) => allowedSchools.includes(e.value))
+    : ESCOLAS;
+  // Quando o ator só pode atribuir uma escola, ela já vem selecionada.
+  const escolaInicial = visibleSchools.some((e) => e.value === defaultValues?.escola)
+    ? defaultValues?.escola
+    : visibleSchools[0]?.value ?? "TODAS";
   const action = salvarUsuario.bind(null, id ?? null);
   const [state, formAction, pending] = useActionState(action, undefined);
 
@@ -64,11 +78,11 @@ export default function UsuarioForm({ defaultValues, additionalRolesDefault = []
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Nome completo *</label>
-          <input name="fullName" defaultValue={defaultValues?.fullName} required className="input" />
+          <input name="fullName" defaultValue={defaultValues?.fullName} required className="input" style={{ textTransform: "uppercase" }} />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Nome de guerra *</label>
-          <input name="warName" defaultValue={defaultValues?.warName} required className="input" />
+          <input name="warName" defaultValue={defaultValues?.warName} required className="input" style={{ textTransform: "uppercase" }} />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Posto/Graduação *</label>
@@ -127,11 +141,13 @@ export default function UsuarioForm({ defaultValues, additionalRolesDefault = []
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Escola *</label>
-          <select name="escola" defaultValue={defaultValues?.escola ?? "TODAS"} required className="input">
-            <option value="TODAS">Todas (EsFAP e EsFO)</option>
-            <option value="ESFAP">EsFAP (CHS / CFSd)</option>
-            <option value="ESFO">EsFO (CFO)</option>
+          <select name="escola" defaultValue={escolaInicial} required className="input" disabled={visibleSchools.length <= 1}>
+            {visibleSchools.map((e) => (
+              <option key={e.value} value={e.value}>{e.label}</option>
+            ))}
           </select>
+          {/* select desabilitado não envia valor — garante a escola fixa no submit */}
+          {visibleSchools.length <= 1 && <input type="hidden" name="escola" value={escolaInicial} />}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Situação</label>
