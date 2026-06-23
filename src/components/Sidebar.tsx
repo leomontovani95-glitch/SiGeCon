@@ -54,14 +54,14 @@ const nav: NavItem[] = [
   { href: "/comunicacoes/nova/cpi",       label: "Nova CPI",             icon: "📝", cfoOnly: true },
   { href: "/comunicacoes/nova/referencia", label: "Nova Ref. Elogiosa",  icon: "⭐", cfoOnly: true },
   { href: "/despachos",    label: "Despachos",            icon: "📨", roles: DESPACHOS_ROLES, hasBadge: true },
-  { href: "/alunos",       label: "Alunos",               icon: "👤", roles: STAFF },
   { href: "/caderno",      label: "Caderno Disciplinar",  icon: "📖", roles: STAFF },
   { href: "/ranking",             label: "Ranking de Conduta",      icon: "🏆", roles: STAFF },
   { href: "/ranking/comunicantes", label: "Ranking de Comunicantes", icon: "📣", roles: RANKING_COMUNICANTES_ROLES },
-  { href: "/relatorios",   label: "Relatórios",           icon: "📈", roles: STAFF },
   { href: "/analise",      label: "Análise",              icon: "📊", roles: STAFF },
-  { href: "/usuarios",     label: "Usuários",             icon: "👥", roles: [...COMANDANTES, ...VIEWERS_APM] },
+  { href: "/relatorios",   label: "Relatórios",           icon: "📈", roles: STAFF },
+  { href: "/alunos",       label: "Alunos",               icon: "👤", roles: STAFF },
   { href: "/cursos",       label: "Cursos",               icon: "🎓", roles: COMANDANTES },
+  { href: "/usuarios",     label: "Usuários",             icon: "👥", roles: [...COMANDANTES, ...VIEWERS_APM] },
   { href: "/manual",       label: "Manual do Aluno",      icon: "📕", roles: ["ADMINISTRADOR", "CHEFE_DIVISAO_ACADEMICA", "COMANDANTE_ESFO", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFO", "COMANDANTE_ESFAP", "SUBCOMANDANTE_ESFAP", "OFICIAL_ESFAP"] },
   { href: "/tipos",        label: "Tipos de Comunicação", icon: "⚙️", roles: TIPOS_ROLES },
   { href: "/auditoria",    label: "Auditoria",            icon: "🔍", roles: ["ADMINISTRADOR"] },
@@ -131,7 +131,7 @@ export default function Sidebar({
           esquerda); no desktop (md+) volta a ser a barra fixa de sempre. */}
       <div
         id="menu-lateral"
-        className={`flex flex-col w-64 bg-[#1e3a5f] min-h-screen h-full fixed inset-y-0 left-0 z-50 transition-transform duration-200 md:static md:z-auto md:translate-x-0 print:hidden ${aberto ? "translate-x-0" : "-translate-x-full"}`}
+        className={`flex flex-col w-[17rem] bg-[#1e3a5f] min-h-screen h-full fixed inset-y-0 left-0 z-50 transition-transform duration-200 md:static md:z-auto md:translate-x-0 print:hidden ${aberto ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="relative flex items-center justify-center h-16 border-b border-[#16304f] px-3">
           <div className="flex items-center gap-2.5">

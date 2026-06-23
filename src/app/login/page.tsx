@@ -18,6 +18,7 @@ export default function LoginPage() {
               width={120}
               height={140}
               className="object-contain drop-shadow-md"
+              style={{ height: "auto" }}
               priority
             />
           </div>
