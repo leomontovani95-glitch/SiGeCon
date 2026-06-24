@@ -21,6 +21,11 @@ const MAPA: Record<string, CoresTipo> = {
   "CPI 3": { bar: "#ef4444", barText: "#5c0a0a", title: "#dc2626" }, // vermelho vivo
   "Referência Elogiosa":    { bar: "#07e03a", barText: "#064d1a", title: "#08962a" },
   "Elogio publicado em BI": { bar: "#10ad17", barText: "#053d08", title: "#10ad17" },
+  // TDs em escala de laranja (leveza crescente → mais escuro), TAC abaixo.
+  "TD Leve":  { bar: "#fb923c", barText: "#7c2d12", title: "#ea580c" }, // laranja claro
+  "TD Média": { bar: "#ea580c", barText: BRANCO,    title: "#c2410c" }, // laranja médio
+  "TD Grave": { bar: "#c2410c", barText: BRANCO,    title: "#9a3412" }, // laranja escuro
+  "TAC":      { bar: "#9a3412", barText: BRANCO,    title: "#7c2d12" }, // marrom-laranja
   "TD / TAC":               { bar: "#c2410c", barText: BRANCO,    title: "#c2410c" },
   "Reenquadramento":        { bar: "#ffedd5", barText: "#7c2d12", title: "#c2410c" },
   "Arquivamento":           { bar: "#6b7280", barText: BRANCO,    title: "#6b7280" },
@@ -52,3 +57,12 @@ export function corTextoLegivel(fundoHex: string): string {
 export const CPI_FILL: string[] = [
   MAPA["CPI 0"].bar, MAPA["CPI 1"].bar, MAPA["CPI 2"].bar, MAPA["CPI 3"].bar,
 ];
+
+// Cor de preenchimento (barra/fatia) para qualquer tipo de comunicação pelo nome.
+// Fonte única usada nos gráficos de análise (tela e impressão).
+export function corBarraTipo(nome: string): string {
+  // CPI com grau numérico: "CPI 1", "CPI 2", "CPI 3" — extrai o grau.
+  const cpi = nome.match(/cpi\s*(\d)/i);
+  if (cpi) return MAPA[`CPI ${Math.min(3, parseInt(cpi[1], 10))}`]?.bar ?? MAPA["CPI 3"].bar;
+  return coresTipo(nome).bar;
+}

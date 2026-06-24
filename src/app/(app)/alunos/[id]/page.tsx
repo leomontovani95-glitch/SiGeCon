@@ -80,7 +80,7 @@ export default async function AlunoPage({
     isCurrent: m.id === currentId,
     selected: m.id === aluno.id,
     viewHref: `/alunos/${m.id}`,
-    pdfHref: `/alunos/${m.id}/historico`,
+    pdfHref: `/alunos/${m.id}/historico/imprimir`,
   }));
 
   // Nota sempre calculada sobre todos os itens publicados (não é afetada pelo filtro)
@@ -155,7 +155,7 @@ export default async function AlunoPage({
           <p className="text-sm text-gray-500">{aluno.fullName}</p>
         </div>
         <div className="flex gap-2 flex-wrap justify-end">
-          <Link href={`/alunos/${aluno.id}/historico`} target="_blank" className="btn-secondary text-xs">
+          <Link href={`/alunos/${aluno.id}/historico/imprimir${adaptacao ? `?adaptacao=${adaptacao}` : ""}`} target="_blank" className="btn-secondary text-xs">
             Gerar PDF do Histórico
           </Link>
           {session.role !== "ALUNO" && (

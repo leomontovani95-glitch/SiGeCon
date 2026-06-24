@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { abreviarPelotao, platoonOrder } from "@/lib/utils";
-import { CPI_FILL } from "@/lib/coresComunicacao";
+import { CPI_FILL, corBarraTipo } from "@/lib/coresComunicacao";
 import {
   BarChart,
   Bar,
@@ -38,21 +38,10 @@ const PRIMARY     = "#1e3a5f";
 // Escala de gravidade crescente: amarelo claro (CPI 0) → vermelho vivo (CPI 3).
 // Fonte única compartilhada com o Caderno Disciplinar (tela e PDF).
 const CPI_COLORS  = CPI_FILL;
-const REF_COLOR   = "#07e03a"; // verde — Referência Elogiosa
-const REF_BI_COLOR = "#10ad17"; // verde — Elogio publicado em BI
-const NEUTRO      = "#6b7280"; // cinza — demais tipos (ex.: Arquivamento)
+const REF_COLOR   = "#07e03a"; // verde — Referência Elogiosa (tooltip/barra pelotão)
 
-// Cor de cada fatia do gráfico de pizza conforme o tipo de comunicação,
-// seguindo o mesmo padrão das CPIs (0→3) e das referências favoráveis.
-function corPorTipo(nome: string): string {
-  const lower = nome.toLowerCase();
-  const cpi = lower.match(/cpi\s*(\d)/);
-  if (cpi) return CPI_COLORS[Math.min(3, parseInt(cpi[1], 10))];
-  if (lower.includes("elogi") || lower.includes("refer")) {
-    return lower.includes("bi") || lower.includes("boletim") ? REF_BI_COLOR : REF_COLOR;
-  }
-  return NEUTRO;
-}
+// Delega para a paleta central — fonte única compartilhada com caderno e impressão.
+const corPorTipo = corBarraTipo;
 
 function Panel({
   title,

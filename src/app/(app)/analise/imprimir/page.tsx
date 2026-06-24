@@ -6,12 +6,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import PrintLayout from "@/components/PrintLayout";
 import { escolaHeaderLabel } from "@/lib/utils";
-import { coresTipo } from "@/lib/coresComunicacao";
-
-const PRINT_COLORS = [
-  "#1e3a5f", "#2563eb", "#0891b2", "#0d9488",
-  "#7c3aed", "#db2777", "#d97706", "#16a34a",
-];
+import { coresTipo, corBarraTipo } from "@/lib/coresComunicacao";
 
 // Cabeçalhos das CPIs usam a barra da paleta (coresTipo); as células usam tons
 // claros do mesmo matiz (amarelo → amarelo → laranja → vermelho), alinhados.
@@ -270,22 +265,22 @@ export default async function AnaliseImprimirPage({
           <p className="subtitulo">{total} comunicações consideradas</p>
           {total > 0 && (
             <div className="stacked-bar">
-              {tipoData.map((t, i) => (
+              {tipoData.map((t) => (
                 <div
                   key={t.name}
                   title={`${t.name}: ${t.value}`}
                   style={{
                     width: `${((t.value / total) * 100).toFixed(1)}%`,
-                    background: PRINT_COLORS[i % PRINT_COLORS.length],
+                    background: corBarraTipo(t.name),
                   }}
                 />
               ))}
             </div>
           )}
           <div className="stacked-legend">
-            {tipoData.map((t, i) => (
+            {tipoData.map((t) => (
               <span key={t.name} className="stacked-legend-item">
-                <span className="legend-dot" style={{ background: PRINT_COLORS[i % PRINT_COLORS.length] }} />
+                <span className="legend-dot" style={{ background: corBarraTipo(t.name) }} />
                 {t.name}&nbsp;
                 <strong>{t.value}</strong>&nbsp;
                 <span style={{ color: "#000" }}>({total > 0 ? ((t.value / total) * 100).toFixed(0) : 0}%)</span>
