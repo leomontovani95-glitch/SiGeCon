@@ -30,6 +30,12 @@ const GRID3: React.CSSProperties = {
   gridTemplateColumns: "1fr 1fr 1fr",
   gap: "6px 16px",
 };
+// Coluna central mais larga — usada quando o nome completo ocupa o centro
+const GRID3W: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 2fr 1fr",
+  gap: "6px 16px",
+};
 const COL_L: React.CSSProperties = { textAlign: "left" };
 const COL_C: React.CSSProperties = { textAlign: "center" };
 const COL_R: React.CSSProperties = { textAlign: "right" };
@@ -110,12 +116,12 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
         </div>
       </div>
 
-      {/* 2. Dados do comunicado — 2×3: Nome|NdG|Curso / NºCurso|Pelotão|RG */}
+      {/* 2. Dados do comunicado — 2×3: NdG|NomeCompleto|Curso / NºCurso|Pelotão|RG */}
       <div className="print-section">
         <h2>Dados do Comunicado / Aluno</h2>
-        <div style={GRID3}>
-          <div className="print-field" style={COL_L}><label>Nome completo</label><span>{comm.student.fullName}</span></div>
-          <div className="print-field" style={COL_C}><label>Nome de guerra</label><span>{comm.student.warName}</span></div>
+        <div style={GRID3W}>
+          <div className="print-field" style={COL_L}><label>Nome de guerra</label><span>{comm.student.warName}</span></div>
+          <div className="print-field" style={COL_C}><label>Nome completo</label><span>{comm.student.fullName}</span></div>
           <div className="print-field" style={COL_R}><label>Curso</label><span>{comm.student.course.name}</span></div>
           <div className="print-field" style={COL_L}><label>Nº de curso</label><span>{comm.courseNumber}</span></div>
           <div className="print-field" style={COL_C}><label>Pelotão</label><span>{comm.student.platoon?.name ?? "—"}</span></div>
@@ -276,9 +282,9 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
           comm.communicantUser.student ? (
             /* Aluno do CFO: 2×3 + última linha esq·vazio·dir */
             <>
-              <div style={GRID3}>
-                <div className="print-field" style={COL_L}><label>Nome completo</label><span>{comm.communicantUser.fullName}</span></div>
-                <div className="print-field" style={COL_C}><label>Nome de guerra</label><span>{comm.communicantUser.warName}</span></div>
+              <div style={GRID3W}>
+                <div className="print-field" style={COL_L}><label>Nome de guerra</label><span>{comm.communicantUser.warName}</span></div>
+                <div className="print-field" style={COL_C}><label>Nome completo</label><span>{comm.communicantUser.fullName}</span></div>
                 <div className="print-field" style={COL_R}><label>Posto/Graduação</label><span>{comm.communicantUser.rank}</span></div>
                 <div className="print-field" style={COL_L}><label>RG</label><span>{comm.communicantUser.rg}</span></div>
                 <div className="print-field" style={COL_C}><label>Nº Funcional</label><span>{comm.communicantUser.functionalNumber ?? "—"}</span></div>
@@ -298,13 +304,14 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
             </>
           ) : (
             /* Instrutor/servidor: sem dados de curso/pelotão */
-            <div style={GRID3}>
-              <div className="print-field" style={COL_L}><label>Nome completo</label><span>{comm.communicantUser.fullName}</span></div>
-              <div className="print-field" style={COL_C}><label>Nome de guerra</label><span>{comm.communicantUser.warName}</span></div>
+            <div style={GRID3W}>
+              <div className="print-field" style={COL_L}><label>Nome de guerra</label><span>{comm.communicantUser.warName}</span></div>
+              <div className="print-field" style={COL_C}><label>Nome completo</label><span>{comm.communicantUser.fullName}</span></div>
               <div className="print-field" style={COL_R}><label>Posto/Graduação</label><span>{comm.communicantUser.rank}</span></div>
               <div className="print-field" style={COL_L}><label>RG</label><span>{comm.communicantUser.rg}</span></div>
+              <div />
               {comm.communicantUser.functionalNumber && (
-                <div className="print-field" style={COL_C}><label>Nº Funcional</label><span>{comm.communicantUser.functionalNumber}</span></div>
+                <div className="print-field" style={COL_R}><label>Nº Funcional</label><span>{comm.communicantUser.functionalNumber}</span></div>
               )}
             </div>
           )

@@ -30,6 +30,11 @@ const GRID3: React.CSSProperties = {
   gridTemplateColumns: "1fr 1fr 1fr",
   gap: "6px 16px",
 };
+const GRID3W: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 2fr 1fr",
+  gap: "6px 16px",
+};
 const COL_L: React.CSSProperties = { textAlign: "left" };
 const COL_C: React.CSSProperties = { textAlign: "center" };
 const COL_R: React.CSSProperties = { textAlign: "right" };
@@ -136,9 +141,9 @@ export default async function HistoricoImprimirPage({
         {/* 2. Dados do comunicado */}
         <div className="print-section">
           <h2>Dados do Comunicado / Aluno</h2>
-          <div style={GRID3}>
-            <div className="print-field" style={COL_L}><label>Nome completo</label><span>{aluno.fullName}</span></div>
-            <div className="print-field" style={COL_C}><label>Nome de guerra</label><span>{aluno.warName}</span></div>
+          <div style={GRID3W}>
+            <div className="print-field" style={COL_L}><label>Nome de guerra</label><span>{aluno.warName}</span></div>
+            <div className="print-field" style={COL_C}><label>Nome completo</label><span>{aluno.fullName}</span></div>
             <div className="print-field" style={COL_R}><label>Curso</label><span>{aluno.course.name}</span></div>
             <div className="print-field" style={COL_L}><label>Nº de curso</label><span>{comm.courseNumber}</span></div>
             <div className="print-field" style={COL_C}><label>Pelotão</label><span>{aluno.platoon?.name ?? "—"}</span></div>
@@ -287,9 +292,9 @@ export default async function HistoricoImprimirPage({
           {comm.communicantUser ? (
             comm.communicantUser.student ? (
               <>
-                <div style={GRID3}>
-                  <div className="print-field" style={COL_L}><label>Nome completo</label><span>{comm.communicantUser.fullName}</span></div>
-                  <div className="print-field" style={COL_C}><label>Nome de guerra</label><span>{comm.communicantUser.warName}</span></div>
+                <div style={GRID3W}>
+                  <div className="print-field" style={COL_L}><label>Nome de guerra</label><span>{comm.communicantUser.warName}</span></div>
+                  <div className="print-field" style={COL_C}><label>Nome completo</label><span>{comm.communicantUser.fullName}</span></div>
                   <div className="print-field" style={COL_R}><label>Posto/Graduação</label><span>{comm.communicantUser.rank}</span></div>
                   <div className="print-field" style={COL_L}><label>RG</label><span>{comm.communicantUser.rg}</span></div>
                   <div className="print-field" style={COL_C}><label>Nº Funcional</label><span>{comm.communicantUser.functionalNumber ?? "—"}</span></div>
@@ -302,13 +307,14 @@ export default async function HistoricoImprimirPage({
                 </div>
               </>
             ) : (
-              <div style={GRID3}>
-                <div className="print-field" style={COL_L}><label>Nome completo</label><span>{comm.communicantUser.fullName}</span></div>
-                <div className="print-field" style={COL_C}><label>Nome de guerra</label><span>{comm.communicantUser.warName}</span></div>
+              <div style={GRID3W}>
+                <div className="print-field" style={COL_L}><label>Nome de guerra</label><span>{comm.communicantUser.warName}</span></div>
+                <div className="print-field" style={COL_C}><label>Nome completo</label><span>{comm.communicantUser.fullName}</span></div>
                 <div className="print-field" style={COL_R}><label>Posto/Graduação</label><span>{comm.communicantUser.rank}</span></div>
                 <div className="print-field" style={COL_L}><label>RG</label><span>{comm.communicantUser.rg}</span></div>
+                <div />
                 {comm.communicantUser.functionalNumber && (
-                  <div className="print-field" style={COL_C}><label>Nº Funcional</label><span>{comm.communicantUser.functionalNumber}</span></div>
+                  <div className="print-field" style={COL_R}><label>Nº Funcional</label><span>{comm.communicantUser.functionalNumber}</span></div>
                 )}
               </div>
             )
@@ -344,15 +350,16 @@ export default async function HistoricoImprimirPage({
       {/* ── PÁGINA 1: resumo do histórico ─────────────────────────────────── */}
       <div className="print-section">
         <h2>Histórico do Aluno — Conduta Profissional</h2>
-        <div style={GRID3}>
-          <div className="print-field" style={COL_L}><label>Nome completo</label><span>{aluno.fullName}</span></div>
-          <div className="print-field" style={COL_C}><label>Nome de guerra</label><span>{aluno.warName}</span></div>
+        <div style={GRID3W}>
+          <div className="print-field" style={COL_L}><label>Nome de guerra</label><span>{aluno.warName}</span></div>
+          <div className="print-field" style={COL_C}><label>Nome completo</label><span>{aluno.fullName}</span></div>
           <div className="print-field" style={COL_R}><label>Curso</label><span>{aluno.course.name}</span></div>
           <div className="print-field" style={COL_L}><label>Nº de curso</label><span>{formatCourseNumber(aluno.courseNumber)}</span></div>
           <div className="print-field" style={COL_C}><label>Pelotão</label><span>{aluno.platoon?.name ?? "—"}</span></div>
           <div className="print-field" style={COL_R}><label>RG</label><span>{aluno.rg}</span></div>
           <div className="print-field" style={COL_L}><label>Situação</label><span>{aluno.status}</span></div>
-          <div className="print-field" style={COL_C}><label>Gerado em</label><span>{format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span></div>
+          <div className="print-field" style={COL_C}></div>
+          <div className="print-field" style={COL_R}><label>Gerado em</label><span>{format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span></div>
         </div>
       </div>
 
