@@ -6,6 +6,33 @@ import { ptBR } from "date-fns/locale";
 import PrintLayout from "@/components/PrintLayout";
 import { getHistoricoAluno, STATUS_COMUNICACAO_LABELS as STATUS_LABELS } from "@/lib/historico";
 import { formatCourseNumber, escolaHeaderLabel } from "@/lib/utils";
+import React from "react";
+
+const STATUS_ABREV: Record<string, string> = {
+  REGISTRADA:                "Registrada",
+  AGUARDANDO_CIENCIA:        "Ag. Ciência/Defesa",
+  AGUARDANDO_DEFESA:         "Ag. Ciência/Defesa",
+  JUSTIFICATIVA_APRESENTADA: "Defesa Apresentada",
+  PRAZO_EXPIRADO:            "Prazo Expirado",
+  AGUARDANDO_PARECER:        "Ag. Parecer",
+  PARECER_EMITIDO:           "Parecer Emitido",
+  AGUARDANDO_DECISAO:        "Ag. Decisão",
+  AGUARDANDO_DECISAO_DIVISAO:"Ag. Decisão (Div.)",
+  DECIDIDA:                  "Decidida",
+  ARQUIVADA:                 "Arquivada",
+  DEVOLVIDA:                 "Devolvida p/ complementação",
+  PUBLICADA_CADERNO:         "Decidida/Publicada",
+  FINALIZADA:                "Finalizada",
+};
+
+const GRID3: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr 1fr",
+  gap: "6px 16px",
+};
+const COL_L: React.CSSProperties = { textAlign: "left" };
+const COL_C: React.CSSProperties = { textAlign: "center" };
+const COL_R: React.CSSProperties = { textAlign: "right" };
 
 export default async function HistoricoImprimirPage({
   params,
@@ -23,28 +50,22 @@ export default async function HistoricoImprimirPage({
   if (!historico) notFound();
   const { aluno, nota, desfavoravel, favoravel, resumo, evolucao } = historico;
 
-  // Aluno só vê o próprio histórico (mesma lógica de historico/page.tsx).
+  // ALUNO só vê o próprio histórico.
   if (session.role === "ALUNO" && aluno.userId !== session.userId) {
     const atual = await prisma.student.findFirst({ where: { userId: session.userId }, select: { rg: true } });
     if (!atual || atual.rg !== aluno.rg) notFound();
   }
 
-  // Filtro de período de adaptação espelhando o da página do aluno:
-  // "nao" → apenas as que descontam/acrescentam pontos (fora do P.A.)
-  // "sim" → apenas as do período de adaptação
-  // ""    → todas
   const adaptacaoWhere =
     adaptacao === "nao" ? { adaptationPeriod: false } :
     adaptacao === "sim" ? { adaptationPeriod: true }  : {};
 
-  // Todas as comunicações do aluno com detalhes completos, ordenadas por protocolo.
-  // Como o aluno é sempre o comunicado (não o comunicante) neste contexto, não há
-  // vista restrita — pareceres e decisões são visíveis para fins de transparência.
   const communications = await prisma.communication.findMany({
     where: { studentId: id, ...adaptacaoWhere },
     include: {
       type: true,
       reporter: true,
+      manualRule: true,
       witnesses: true,
       acknowledgements: true,
       defenses: { include: { attachments: true } },
@@ -59,23 +80,20 @@ export default async function HistoricoImprimirPage({
 
   return (
     <PrintLayout title={`Histórico Completo — ${aluno.warName}`} escola={escolaHeaderLabel(aluno.course.school)} repeatHeader>
-      {/* 80 % de zoom na impressão para cada comunicação caber em uma página. */}
       <style>{`@media print { html { zoom: 0.8; } }`}</style>
 
-      {/* ════════════════════════════════════════════════════════════════════
-          PÁGINA 1 — Resumo do histórico (mesmo conteúdo de historico/page.tsx)
-          ════════════════════════════════════════════════════════════════════ */}
+      {/* ── PÁGINA 1: resumo do histórico ─────────────────────────────────── */}
       <div className="print-section">
         <h2>Histórico do Aluno — Conduta Profissional</h2>
-        <div className="print-grid">
-          <div className="print-field"><label>Nome completo</label><span>{aluno.fullName}</span></div>
-          <div className="print-field"><label>Nome de guerra</label><span>{aluno.warName}</span></div>
-          <div className="print-field"><label>Curso</label><span>{aluno.course.name}</span></div>
-          <div className="print-field"><label>Nº de curso</label><span>{formatCourseNumber(aluno.courseNumber)}</span></div>
-          <div className="print-field"><label>Pelotão</label><span>{aluno.platoon?.name ?? "—"}</span></div>
-          <div className="print-field"><label>RG</label><span>{aluno.rg}</span></div>
-          <div className="print-field"><label>Situação</label><span>{aluno.status}</span></div>
-          <div className="print-field"><label>Gerado em</label><span>{format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span></div>
+        <div style={GRID3}>
+          <div className="print-field" style={COL_L}><label>Nome completo</label><span>{aluno.fullName}</span></div>
+          <div className="print-field" style={COL_C}><label>Nome de guerra</label><span>{aluno.warName}</span></div>
+          <div className="print-field" style={COL_R}><label>Curso</label><span>{aluno.course.name}</span></div>
+          <div className="print-field" style={COL_L}><label>Nº de curso</label><span>{formatCourseNumber(aluno.courseNumber)}</span></div>
+          <div className="print-field" style={COL_C}><label>Pelotão</label><span>{aluno.platoon?.name ?? "—"}</span></div>
+          <div className="print-field" style={COL_R}><label>RG</label><span>{aluno.rg}</span></div>
+          <div className="print-field" style={COL_L}><label>Situação</label><span>{aluno.status}</span></div>
+          <div className="print-field" style={COL_C}><label>Gerado em</label><span>{format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span></div>
         </div>
       </div>
 
@@ -161,111 +179,141 @@ export default async function HistoricoImprimirPage({
           adaptacao === "sim" ? aluno.communications.filter((c) =>  c.adaptationPeriod) :
           aluno.communications;
         return (
-      <div className="print-section">
-        {adaptacao === "nao" && <p style={{ fontSize: "9pt", color: "#b45309", marginBottom: 8, fontWeight: "bold" }}>Filtrado: apenas comunicações fora do Período de Adaptação (que afetam a nota)</p>}
-        {adaptacao === "sim" && <p style={{ fontSize: "9pt", color: "#b45309", marginBottom: 8, fontWeight: "bold" }}>Filtrado: apenas comunicações do Período de Adaptação</p>}
-        <h2>Comunicações ({commsVisiveis.length}{adaptacao ? ` de ${aluno.communications.length}` : ""} total)</h2>
-        <table className="print-table">
-          <thead>
-            <tr>
-              <th>Protocolo</th>
-              <th>Tipo</th>
-              <th>Data do Fato</th>
-              <th>Status</th>
-              <th>Pontuação</th>
-              <th>Decisão</th>
-            </tr>
-          </thead>
-          <tbody>
-            {commsVisiveis.map((c) => (
-              <tr key={c.id}>
-                <td style={{ fontFamily: "monospace", fontSize: "8pt", whiteSpace: "nowrap" }}>{c.protocolNumber}</td>
-                <td>{c.type.name}</td>
-                <td>{format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
-                <td style={{ fontSize: "8pt" }}>
-                  {STATUS_LABELS[c.status] ?? c.status}
-                  {c.adaptationPeriod && <span style={{ marginLeft: 4, fontSize: "7pt", fontWeight: "bold", color: "#c2410c", border: "1px solid #c2410c", borderRadius: 3, padding: "0 3px" }}>PA</span>}
-                </td>
-                <td style={{ textAlign: "right", fontWeight: "bold" }}>
-                  {c.finalScore != null ? (
-                    <span className={`print-badge ${c.type.scoreNature === "DESFAVORAVEL" ? "badge-desfav" : "badge-fav"}`}>
-                      {c.type.scoreNature === "DESFAVORAVEL" ? "−" : "+"}{c.finalScore.toFixed(1)}
-                    </span>
-                  ) : "—"}
-                </td>
-                <td style={{ fontSize: "8pt" }}>{c.decisions[0]?.decisionType ?? "—"}</td>
-              </tr>
-            ))}
-            {commsVisiveis.length === 0 && (
-              <tr><td colSpan={6} style={{ textAlign: "center", color: "#000" }}>{aluno.communications.length === 0 ? "Nenhuma comunicação registrada." : "Nenhuma comunicação encontrada com este filtro."}</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          <div className="print-section">
+            {adaptacao === "nao" && <p style={{ fontSize: "9pt", color: "#b45309", marginBottom: 8, fontWeight: "bold" }}>Filtrado: apenas comunicações fora do Período de Adaptação (que afetam a nota)</p>}
+            {adaptacao === "sim" && <p style={{ fontSize: "9pt", color: "#b45309", marginBottom: 8, fontWeight: "bold" }}>Filtrado: apenas comunicações do Período de Adaptação</p>}
+            <h2>Comunicações ({commsVisiveis.length}{adaptacao ? ` de ${aluno.communications.length}` : ""} total)</h2>
+            <table className="print-table">
+              <thead>
+                <tr>
+                  <th>Protocolo</th>
+                  <th>Tipo</th>
+                  <th>Data do Fato</th>
+                  <th>Status</th>
+                  <th>Pontuação</th>
+                  <th>Decisão</th>
+                </tr>
+              </thead>
+              <tbody>
+                {commsVisiveis.map((c) => (
+                  <tr key={c.id}>
+                    <td style={{ fontFamily: "monospace", fontSize: "8pt", whiteSpace: "nowrap" }}>{c.protocolNumber}</td>
+                    <td>{c.type.name}</td>
+                    <td>{format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
+                    <td style={{ fontSize: "8pt" }}>
+                      {STATUS_LABELS[c.status] ?? c.status}
+                      {c.adaptationPeriod && <span style={{ marginLeft: 4, fontSize: "7pt", fontWeight: "bold", color: "#c2410c", border: "1px solid #c2410c", borderRadius: 3, padding: "0 3px" }}>PA</span>}
+                    </td>
+                    <td style={{ textAlign: "right", fontWeight: "bold" }}>
+                      {c.finalScore != null ? (
+                        <span className={`print-badge ${c.type.scoreNature === "DESFAVORAVEL" ? "badge-desfav" : "badge-fav"}`}>
+                          {c.type.scoreNature === "DESFAVORAVEL" ? "−" : "+"}{c.finalScore.toFixed(1)}
+                        </span>
+                      ) : "—"}
+                    </td>
+                    <td style={{ fontSize: "8pt" }}>{c.decisions[0]?.decisionType ?? "—"}</td>
+                  </tr>
+                ))}
+                {commsVisiveis.length === 0 && (
+                  <tr><td colSpan={6} style={{ textAlign: "center", color: "#000" }}>{aluno.communications.length === 0 ? "Nenhuma comunicação registrada." : "Nenhuma comunicação encontrada com este filtro."}</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         );
       })()}
 
-      {/* ════════════════════════════════════════════════════════════════════
-          PÁGINAS SEGUINTES — Uma por comunicação, ordenadas por protocolo.
-          Cada div com break-before inicia uma nova página na impressão.
-          ════════════════════════════════════════════════════════════════════ */}
+      {/* ── PÁGINAS SEGUINTES: uma por comunicação ─────────────────────── */}
       {communications.map((comm) => {
         const isCPI = comm.type.name.startsWith("CPI");
-        const docTitle = isCPI
-          ? `Conduta Profissional Inadequada (${comm.type.name})`
-          : `${comm.type.name}`;
+        const secTitle = isCPI ? "Conduta Profissional Inadequada (CPI)" : comm.type.name;
+
+        // Pontuação: usa finalScore (se já decidido) ou padrão do tipo
+        const scoreVal  = comm.finalScore ?? comm.type.score;
+        const scoreSign = comm.type.scoreNature === "DESFAVORAVEL" ? "−" : "+";
+        const scoreStr  = `${scoreSign}${scoreVal.toFixed(1).replace(".", ",")} ponto`;
+        const tipoDisplay = `${comm.type.name} (${scoreStr})`;
+
+        // Situação
+        const situacaoDisplay = STATUS_ABREV[comm.status] ?? comm.status;
+
+        // Dispositivo legal com descrição da alínea
+        const dispositivoParts: string[] = [];
+        if (comm.article) dispositivoParts.push(`Art. ${comm.article}`);
+        if (comm.item)    dispositivoParts.push(`Inc. ${comm.item}`);
+        if (comm.letter)  dispositivoParts.push(`Al. ${comm.letter}`);
+        const dispositivoBase    = dispositivoParts.join(", ");
+        const dispositivoDisplay = comm.manualRule?.description
+          ? `${dispositivoBase} (${comm.manualRule.description})`
+          : dispositivoBase;
 
         return (
           <div key={comm.id} style={{ breakBefore: "page", pageBreakBefore: "always" }}>
 
+            {/* 1. Protocolo · tipo+pontuação · situação */}
             <div className="print-section">
-              <h2>{docTitle}</h2>
-              <div className="print-field">
-                <label>Número de Protocolo</label>
-                <span className="print-protocol">{comm.protocolNumber}</span>
-              </div>
-              <div className="print-field">
-                <label>Tipo</label>
-                <span>{comm.type.name} — Pontuação: {comm.type.score.toFixed(1)} ponto(s)</span>
-              </div>
-              <div className="print-field">
-                <label>Situação</label>
-                <span>{STATUS_LABELS[comm.status] ?? comm.status}</span>
+              <h2>{secTitle}</h2>
+              <div style={GRID3}>
+                <div className="print-field" style={COL_L}>
+                  <label>Nº de Protocolo</label>
+                  <span>{comm.protocolNumber}</span>
+                </div>
+                <div className="print-field" style={COL_C}>
+                  <label>Tipo / Pontuação</label>
+                  <span>{tipoDisplay}</span>
+                </div>
+                <div className="print-field" style={COL_R}>
+                  <label>Situação</label>
+                  <span>{situacaoDisplay}</span>
+                </div>
               </div>
             </div>
 
+            {/* 2. Dados do comunicado — 2×3: Nome|NdG|Curso / NºCurso|Pelotão|RG */}
             <div className="print-section">
               <h2>Dados do Comunicado / Aluno</h2>
-              <div className="print-grid">
-                <div className="print-field"><label>Nome completo</label><span>{aluno.fullName}</span></div>
-                <div className="print-field"><label>Nome de guerra</label><span>{aluno.warName}</span></div>
-                <div className="print-field"><label>Curso</label><span>{aluno.course.name}</span></div>
-                <div className="print-field"><label>Nº de curso</label><span>{comm.courseNumber}</span></div>
-                <div className="print-field"><label>Pelotão</label><span>{aluno.platoon?.name ?? "—"}</span></div>
-                <div className="print-field"><label>RG</label><span>{aluno.rg}</span></div>
+              <div style={GRID3}>
+                <div className="print-field" style={COL_L}><label>Nome completo</label><span>{aluno.fullName}</span></div>
+                <div className="print-field" style={COL_C}><label>Nome de guerra</label><span>{aluno.warName}</span></div>
+                <div className="print-field" style={COL_R}><label>Curso</label><span>{aluno.course.name}</span></div>
+                <div className="print-field" style={COL_L}><label>Nº de curso</label><span>{comm.courseNumber}</span></div>
+                <div className="print-field" style={COL_C}><label>Pelotão</label><span>{aluno.platoon?.name ?? "—"}</span></div>
+                <div className="print-field" style={COL_R}><label>RG</label><span>{aluno.rg}</span></div>
               </div>
             </div>
 
+            {/* 3. Dados do fato — data/hora/local em 3 cols + dispositivo abaixo */}
             <div className="print-section">
               <h2>Dados do Fato</h2>
-              <div className="print-grid">
-                <div className="print-field"><label>Data do fato</label><span>{format(new Date(comm.factDate), "dd/MM/yyyy", { locale: ptBR })}</span></div>
-                <div className="print-field"><label>Hora do fato</label><span>{comm.factTime ?? "—"}</span></div>
-                <div className="print-field"><label>Local</label><span>{comm.factPlace ?? "—"}</span></div>
-                {comm.article && (
-                  <div className="print-field">
-                    <label>Dispositivo legal</label>
-                    <span>Art. {comm.article}{comm.item ? `, Inc. ${comm.item}` : ""}{comm.letter ? `, Al. ${comm.letter}` : ""}</span>
-                  </div>
-                )}
+              <div style={GRID3}>
+                <div className="print-field" style={COL_L}>
+                  <label>Data do fato</label>
+                  <span>{format(new Date(comm.factDate), "dd/MM/yyyy", { locale: ptBR })}</span>
+                </div>
+                <div className="print-field" style={COL_C}>
+                  <label>Hora do fato</label>
+                  <span>{comm.factTime ?? "—"}</span>
+                </div>
+                <div className="print-field" style={COL_R}>
+                  <label>Local</label>
+                  <span>{comm.factPlace ?? "—"}</span>
+                </div>
               </div>
+              {dispositivoDisplay && (
+                <div className="print-field" style={{ marginTop: 6, ...COL_L }}>
+                  <label>Dispositivo legal</label>
+                  <span>{dispositivoDisplay}</span>
+                </div>
+              )}
             </div>
 
+            {/* 4. Descrição do fato */}
             <div className="print-section">
               <h2>Descrição do Fato</h2>
               <p className="print-text">{comm.factDescription}</p>
             </div>
 
+            {/* 5. Testemunha(s) */}
             {comm.witnesses.length > 0 && (
               <div className="print-section">
                 <h2>Testemunha(s)</h2>
@@ -278,6 +326,7 @@ export default async function HistoricoImprimirPage({
               </div>
             )}
 
+            {/* 6. Encaminhamento por prazo expirado */}
             {comm.acknowledgements.some((a) => a.method === "PRAZO_EXPIRADO") && (
               <div className="print-section">
                 <h2>Encaminhamento Automático por Prazo Expirado</h2>
@@ -294,9 +343,10 @@ export default async function HistoricoImprimirPage({
               </div>
             )}
 
+            {/* 7. Posição do aluno */}
             {(() => {
-              const comDefesa  = comm.defenses.length > 0;
-              const semDefesa  = comm.acknowledgements.some((a) => a.method === "SEM_DEFESA");
+              const comDefesa = comm.defenses.length > 0;
+              const semDefesa = comm.acknowledgements.some((a) => a.method === "SEM_DEFESA");
               if (!comDefesa && !semDefesa) return null;
               return (
                 <div className="print-section">
@@ -329,13 +379,16 @@ export default async function HistoricoImprimirPage({
               );
             })()}
 
+            {/* 8. Parecer */}
             {comm.opinions.length > 0 && (
               <div className="print-section">
                 <h2>Parecer</h2>
                 {comm.opinions.map((o) => (
                   <div key={o.id}>
                     <p className="print-text">{o.text}</p>
-                    {o.recommendation && <p style={{ fontWeight: "bold", marginTop: 4, fontSize: "10pt" }}>Recomendação: {o.recommendation}</p>}
+                    {o.recommendation && (
+                      <p style={{ fontWeight: "bold", marginTop: 4, fontSize: "10pt" }}>Recomendação: {o.recommendation}</p>
+                    )}
                     {o.attachments.length > 0 && (
                       <p style={{ fontSize: "8pt", color: "#000", marginTop: 4 }}>
                         Anexo(s): {o.attachments.map((a) => a.fileName).join(", ")}
@@ -349,15 +402,18 @@ export default async function HistoricoImprimirPage({
               </div>
             )}
 
+            {/* 9. Decisão */}
             {comm.decisions.length > 0 && (
               <div className="print-section">
-                <h2>Decisão</h2>
+                <h2>Decisão do Comandante da Escola</h2>
                 {comm.decisions.map((d) => (
                   <div key={d.id}>
                     <p style={{ fontWeight: "bold", fontSize: "11pt", marginBottom: 4 }}>{d.decisionType}</p>
                     <p className="print-text">{d.text}</p>
                     {d.finalScore != null && (
-                      <p style={{ fontWeight: "bold", marginTop: 6 }}>Pontuação aplicada: {d.finalScore.toFixed(1)} ponto(s)</p>
+                      <p style={{ fontWeight: "bold", marginTop: 6 }}>
+                        Pontuação aplicada: {d.finalScore.toFixed(1).replace(".", ",")} ponto(s)
+                      </p>
                     )}
                     {d.attachments.length > 0 && (
                       <p style={{ fontSize: "8pt", color: "#000", marginTop: 4 }}>
@@ -372,37 +428,56 @@ export default async function HistoricoImprimirPage({
               </div>
             )}
 
+            {/* 10. Comunicante */}
             <div className="print-section">
               <h2>Comunicante</h2>
               {comm.communicantUser ? (
-                <div className="print-grid">
-                  <div className="print-field"><label>Nome completo</label><span>{comm.communicantUser.fullName}</span></div>
-                  <div className="print-field"><label>Nome de guerra</label><span>{comm.communicantUser.warName}</span></div>
-                  <div className="print-field"><label>Posto/Graduação</label><span>{comm.communicantUser.rank}</span></div>
-                  <div className="print-field"><label>RG</label><span>{comm.communicantUser.rg}</span></div>
-                  {comm.communicantUser.functionalNumber && (
-                    <div className="print-field"><label>Nº Funcional</label><span>{comm.communicantUser.functionalNumber}</span></div>
-                  )}
-                  {comm.communicantUser.student && (
-                    <>
-                      <div className="print-field"><label>Curso</label><span>{comm.communicantUser.student.course.name}</span></div>
-                      <div className="print-field"><label>Nº de curso</label><span>{comm.communicantUser.student.courseNumber}</span></div>
-                      <div className="print-field"><label>Pelotão</label><span>{comm.communicantUser.student.platoon?.name ?? "—"}</span></div>
-                    </>
-                  )}
-                </div>
+                comm.communicantUser.student ? (
+                  /* Aluno do CFO: 2×3 + última linha esq·vazio·dir */
+                  <>
+                    <div style={GRID3}>
+                      <div className="print-field" style={COL_L}><label>Nome completo</label><span>{comm.communicantUser.fullName}</span></div>
+                      <div className="print-field" style={COL_C}><label>Nome de guerra</label><span>{comm.communicantUser.warName}</span></div>
+                      <div className="print-field" style={COL_R}><label>Posto/Graduação</label><span>{comm.communicantUser.rank}</span></div>
+                      <div className="print-field" style={COL_L}><label>RG</label><span>{comm.communicantUser.rg}</span></div>
+                      <div className="print-field" style={COL_C}><label>Nº Funcional</label><span>{comm.communicantUser.functionalNumber ?? "—"}</span></div>
+                      <div className="print-field" style={COL_R}><label>Curso</label><span>{comm.communicantUser.student.course.name}</span></div>
+                    </div>
+                    <div style={{ ...GRID3, marginTop: 6 }}>
+                      <div className="print-field" style={COL_L}>
+                        <label>Nº de curso</label>
+                        <span>{comm.communicantUser.student.courseNumber}</span>
+                      </div>
+                      <div />
+                      <div className="print-field" style={COL_R}>
+                        <label>Pelotão</label>
+                        <span>{comm.communicantUser.student.platoon?.name ?? "—"}</span>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  /* Instrutor/servidor: sem dados de curso/pelotão */
+                  <div style={GRID3}>
+                    <div className="print-field" style={COL_L}><label>Nome completo</label><span>{comm.communicantUser.fullName}</span></div>
+                    <div className="print-field" style={COL_C}><label>Nome de guerra</label><span>{comm.communicantUser.warName}</span></div>
+                    <div className="print-field" style={COL_R}><label>Posto/Graduação</label><span>{comm.communicantUser.rank}</span></div>
+                    <div className="print-field" style={COL_L}><label>RG</label><span>{comm.communicantUser.rg}</span></div>
+                    {comm.communicantUser.functionalNumber && (
+                      <div className="print-field" style={COL_C}><label>Nº Funcional</label><span>{comm.communicantUser.functionalNumber}</span></div>
+                    )}
+                  </div>
+                )
               ) : (
-                <div className="print-grid">
-                  <div className="print-field"><label>Comunicante</label><span>{comm.communicantName ?? "—"}</span></div>
-                </div>
+                <div className="print-field" style={COL_L}><label>Comunicante</label><span>{comm.communicantName ?? "—"}</span></div>
               )}
             </div>
 
+            {/* 11. Registro */}
             <div className="print-section">
               <h2>Registro da Comunicação</h2>
-              <div className="print-grid">
-                <div className="print-field"><label>Registrado por</label><span>{comm.reporter.rank} {comm.reporter.warName}</span></div>
-                <div className="print-field"><label>Data do registro</label><span>{format(new Date(comm.createdAt), "dd/MM/yyyy", { locale: ptBR })}</span></div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px" }}>
+                <div className="print-field" style={COL_L}><label>Registrado por</label><span>{comm.reporter.rank} {comm.reporter.warName}</span></div>
+                <div className="print-field" style={COL_R}><label>Data do registro</label><span>{format(new Date(comm.createdAt), "dd/MM/yyyy", { locale: ptBR })}</span></div>
               </div>
             </div>
 
