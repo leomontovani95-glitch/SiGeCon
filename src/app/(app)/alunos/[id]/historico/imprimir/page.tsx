@@ -142,9 +142,9 @@ export default async function HistoricoImprimirPage({
         <div className="print-section">
           <h2>Dados do Comunicado / Aluno</h2>
           <div style={GRID3W}>
-            <div className="print-field" style={COL_L}><label>Nome de guerra</label><span>{aluno.warName}</span></div>
+            <div className="print-field" style={COL_L}><label>Curso</label><span>{aluno.course.name}</span></div>
             <div className="print-field" style={COL_C}><label>Nome completo</label><span>{aluno.fullName}</span></div>
-            <div className="print-field" style={COL_R}><label>Curso</label><span>{aluno.course.name}</span></div>
+            <div className="print-field" style={COL_R}><label>Nome de guerra</label><span>{aluno.warName}</span></div>
             <div className="print-field" style={COL_L}><label>Nº de curso</label><span>{comm.courseNumber}</span></div>
             <div className="print-field" style={COL_C}><label>Pelotão</label><span>{aluno.platoon?.name ?? "—"}</span></div>
             <div className="print-field" style={COL_R}><label>RG</label><span>{aluno.rg}</span></div>
@@ -293,9 +293,9 @@ export default async function HistoricoImprimirPage({
             comm.communicantUser.student ? (
               <>
                 <div style={GRID3W}>
-                  <div className="print-field" style={COL_L}><label>Nome de guerra</label><span>{comm.communicantUser.warName}</span></div>
+                  <div className="print-field" style={COL_L}><label>Posto/Graduação</label><span>{comm.communicantUser.rank}</span></div>
                   <div className="print-field" style={COL_C}><label>Nome completo</label><span>{comm.communicantUser.fullName}</span></div>
-                  <div className="print-field" style={COL_R}><label>Posto/Graduação</label><span>{comm.communicantUser.rank}</span></div>
+                  <div className="print-field" style={COL_R}><label>Nome de guerra</label><span>{comm.communicantUser.warName}</span></div>
                   <div className="print-field" style={COL_L}><label>RG</label><span>{comm.communicantUser.rg}</span></div>
                   <div className="print-field" style={COL_C}><label>Nº Funcional</label><span>{comm.communicantUser.functionalNumber ?? "—"}</span></div>
                   <div className="print-field" style={COL_R}><label>Curso</label><span>{comm.communicantUser.student.course.name}</span></div>
@@ -308,9 +308,9 @@ export default async function HistoricoImprimirPage({
               </>
             ) : (
               <div style={GRID3W}>
-                <div className="print-field" style={COL_L}><label>Nome de guerra</label><span>{comm.communicantUser.warName}</span></div>
+                <div className="print-field" style={COL_L}><label>Posto/Graduação</label><span>{comm.communicantUser.rank}</span></div>
                 <div className="print-field" style={COL_C}><label>Nome completo</label><span>{comm.communicantUser.fullName}</span></div>
-                <div className="print-field" style={COL_R}><label>Posto/Graduação</label><span>{comm.communicantUser.rank}</span></div>
+                <div className="print-field" style={COL_R}><label>Nome de guerra</label><span>{comm.communicantUser.warName}</span></div>
                 <div className="print-field" style={COL_L}><label>RG</label><span>{comm.communicantUser.rg}</span></div>
                 <div />
                 {comm.communicantUser.functionalNumber && (
@@ -351,9 +351,9 @@ export default async function HistoricoImprimirPage({
       <div className="print-section">
         <h2>Histórico do Aluno — Conduta Profissional</h2>
         <div style={GRID3W}>
-          <div className="print-field" style={COL_L}><label>Nome de guerra</label><span>{aluno.warName}</span></div>
+          <div className="print-field" style={COL_L}><label>Curso</label><span>{aluno.course.name}</span></div>
           <div className="print-field" style={COL_C}><label>Nome completo</label><span>{aluno.fullName}</span></div>
-          <div className="print-field" style={COL_R}><label>Curso</label><span>{aluno.course.name}</span></div>
+          <div className="print-field" style={COL_R}><label>Nome de guerra</label><span>{aluno.warName}</span></div>
           <div className="print-field" style={COL_L}><label>Nº de curso</label><span>{formatCourseNumber(aluno.courseNumber)}</span></div>
           <div className="print-field" style={COL_C}><label>Pelotão</label><span>{aluno.platoon?.name ?? "—"}</span></div>
           <div className="print-field" style={COL_R}><label>RG</label><span>{aluno.rg}</span></div>
