@@ -78,10 +78,269 @@ export default async function HistoricoImprimirPage({
     orderBy: { protocolNumber: "asc" },
   });
 
-  return (
-    <PrintLayout title={`Histórico Completo — ${aluno.warName}`} escola={escolaHeaderLabel(aluno.course.school)} repeatHeader>
-      <style>{`@media print { html { zoom: 0.8; } }`}</style>
+  const escolaLabel = escolaHeaderLabel(aluno.course.school);
 
+  // Cabeçalho institucional reutilizado em cada página de comunicação.
+  // As classes (print-header, linha1…) são definidas pelo PrintLayout.
+  const commHeader = (
+    <div className="print-header">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo-pmes.png" alt="PMES" className="print-header-logo" width={68} height={68} loading="eager" />
+      <div className="print-header-text">
+        <p className="linha1">Governo do Estado do Espírito Santo</p>
+        <p className="linha2">Polícia Militar</p>
+        <p className="linha3">Academia de Polícia Militar</p>
+        {escolaLabel && <p className="linha4">{escolaLabel}</p>}
+      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/brasao-apm-sm.png" alt="APM/ES" className="print-header-logo" width={68} height={68} loading="eager" />
+    </div>
+  );
+
+  // Cada comunicação vira uma entrada no array extraPages (div.extra-page
+  // com break-before:page), garantindo que o page-break funcione no navegador
+  // independentemente da estrutura de tabela usada no repeatHeader.
+  const commPages = communications.map((comm) => {
+    const isCPI = comm.type.name.startsWith("CPI");
+    const secTitle = isCPI ? "Conduta Profissional Inadequada (CPI)" : comm.type.name;
+
+    const scoreVal  = comm.finalScore ?? comm.type.score;
+    const scoreSign = comm.type.scoreNature === "DESFAVORAVEL" ? "−" : "+";
+    const scoreStr  = `${scoreSign}${scoreVal.toFixed(1).replace(".", ",")} ponto`;
+    const tipoDisplay = `${comm.type.name} (${scoreStr})`;
+    const situacaoDisplay = STATUS_ABREV[comm.status] ?? comm.status;
+
+    const dispositivoParts: string[] = [];
+    if (comm.article) dispositivoParts.push(`Art. ${comm.article}`);
+    if (comm.item)    dispositivoParts.push(`Inc. ${comm.item}`);
+    if (comm.letter)  dispositivoParts.push(`Al. ${comm.letter}`);
+    const dispositivoBase    = dispositivoParts.join(", ");
+    const dispositivoDisplay = comm.manualRule?.description
+      ? `${dispositivoBase} (${comm.manualRule.description})`
+      : dispositivoBase;
+
+    return (
+      <div key={comm.id}>
+        {commHeader}
+
+        {/* 1. Protocolo · tipo+pontuação · situação */}
+        <div className="print-section">
+          <h2>{secTitle}</h2>
+          <div style={GRID3}>
+            <div className="print-field" style={COL_L}><label>Nº de Protocolo</label><span>{comm.protocolNumber}</span></div>
+            <div className="print-field" style={COL_C}><label>Tipo / Pontuação</label><span>{tipoDisplay}</span></div>
+            <div className="print-field" style={COL_R}><label>Situação</label><span>{situacaoDisplay}</span></div>
+          </div>
+        </div>
+
+        {/* 2. Dados do comunicado */}
+        <div className="print-section">
+          <h2>Dados do Comunicado / Aluno</h2>
+          <div style={GRID3}>
+            <div className="print-field" style={COL_L}><label>Nome completo</label><span>{aluno.fullName}</span></div>
+            <div className="print-field" style={COL_C}><label>Nome de guerra</label><span>{aluno.warName}</span></div>
+            <div className="print-field" style={COL_R}><label>Curso</label><span>{aluno.course.name}</span></div>
+            <div className="print-field" style={COL_L}><label>Nº de curso</label><span>{comm.courseNumber}</span></div>
+            <div className="print-field" style={COL_C}><label>Pelotão</label><span>{aluno.platoon?.name ?? "—"}</span></div>
+            <div className="print-field" style={COL_R}><label>RG</label><span>{aluno.rg}</span></div>
+          </div>
+        </div>
+
+        {/* 3. Dados do fato */}
+        <div className="print-section">
+          <h2>Dados do Fato</h2>
+          <div style={GRID3}>
+            <div className="print-field" style={COL_L}><label>Data do fato</label><span>{format(new Date(comm.factDate), "dd/MM/yyyy", { locale: ptBR })}</span></div>
+            <div className="print-field" style={COL_C}><label>Hora do fato</label><span>{comm.factTime ?? "—"}</span></div>
+            <div className="print-field" style={COL_R}><label>Local</label><span>{comm.factPlace ?? "—"}</span></div>
+          </div>
+          {dispositivoDisplay && (
+            <div className="print-field" style={{ marginTop: 6, ...COL_L }}>
+              <label>Dispositivo legal</label>
+              <span>{dispositivoDisplay}</span>
+            </div>
+          )}
+        </div>
+
+        {/* 4. Descrição */}
+        <div className="print-section">
+          <h2>Descrição do Fato</h2>
+          <p className="print-text">{comm.factDescription}</p>
+        </div>
+
+        {/* 5. Testemunhas */}
+        {comm.witnesses.length > 0 && (
+          <div className="print-section">
+            <h2>Testemunha(s)</h2>
+            {comm.witnesses.map((w, i) => (
+              <div key={w.id} className="print-field">
+                <label>Testemunha {i + 1}</label>
+                <span>{w.name}{w.rg ? ` — RG: ${w.rg}` : ""}{w.functionalNumber ? ` — Func: ${w.functionalNumber}` : ""}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 6. Prazo expirado */}
+        {comm.acknowledgements.some((a) => a.method === "PRAZO_EXPIRADO") && (
+          <div className="print-section">
+            <h2>Encaminhamento Automático por Prazo Expirado</h2>
+            {comm.acknowledgements
+              .filter((a) => a.method === "PRAZO_EXPIRADO")
+              .map((a) => (
+                <div key={a.id}>
+                  <p className="print-text">{a.notes}</p>
+                  <p style={{ fontSize: "8pt", color: "#000", marginTop: 4 }}>
+                    Processado automaticamente em {format(new Date(a.acknowledgedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                  </p>
+                </div>
+              ))}
+          </div>
+        )}
+
+        {/* 7. Posição do aluno */}
+        {(() => {
+          const comDefesa = comm.defenses.length > 0;
+          const semDefesa = comm.acknowledgements.some((a) => a.method === "SEM_DEFESA");
+          if (!comDefesa && !semDefesa) return null;
+          return (
+            <div className="print-section">
+              <h2>Posição do Aluno</h2>
+              {comDefesa ? (
+                comm.defenses.map((d) => (
+                  <div key={d.id}>
+                    <p className="print-text">{d.text}</p>
+                    <p style={{ fontSize: "8pt", color: "#000", marginTop: 4 }}>
+                      Defesa apresentada em {format(new Date(d.submittedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                      {d.isLate ? " (FORA DO PRAZO)" : ""}
+                    </p>
+                    {d.attachments.length > 0 && (
+                      <p style={{ fontSize: "8pt", color: "#000", marginTop: 4 }}>
+                        Anexo(s): {d.attachments.map((a) => a.fileName).join(", ")}
+                      </p>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p className="print-text" style={{ fontStyle: "italic" }}>
+                  {comm.type.name.toLowerCase().includes("elogiosa")
+                    ? "O aluno tomou ciência da Referência Elogiosa."
+                    : comm.adaptationPeriod
+                    ? "O aluno tomou ciência da comunicação e não há apresentação de defesa por se tratar de comunicação em Período de Adaptação."
+                    : "O aluno tomou ciência da comunicação e optou por não apresentar justificativa/defesa."}
+                </p>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* 8. Parecer */}
+        {comm.opinions.length > 0 && (
+          <div className="print-section">
+            <h2>Parecer</h2>
+            {comm.opinions.map((o) => (
+              <div key={o.id}>
+                <p className="print-text">{o.text}</p>
+                {o.recommendation && <p style={{ fontWeight: "bold", marginTop: 4, fontSize: "10pt" }}>Recomendação: {o.recommendation}</p>}
+                {o.attachments.length > 0 && (
+                  <p style={{ fontSize: "8pt", color: "#000", marginTop: 4 }}>
+                    Anexo(s): {o.attachments.map((a) => a.fileName).join(", ")}
+                  </p>
+                )}
+                <p style={{ fontSize: "8pt", color: "#000" }}>
+                  {o.author.fullName} — {o.authorRole.replace(/_/g, " ")} — {format(new Date(o.createdAt), "dd/MM/yyyy", { locale: ptBR })}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 9. Decisão */}
+        {comm.decisions.length > 0 && (
+          <div className="print-section">
+            <h2>Decisão do Comandante da Escola</h2>
+            {comm.decisions.map((d) => (
+              <div key={d.id}>
+                <p style={{ fontWeight: "bold", fontSize: "11pt", marginBottom: 4 }}>{d.decisionType}</p>
+                <p className="print-text">{d.text}</p>
+                {d.finalScore != null && (
+                  <p style={{ fontWeight: "bold", marginTop: 6 }}>
+                    Pontuação aplicada: {d.finalScore.toFixed(1).replace(".", ",")} ponto(s)
+                  </p>
+                )}
+                {d.attachments.length > 0 && (
+                  <p style={{ fontSize: "8pt", color: "#000", marginTop: 4 }}>
+                    Anexo(s): {d.attachments.map((a) => a.fileName).join(", ")}
+                  </p>
+                )}
+                <p style={{ fontSize: "8pt", color: "#000", marginTop: 4 }}>
+                  {d.authority.fullName} — {d.authority.role.replace(/_/g, " ")} — {format(new Date(d.decidedAt), "dd/MM/yyyy", { locale: ptBR })}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 10. Comunicante */}
+        <div className="print-section">
+          <h2>Comunicante</h2>
+          {comm.communicantUser ? (
+            comm.communicantUser.student ? (
+              <>
+                <div style={GRID3}>
+                  <div className="print-field" style={COL_L}><label>Nome completo</label><span>{comm.communicantUser.fullName}</span></div>
+                  <div className="print-field" style={COL_C}><label>Nome de guerra</label><span>{comm.communicantUser.warName}</span></div>
+                  <div className="print-field" style={COL_R}><label>Posto/Graduação</label><span>{comm.communicantUser.rank}</span></div>
+                  <div className="print-field" style={COL_L}><label>RG</label><span>{comm.communicantUser.rg}</span></div>
+                  <div className="print-field" style={COL_C}><label>Nº Funcional</label><span>{comm.communicantUser.functionalNumber ?? "—"}</span></div>
+                  <div className="print-field" style={COL_R}><label>Curso</label><span>{comm.communicantUser.student.course.name}</span></div>
+                </div>
+                <div style={{ ...GRID3, marginTop: 6 }}>
+                  <div className="print-field" style={COL_L}><label>Nº de curso</label><span>{comm.communicantUser.student.courseNumber}</span></div>
+                  <div />
+                  <div className="print-field" style={COL_R}><label>Pelotão</label><span>{comm.communicantUser.student.platoon?.name ?? "—"}</span></div>
+                </div>
+              </>
+            ) : (
+              <div style={GRID3}>
+                <div className="print-field" style={COL_L}><label>Nome completo</label><span>{comm.communicantUser.fullName}</span></div>
+                <div className="print-field" style={COL_C}><label>Nome de guerra</label><span>{comm.communicantUser.warName}</span></div>
+                <div className="print-field" style={COL_R}><label>Posto/Graduação</label><span>{comm.communicantUser.rank}</span></div>
+                <div className="print-field" style={COL_L}><label>RG</label><span>{comm.communicantUser.rg}</span></div>
+                {comm.communicantUser.functionalNumber && (
+                  <div className="print-field" style={COL_C}><label>Nº Funcional</label><span>{comm.communicantUser.functionalNumber}</span></div>
+                )}
+              </div>
+            )
+          ) : (
+            <div className="print-field" style={COL_L}><label>Comunicante</label><span>{comm.communicantName ?? "—"}</span></div>
+          )}
+        </div>
+
+        {/* 11. Registro */}
+        <div className="print-section">
+          <h2>Registro da Comunicação</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px" }}>
+            <div className="print-field" style={COL_L}><label>Registrado por</label><span>{comm.reporter.rank} {comm.reporter.warName}</span></div>
+            <div className="print-field" style={COL_R}><label>Data do registro</label><span>{format(new Date(comm.createdAt), "dd/MM/yyyy", { locale: ptBR })}</span></div>
+          </div>
+        </div>
+      </div>
+    );
+  });
+
+  const commsVisiveis =
+    adaptacao === "nao" ? aluno.communications.filter((c) => !c.adaptationPeriod) :
+    adaptacao === "sim" ? aluno.communications.filter((c) =>  c.adaptationPeriod) :
+    aluno.communications;
+
+  return (
+    <PrintLayout
+      title={`Histórico Completo — ${aluno.warName}`}
+      escola={escolaLabel}
+      extraStyles="@media print { html { zoom: 0.8; } }"
+      extraPages={commPages}
+    >
       {/* ── PÁGINA 1: resumo do histórico ─────────────────────────────────── */}
       <div className="print-section">
         <h2>Histórico do Aluno — Conduta Profissional</h2>
@@ -173,318 +432,47 @@ export default async function HistoricoImprimirPage({
         </div>
       )}
 
-      {(() => {
-        const commsVisiveis =
-          adaptacao === "nao" ? aluno.communications.filter((c) => !c.adaptationPeriod) :
-          adaptacao === "sim" ? aluno.communications.filter((c) =>  c.adaptationPeriod) :
-          aluno.communications;
-        return (
-          <div className="print-section">
-            {adaptacao === "nao" && <p style={{ fontSize: "9pt", color: "#b45309", marginBottom: 8, fontWeight: "bold" }}>Filtrado: apenas comunicações fora do Período de Adaptação (que afetam a nota)</p>}
-            {adaptacao === "sim" && <p style={{ fontSize: "9pt", color: "#b45309", marginBottom: 8, fontWeight: "bold" }}>Filtrado: apenas comunicações do Período de Adaptação</p>}
-            <h2>Comunicações ({commsVisiveis.length}{adaptacao ? ` de ${aluno.communications.length}` : ""} total)</h2>
-            <table className="print-table">
-              <thead>
-                <tr>
-                  <th>Protocolo</th>
-                  <th>Tipo</th>
-                  <th>Data do Fato</th>
-                  <th>Status</th>
-                  <th>Pontuação</th>
-                  <th>Decisão</th>
-                </tr>
-              </thead>
-              <tbody>
-                {commsVisiveis.map((c) => (
-                  <tr key={c.id}>
-                    <td style={{ fontFamily: "monospace", fontSize: "8pt", whiteSpace: "nowrap" }}>{c.protocolNumber}</td>
-                    <td>{c.type.name}</td>
-                    <td>{format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
-                    <td style={{ fontSize: "8pt" }}>
-                      {STATUS_LABELS[c.status] ?? c.status}
-                      {c.adaptationPeriod && <span style={{ marginLeft: 4, fontSize: "7pt", fontWeight: "bold", color: "#c2410c", border: "1px solid #c2410c", borderRadius: 3, padding: "0 3px" }}>PA</span>}
-                    </td>
-                    <td style={{ textAlign: "right", fontWeight: "bold" }}>
-                      {c.finalScore != null ? (
-                        <span className={`print-badge ${c.type.scoreNature === "DESFAVORAVEL" ? "badge-desfav" : "badge-fav"}`}>
-                          {c.type.scoreNature === "DESFAVORAVEL" ? "−" : "+"}{c.finalScore.toFixed(1)}
-                        </span>
-                      ) : "—"}
-                    </td>
-                    <td style={{ fontSize: "8pt" }}>{c.decisions[0]?.decisionType ?? "—"}</td>
-                  </tr>
-                ))}
-                {commsVisiveis.length === 0 && (
-                  <tr><td colSpan={6} style={{ textAlign: "center", color: "#000" }}>{aluno.communications.length === 0 ? "Nenhuma comunicação registrada." : "Nenhuma comunicação encontrada com este filtro."}</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        );
-      })()}
-
-      {/* ── PÁGINAS SEGUINTES: uma por comunicação ─────────────────────── */}
-      {communications.map((comm) => {
-        const isCPI = comm.type.name.startsWith("CPI");
-        const secTitle = isCPI ? "Conduta Profissional Inadequada (CPI)" : comm.type.name;
-
-        // Pontuação: usa finalScore (se já decidido) ou padrão do tipo
-        const scoreVal  = comm.finalScore ?? comm.type.score;
-        const scoreSign = comm.type.scoreNature === "DESFAVORAVEL" ? "−" : "+";
-        const scoreStr  = `${scoreSign}${scoreVal.toFixed(1).replace(".", ",")} ponto`;
-        const tipoDisplay = `${comm.type.name} (${scoreStr})`;
-
-        // Situação
-        const situacaoDisplay = STATUS_ABREV[comm.status] ?? comm.status;
-
-        // Dispositivo legal com descrição da alínea
-        const dispositivoParts: string[] = [];
-        if (comm.article) dispositivoParts.push(`Art. ${comm.article}`);
-        if (comm.item)    dispositivoParts.push(`Inc. ${comm.item}`);
-        if (comm.letter)  dispositivoParts.push(`Al. ${comm.letter}`);
-        const dispositivoBase    = dispositivoParts.join(", ");
-        const dispositivoDisplay = comm.manualRule?.description
-          ? `${dispositivoBase} (${comm.manualRule.description})`
-          : dispositivoBase;
-
-        return (
-          <div key={comm.id} style={{ breakBefore: "page", pageBreakBefore: "always" }}>
-
-            {/* 1. Protocolo · tipo+pontuação · situação */}
-            <div className="print-section">
-              <h2>{secTitle}</h2>
-              <div style={GRID3}>
-                <div className="print-field" style={COL_L}>
-                  <label>Nº de Protocolo</label>
-                  <span>{comm.protocolNumber}</span>
-                </div>
-                <div className="print-field" style={COL_C}>
-                  <label>Tipo / Pontuação</label>
-                  <span>{tipoDisplay}</span>
-                </div>
-                <div className="print-field" style={COL_R}>
-                  <label>Situação</label>
-                  <span>{situacaoDisplay}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* 2. Dados do comunicado — 2×3: Nome|NdG|Curso / NºCurso|Pelotão|RG */}
-            <div className="print-section">
-              <h2>Dados do Comunicado / Aluno</h2>
-              <div style={GRID3}>
-                <div className="print-field" style={COL_L}><label>Nome completo</label><span>{aluno.fullName}</span></div>
-                <div className="print-field" style={COL_C}><label>Nome de guerra</label><span>{aluno.warName}</span></div>
-                <div className="print-field" style={COL_R}><label>Curso</label><span>{aluno.course.name}</span></div>
-                <div className="print-field" style={COL_L}><label>Nº de curso</label><span>{comm.courseNumber}</span></div>
-                <div className="print-field" style={COL_C}><label>Pelotão</label><span>{aluno.platoon?.name ?? "—"}</span></div>
-                <div className="print-field" style={COL_R}><label>RG</label><span>{aluno.rg}</span></div>
-              </div>
-            </div>
-
-            {/* 3. Dados do fato — data/hora/local em 3 cols + dispositivo abaixo */}
-            <div className="print-section">
-              <h2>Dados do Fato</h2>
-              <div style={GRID3}>
-                <div className="print-field" style={COL_L}>
-                  <label>Data do fato</label>
-                  <span>{format(new Date(comm.factDate), "dd/MM/yyyy", { locale: ptBR })}</span>
-                </div>
-                <div className="print-field" style={COL_C}>
-                  <label>Hora do fato</label>
-                  <span>{comm.factTime ?? "—"}</span>
-                </div>
-                <div className="print-field" style={COL_R}>
-                  <label>Local</label>
-                  <span>{comm.factPlace ?? "—"}</span>
-                </div>
-              </div>
-              {dispositivoDisplay && (
-                <div className="print-field" style={{ marginTop: 6, ...COL_L }}>
-                  <label>Dispositivo legal</label>
-                  <span>{dispositivoDisplay}</span>
-                </div>
-              )}
-            </div>
-
-            {/* 4. Descrição do fato */}
-            <div className="print-section">
-              <h2>Descrição do Fato</h2>
-              <p className="print-text">{comm.factDescription}</p>
-            </div>
-
-            {/* 5. Testemunha(s) */}
-            {comm.witnesses.length > 0 && (
-              <div className="print-section">
-                <h2>Testemunha(s)</h2>
-                {comm.witnesses.map((w, i) => (
-                  <div key={w.id} className="print-field">
-                    <label>Testemunha {i + 1}</label>
-                    <span>{w.name}{w.rg ? ` — RG: ${w.rg}` : ""}{w.functionalNumber ? ` — Func: ${w.functionalNumber}` : ""}</span>
-                  </div>
-                ))}
-              </div>
+      <div className="print-section">
+        {adaptacao === "nao" && <p style={{ fontSize: "9pt", color: "#b45309", marginBottom: 8, fontWeight: "bold" }}>Filtrado: apenas comunicações fora do Período de Adaptação (que afetam a nota)</p>}
+        {adaptacao === "sim" && <p style={{ fontSize: "9pt", color: "#b45309", marginBottom: 8, fontWeight: "bold" }}>Filtrado: apenas comunicações do Período de Adaptação</p>}
+        <h2>Comunicações ({commsVisiveis.length}{adaptacao ? ` de ${aluno.communications.length}` : ""} total)</h2>
+        <table className="print-table">
+          <thead>
+            <tr>
+              <th>Protocolo</th>
+              <th>Tipo</th>
+              <th>Data do Fato</th>
+              <th>Status</th>
+              <th>Pontuação</th>
+              <th>Decisão</th>
+            </tr>
+          </thead>
+          <tbody>
+            {commsVisiveis.map((c) => (
+              <tr key={c.id}>
+                <td style={{ fontFamily: "monospace", fontSize: "8pt", whiteSpace: "nowrap" }}>{c.protocolNumber}</td>
+                <td>{c.type.name}</td>
+                <td>{format(new Date(c.factDate), "dd/MM/yyyy", { locale: ptBR })}</td>
+                <td style={{ fontSize: "8pt" }}>
+                  {STATUS_LABELS[c.status] ?? c.status}
+                  {c.adaptationPeriod && <span style={{ marginLeft: 4, fontSize: "7pt", fontWeight: "bold", color: "#c2410c", border: "1px solid #c2410c", borderRadius: 3, padding: "0 3px" }}>PA</span>}
+                </td>
+                <td style={{ textAlign: "right", fontWeight: "bold" }}>
+                  {c.finalScore != null ? (
+                    <span className={`print-badge ${c.type.scoreNature === "DESFAVORAVEL" ? "badge-desfav" : "badge-fav"}`}>
+                      {c.type.scoreNature === "DESFAVORAVEL" ? "−" : "+"}{c.finalScore.toFixed(1)}
+                    </span>
+                  ) : "—"}
+                </td>
+                <td style={{ fontSize: "8pt" }}>{c.decisions[0]?.decisionType ?? "—"}</td>
+              </tr>
+            ))}
+            {commsVisiveis.length === 0 && (
+              <tr><td colSpan={6} style={{ textAlign: "center", color: "#000" }}>{aluno.communications.length === 0 ? "Nenhuma comunicação registrada." : "Nenhuma comunicação encontrada com este filtro."}</td></tr>
             )}
-
-            {/* 6. Encaminhamento por prazo expirado */}
-            {comm.acknowledgements.some((a) => a.method === "PRAZO_EXPIRADO") && (
-              <div className="print-section">
-                <h2>Encaminhamento Automático por Prazo Expirado</h2>
-                {comm.acknowledgements
-                  .filter((a) => a.method === "PRAZO_EXPIRADO")
-                  .map((a) => (
-                    <div key={a.id}>
-                      <p className="print-text">{a.notes}</p>
-                      <p style={{ fontSize: "8pt", color: "#000", marginTop: 4 }}>
-                        Processado automaticamente em {format(new Date(a.acknowledgedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                      </p>
-                    </div>
-                  ))}
-              </div>
-            )}
-
-            {/* 7. Posição do aluno */}
-            {(() => {
-              const comDefesa = comm.defenses.length > 0;
-              const semDefesa = comm.acknowledgements.some((a) => a.method === "SEM_DEFESA");
-              if (!comDefesa && !semDefesa) return null;
-              return (
-                <div className="print-section">
-                  <h2>Posição do Aluno</h2>
-                  {comDefesa ? (
-                    comm.defenses.map((d) => (
-                      <div key={d.id}>
-                        <p className="print-text">{d.text}</p>
-                        <p style={{ fontSize: "8pt", color: "#000", marginTop: 4 }}>
-                          Defesa apresentada em {format(new Date(d.submittedAt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
-                          {d.isLate ? " (FORA DO PRAZO)" : ""}
-                        </p>
-                        {d.attachments.length > 0 && (
-                          <p style={{ fontSize: "8pt", color: "#000", marginTop: 4 }}>
-                            Anexo(s): {d.attachments.map((a) => a.fileName).join(", ")}
-                          </p>
-                        )}
-                      </div>
-                    ))
-                  ) : (
-                    <p className="print-text" style={{ fontStyle: "italic" }}>
-                      {comm.type.name.toLowerCase().includes("elogiosa")
-                        ? "O aluno tomou ciência da Referência Elogiosa."
-                        : comm.adaptationPeriod
-                        ? "O aluno tomou ciência da comunicação e não há apresentação de defesa por se tratar de comunicação em Período de Adaptação."
-                        : "O aluno tomou ciência da comunicação e optou por não apresentar justificativa/defesa."}
-                    </p>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* 8. Parecer */}
-            {comm.opinions.length > 0 && (
-              <div className="print-section">
-                <h2>Parecer</h2>
-                {comm.opinions.map((o) => (
-                  <div key={o.id}>
-                    <p className="print-text">{o.text}</p>
-                    {o.recommendation && (
-                      <p style={{ fontWeight: "bold", marginTop: 4, fontSize: "10pt" }}>Recomendação: {o.recommendation}</p>
-                    )}
-                    {o.attachments.length > 0 && (
-                      <p style={{ fontSize: "8pt", color: "#000", marginTop: 4 }}>
-                        Anexo(s): {o.attachments.map((a) => a.fileName).join(", ")}
-                      </p>
-                    )}
-                    <p style={{ fontSize: "8pt", color: "#000" }}>
-                      {o.author.fullName} — {o.authorRole.replace(/_/g, " ")} — {format(new Date(o.createdAt), "dd/MM/yyyy", { locale: ptBR })}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* 9. Decisão */}
-            {comm.decisions.length > 0 && (
-              <div className="print-section">
-                <h2>Decisão do Comandante da Escola</h2>
-                {comm.decisions.map((d) => (
-                  <div key={d.id}>
-                    <p style={{ fontWeight: "bold", fontSize: "11pt", marginBottom: 4 }}>{d.decisionType}</p>
-                    <p className="print-text">{d.text}</p>
-                    {d.finalScore != null && (
-                      <p style={{ fontWeight: "bold", marginTop: 6 }}>
-                        Pontuação aplicada: {d.finalScore.toFixed(1).replace(".", ",")} ponto(s)
-                      </p>
-                    )}
-                    {d.attachments.length > 0 && (
-                      <p style={{ fontSize: "8pt", color: "#000", marginTop: 4 }}>
-                        Anexo(s): {d.attachments.map((a) => a.fileName).join(", ")}
-                      </p>
-                    )}
-                    <p style={{ fontSize: "8pt", color: "#000", marginTop: 4 }}>
-                      {d.authority.fullName} — {d.authority.role.replace(/_/g, " ")} — {format(new Date(d.decidedAt), "dd/MM/yyyy", { locale: ptBR })}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* 10. Comunicante */}
-            <div className="print-section">
-              <h2>Comunicante</h2>
-              {comm.communicantUser ? (
-                comm.communicantUser.student ? (
-                  /* Aluno do CFO: 2×3 + última linha esq·vazio·dir */
-                  <>
-                    <div style={GRID3}>
-                      <div className="print-field" style={COL_L}><label>Nome completo</label><span>{comm.communicantUser.fullName}</span></div>
-                      <div className="print-field" style={COL_C}><label>Nome de guerra</label><span>{comm.communicantUser.warName}</span></div>
-                      <div className="print-field" style={COL_R}><label>Posto/Graduação</label><span>{comm.communicantUser.rank}</span></div>
-                      <div className="print-field" style={COL_L}><label>RG</label><span>{comm.communicantUser.rg}</span></div>
-                      <div className="print-field" style={COL_C}><label>Nº Funcional</label><span>{comm.communicantUser.functionalNumber ?? "—"}</span></div>
-                      <div className="print-field" style={COL_R}><label>Curso</label><span>{comm.communicantUser.student.course.name}</span></div>
-                    </div>
-                    <div style={{ ...GRID3, marginTop: 6 }}>
-                      <div className="print-field" style={COL_L}>
-                        <label>Nº de curso</label>
-                        <span>{comm.communicantUser.student.courseNumber}</span>
-                      </div>
-                      <div />
-                      <div className="print-field" style={COL_R}>
-                        <label>Pelotão</label>
-                        <span>{comm.communicantUser.student.platoon?.name ?? "—"}</span>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  /* Instrutor/servidor: sem dados de curso/pelotão */
-                  <div style={GRID3}>
-                    <div className="print-field" style={COL_L}><label>Nome completo</label><span>{comm.communicantUser.fullName}</span></div>
-                    <div className="print-field" style={COL_C}><label>Nome de guerra</label><span>{comm.communicantUser.warName}</span></div>
-                    <div className="print-field" style={COL_R}><label>Posto/Graduação</label><span>{comm.communicantUser.rank}</span></div>
-                    <div className="print-field" style={COL_L}><label>RG</label><span>{comm.communicantUser.rg}</span></div>
-                    {comm.communicantUser.functionalNumber && (
-                      <div className="print-field" style={COL_C}><label>Nº Funcional</label><span>{comm.communicantUser.functionalNumber}</span></div>
-                    )}
-                  </div>
-                )
-              ) : (
-                <div className="print-field" style={COL_L}><label>Comunicante</label><span>{comm.communicantName ?? "—"}</span></div>
-              )}
-            </div>
-
-            {/* 11. Registro */}
-            <div className="print-section">
-              <h2>Registro da Comunicação</h2>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px" }}>
-                <div className="print-field" style={COL_L}><label>Registrado por</label><span>{comm.reporter.rank} {comm.reporter.warName}</span></div>
-                <div className="print-field" style={COL_R}><label>Data do registro</label><span>{format(new Date(comm.createdAt), "dd/MM/yyyy", { locale: ptBR })}</span></div>
-              </div>
-            </div>
-
-          </div>
-        );
-      })}
-
+          </tbody>
+        </table>
+      </div>
     </PrintLayout>
   );
 }
