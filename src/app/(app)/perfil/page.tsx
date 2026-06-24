@@ -58,7 +58,7 @@ export default async function PerfilPage({ searchParams }: { searchParams: Promi
     isCurrent: m.id === currentId,
     selected: m.id === selectedId,
     viewHref: `/perfil?aba=historico&hist=${m.id}`,
-    pdfHref: `/alunos/${m.id}/historico`,
+    pdfHref: `/alunos/${m.id}/historico/imprimir`,
   }));
 
   const campos = [
