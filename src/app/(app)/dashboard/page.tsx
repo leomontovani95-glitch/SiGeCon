@@ -327,7 +327,7 @@ export default async function DashboardPage({
 
         <div className="flex gap-3">
           <Link href="/comunicacoes" className="btn-secondary text-sm">Ver todas as comunicações</Link>
-          <Link href={`/alunos/${aluno.id}/historico`} target="_blank" className="btn-secondary text-sm">Histórico / PDF</Link>
+          <Link href={`/alunos/${aluno.id}/historico/imprimir`} target="_blank" className="btn-secondary text-sm">Histórico / PDF</Link>
         </div>
       </div>
     );

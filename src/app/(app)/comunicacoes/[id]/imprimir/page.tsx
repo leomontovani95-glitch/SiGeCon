@@ -64,7 +64,11 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
   const ehEsteAluno   = comm.student.userId === session.userId;
   const ehComunicante = comm.communicantUserId === session.userId && !ehEsteAluno;
   if (session.role === "ALUNO") {
-    if (!ehEsteAluno && !ehComunicante) notFound();
+    if (!ehEsteAluno && !ehComunicante) {
+      // Matrícula anterior (userId=null após ascensão): verifica por RG
+      const atual = await prisma.student.findFirst({ where: { userId: session.userId }, select: { rg: true } });
+      if (!atual || comm.student.rg !== atual.rg) notFound();
+    }
   } else {
     const escopo = getSchoolFilter(session.role, session.escola);
     if (escopo && comm.student.course.school !== escopo) notFound();

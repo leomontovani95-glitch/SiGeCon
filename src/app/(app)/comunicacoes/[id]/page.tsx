@@ -55,7 +55,12 @@ export default async function ComunicacaoPage({
   if (session.role === "ALUNO") {
     const ehEsteAluno = comm.student.userId === session.userId;
     const ehComunicanteRegistrado = comm.communicantUserId === session.userId;
-    if (!ehEsteAluno && !ehComunicanteRegistrado) notFound();
+    if (!ehEsteAluno && !ehComunicanteRegistrado) {
+      // Matrícula anterior (userId=null após ascensão de curso): verifica por RG
+      // para que o aluno possa ver comunicações de cursos anteriores.
+      const atual = await prisma.student.findFirst({ where: { userId: session.userId }, select: { rg: true } });
+      if (!atual || comm.student.rg !== atual.rg) notFound();
+    }
   } else {
     // Isolamento por escola: staff fora do escopo não acessa a comunicação.
     const escopo = getSchoolFilter(session.role, session.escola);
