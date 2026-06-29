@@ -57,6 +57,7 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
       opinions: { include: { author: true, attachments: true } },
       decisions: { include: { authority: true, attachments: true } },
       communicantUser: { include: { student: { include: { course: true, platoon: true } } } },
+      disciplinaryBookItems: { include: { disciplinaryBook: true } },
     },
   });
   if (!comm) notFound();
@@ -74,19 +75,52 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
     if (escopo && comm.student.course.school !== escopo) notFound();
   }
 
-  const vistaRestrita = ehComunicante || temVistaRestritaComunicacao(session.role);
+  // Aluno-comunicante (colega que reportou outro aluno) tem vista restrita.
+  // Roles com acesso pleno (ADMINISTRADOR, COMANDANTE, OFICIAL…) nunca são
+  // restritos por serem o comunicante — só pelo próprio role.
+  const vistaRestrita = temVistaRestritaComunicacao(session.role)
+    || (ehComunicante && session.role === "ALUNO");
 
-  const isCPI     = comm.type.name.startsWith("CPI");
-  const docTitle  = isCPI ? `CPI — ${comm.protocolNumber}` : `Referência Elogiosa — ${comm.protocolNumber}`;
+  const isCPI        = comm.type.name.startsWith("CPI");
+  const isReferencia = comm.type.name === "Referência Elogiosa";
+  const isElogio     = comm.type.name === "Elogio publicado em BI";
+  const isTD         = comm.type.name.startsWith("TD");
+  const isTAC        = comm.type.name === "TAC";
+  const isBgpm       = isElogio || isTD || isTAC; // tipos vindos de BGPM, sem fluxo de defesa/parecer
+
+  const docTitleMap: Record<string, string> = {
+    "Referência Elogiosa":   `Referência Elogiosa — ${comm.protocolNumber}`,
+    "Elogio publicado em BI":`Elogio em BI — ${comm.protocolNumber}`,
+    "TAC":                   `TAC — ${comm.protocolNumber}`,
+  };
+  const docTitle = isCPI        ? `CPI — ${comm.protocolNumber}`
+    : isTD                      ? `Transgressão Disciplinar — ${comm.protocolNumber}`
+    : docTitleMap[comm.type.name] ?? `${comm.type.name} — ${comm.protocolNumber}`;
+
+  const secTitleMap: Record<string, string> = {
+    "Referência Elogiosa":   "Referência Elogiosa",
+    "Elogio publicado em BI":"Elogio Publicado em BI",
+    "TAC":                   "Termo de Ajuste de Conduta",
+  };
+  const secTitle = isCPI ? "Conduta Profissional Inadequada (CPI)"
+    : isTD                ? "Transgressão Disciplinar"
+    : secTitleMap[comm.type.name] ?? comm.type.name;
 
   // Pontuação: usa finalScore (se já decidido) ou o padrão do tipo
   const scoreVal  = comm.finalScore ?? comm.type.score;
   const scoreSign = comm.type.scoreNature === "DESFAVORAVEL" ? "−" : "+";
   const scoreStr  = `${scoreSign}${scoreVal.toFixed(1).replace(".", ",")} ponto`;
-  const tipoDisplay = `${comm.type.name} (${scoreStr})`;
+  const tipoAbrev = comm.type.name === "Referência Elogiosa" ? "Ref. Elogiosa"
+    : comm.type.name === "Elogio publicado em BI" ? "Elogio em BI"
+    : comm.type.name;
+  const tipoDisplay = `${tipoAbrev} (${scoreStr})`;
 
   // Situação: label direto do status, sem lógica adicional
   const situacaoDisplay = STATUS_ABREV[comm.status] ?? comm.status;
+  const caderno = comm.disciplinaryBookItems[0]?.disciplinaryBook ?? null;
+  const cadernoLabel = (comm.status === "PUBLICADA_CADERNO" && caderno)
+    ? `(CD Nº ${String(caderno.number).padStart(2, "0")}/${caderno.year})`
+    : null;
 
   // Dispositivo legal com descrição da alínea entre parênteses
   const dispositivoParts: string[] = [];
@@ -103,7 +137,7 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
 
       {/* 1. Protocolo · tipo+pontuação · situação */}
       <div className="print-section">
-        <h2>{isCPI ? "Conduta Profissional Inadequada (CPI)" : "Referência Elogiosa"}</h2>
+        <h2>{secTitle}</h2>
         <div style={GRID3}>
           <div className="print-field" style={COL_L}>
             <label>Nº de Protocolo</label>
@@ -115,7 +149,12 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
           </div>
           <div className="print-field" style={COL_R}>
             <label>Situação</label>
-            <span>{situacaoDisplay}</span>
+            <span>
+              {situacaoDisplay}
+              {cadernoLabel && (
+                <span style={{ display: "block", fontSize: "7.5pt", color: "#000", fontWeight: "normal", lineHeight: 1.2 }}>{cadernoLabel}</span>
+              )}
+            </span>
           </div>
         </div>
       </div>
@@ -161,7 +200,11 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
       {/* 4. Descrição do fato */}
       <div className="print-section">
         <h2>Descrição do Fato</h2>
-        <p className="print-text">{comm.factDescription}</p>
+        <p className="print-text">
+          {isElogio && comm.bgpmNumber && comm.bgpmYear
+            ? `Elogio publicado em BI - BGPM Nº ${comm.bgpmNumber}/${comm.bgpmYear}.`
+            : comm.factDescription}
+        </p>
       </div>
 
       {/* 5. Testemunha(s) */}
@@ -194,11 +237,10 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
         </div>
       )}
 
-      {/* 7. Posição do aluno — defesa ou ciência sem defesa */}
-      {!vistaRestrita && (() => {
+      {/* 7. Posição do aluno — defesa ou ciência sem defesa (não se aplica a tipos BGPM) */}
+      {!vistaRestrita && !isBgpm && (() => {
         const comDefesa = comm.defenses.length > 0;
         const semDefesa = comm.acknowledgements.some((a) => a.method === "SEM_DEFESA");
-        if (!comDefesa && !semDefesa) return null;
         return (
           <div className="print-section">
             <h2>Posição do Aluno</h2>
@@ -219,63 +261,85 @@ export default async function ImprimirComunicacaoPage({ params }: { params: Prom
               ))
             ) : (
               <p className="print-text" style={{ fontStyle: "italic" }}>
-                {comm.type.name.toLowerCase().includes("elogiosa")
-                  ? "O aluno tomou ciência da Referência Elogiosa."
-                  : comm.adaptationPeriod
-                  ? "O aluno tomou ciência da comunicação e não há apresentação de defesa por se tratar de comunicação em Período de Adaptação."
-                  : "O aluno tomou ciência da comunicação e optou por não apresentar justificativa/defesa."}
+                {semDefesa
+                  ? (comm.type.name.toLowerCase().includes("elogiosa")
+                      ? "O aluno tomou ciência da Referência Elogiosa."
+                      : comm.adaptationPeriod
+                      ? "O aluno tomou ciência da comunicação e não há apresentação de defesa por se tratar de comunicação em Período de Adaptação."
+                      : "O aluno tomou ciência da comunicação e optou por não apresentar justificativa/defesa.")
+                  : "Aguardando ciência/posição do aluno."}
               </p>
             )}
           </div>
         );
       })()}
 
-      {/* 8. Parecer */}
-      {!vistaRestrita && comm.opinions.length > 0 && (
+      {/* 8. Parecer (não se aplica a tipos BGPM) */}
+      {!vistaRestrita && !isBgpm && (
         <div className="print-section">
           <h2>Parecer</h2>
-          {comm.opinions.map((o) => (
-            <div key={o.id}>
-              <p className="print-text">{o.text}</p>
-              {o.recommendation && (
-                <p style={{ fontWeight: "bold", marginTop: 4, fontSize: "10pt" }}>Recomendação: {o.recommendation}</p>
-              )}
-              {o.attachments.length > 0 && (
-                <p style={{ fontSize: "8pt", color: "#000", marginTop: 4 }}>
-                  Anexo(s): {o.attachments.map((a) => a.fileName).join(", ")}
+          {comm.opinions.length > 0 ? (
+            comm.opinions.map((o) => (
+              <div key={o.id}>
+                <p className="print-text">{o.text}</p>
+                {o.recommendation && (
+                  <p style={{ fontWeight: "bold", marginTop: 4, fontSize: "10pt" }}>Recomendação: {o.recommendation}</p>
+                )}
+                {o.attachments.length > 0 && (
+                  <p style={{ fontSize: "8pt", color: "#000", marginTop: 4 }}>
+                    Anexo(s): {o.attachments.map((a) => a.fileName).join(", ")}
+                  </p>
+                )}
+                <p style={{ fontSize: "8pt", color: "#000" }}>
+                  {o.author.fullName} — {o.authorRole.replace(/_/g, " ")} — {format(new Date(o.createdAt), "dd/MM/yyyy", { locale: ptBR })}
                 </p>
-              )}
-              <p style={{ fontSize: "8pt", color: "#000" }}>
-                {o.author.fullName} — {o.authorRole.replace(/_/g, " ")} — {format(new Date(o.createdAt), "dd/MM/yyyy", { locale: ptBR })}
-              </p>
-            </div>
-          ))}
+              </div>
+            ))
+          ) : (
+            <p className="print-text" style={{ fontStyle: "italic" }}>
+              {comm.adaptationPeriod
+                ? "Não há parecer neste processo por se tratar de comunicação registrada durante o Período de Adaptação."
+                : "Aguardando parecer."}
+            </p>
+          )}
         </div>
       )}
 
       {/* 9. Decisão */}
-      {!vistaRestrita && comm.decisions.length > 0 && (
+      {!vistaRestrita && (
         <div className="print-section">
           <h2>Decisão do Comandante da Escola</h2>
-          {comm.decisions.map((d) => (
-            <div key={d.id}>
-              <p style={{ fontWeight: "bold", fontSize: "11pt", marginBottom: 4 }}>{d.decisionType}</p>
-              <p className="print-text">{d.text}</p>
-              {d.finalScore != null && (
-                <p style={{ fontWeight: "bold", marginTop: 6 }}>
-                  Pontuação aplicada: {d.finalScore.toFixed(1).replace(".", ",")} ponto(s)
-                </p>
-              )}
-              {d.attachments.length > 0 && (
+          {isBgpm ? (
+            <p className="print-text" style={{ fontStyle: "italic" }}>
+              {isElogio
+                ? "Comunicação escolar de caráter informativo. O elogio já foi publicado em BGPM e será registrado no Caderno Disciplinar exclusivamente para fins de assentamento acadêmico, não sendo necessária decisão do Comandante da Escola."
+                : isTAC
+                ? "Comunicação escolar referente a Termo de Ajuste de Conduta já publicado em BGPM. O registro no Caderno Disciplinar é realizado exclusivamente para fins de assentamento acadêmico, não sendo necessária decisão do Comandante da Escola."
+                : "Comunicação escolar referente a Transgressão Disciplinar já publicada em BGPM. O registro no Caderno Disciplinar é realizado exclusivamente para fins de assentamento acadêmico, não sendo necessária decisão do Comandante da Escola."}
+            </p>
+          ) : comm.decisions.length > 0 ? (
+            comm.decisions.map((d) => (
+              <div key={d.id}>
+                <p style={{ fontWeight: "bold", fontSize: "11pt", marginBottom: 4 }}>{d.decisionType}</p>
+                <p className="print-text">{d.text}</p>
+                {d.finalScore != null && (
+                  <p style={{ fontWeight: "bold", marginTop: 6 }}>
+                    Pontuação aplicada: {d.finalScore.toFixed(1).replace(".", ",")} ponto(s)
+                  </p>
+                )}
+                {d.attachments.length > 0 && (
+                  <p style={{ fontSize: "8pt", color: "#000", marginTop: 4 }}>
+                    Anexo(s): {d.attachments.map((a) => a.fileName).join(", ")}
+                  </p>
+                )}
                 <p style={{ fontSize: "8pt", color: "#000", marginTop: 4 }}>
-                  Anexo(s): {d.attachments.map((a) => a.fileName).join(", ")}
+                  {d.authority.fullName} — {d.authority.role.replace(/_/g, " ")} — {format(new Date(d.decidedAt), "dd/MM/yyyy", { locale: ptBR })}
                 </p>
-              )}
-              <p style={{ fontSize: "8pt", color: "#000", marginTop: 4 }}>
-                {d.authority.fullName} — {d.authority.role.replace(/_/g, " ")} — {format(new Date(d.decidedAt), "dd/MM/yyyy", { locale: ptBR })}
-              </p>
-            </div>
-          ))}
+              </div>
+            ))
+          ) : (
+            <p className="print-text" style={{ fontStyle: "italic" }}>Aguardando decisão do Comandante da Escola.</p>
+          )}
         </div>
       )}
 
