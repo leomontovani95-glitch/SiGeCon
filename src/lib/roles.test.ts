@@ -15,6 +15,8 @@ import {
   escolaNoEscopo,
   cursosPermitidosParaCPI,
   temVistaRestritaComunicacao,
+  canManageObservacoes,
+  podeEditarObservacao,
 } from "./roles";
 
 describe("effectiveRoles", () => {
@@ -190,6 +192,44 @@ describe("escolaNoEscopo", () => {
   it("escopo restrito só acessa a própria escola", () => {
     expect(escolaNoEscopo({ role: "OFICIAL_ESFAP", escola: "ESFAP" }, "ESFAP")).toBe(true);
     expect(escolaNoEscopo({ role: "OFICIAL_ESFAP", escola: "ESFAP" }, "ESFO")).toBe(false);
+  });
+});
+
+describe("canManageObservacoes", () => {
+  it("Oficial de escola para cima tem acesso", () => {
+    expect(canManageObservacoes("OFICIAL_ESFO")).toBe(true);
+    expect(canManageObservacoes("OFICIAL_ESFAP")).toBe(true);
+    expect(canManageObservacoes("SUBCOMANDANTE_ESFO")).toBe(true);
+    expect(canManageObservacoes("COMANDANTE_ESFAP")).toBe(true);
+    expect(canManageObservacoes("CHEFE_DIVISAO_ACADEMICA")).toBe(true);
+    expect(canManageObservacoes("ADMINISTRADOR")).toBe(true);
+  });
+  it("inclui Comando da APM", () => {
+    expect(canManageObservacoes("COMANDANTE_APM")).toBe(true);
+    expect(canManageObservacoes("SUBCOMANDANTE_APM")).toBe(true);
+  });
+  it("Chefe de Curso, Protocolo e Aluno NÃO têm acesso", () => {
+    expect(canManageObservacoes("CHEFE_CURSO")).toBe(false);
+    expect(canManageObservacoes("PROTOCOLO")).toBe(false);
+    expect(canManageObservacoes("ALUNO")).toBe(false);
+  });
+  it("respeita papéis adicionais", () => {
+    expect(canManageObservacoes("PROTOCOLO", "OFICIAL_ESFO")).toBe(true);
+    expect(canManageObservacoes("PROTOCOLO", "CHEFE_CURSO")).toBe(false);
+  });
+});
+
+describe("podeEditarObservacao", () => {
+  it("o autor pode editar a própria observação", () => {
+    expect(podeEditarObservacao({ userId: "u1", role: "OFICIAL_ESFO" }, { authorId: "u1" })).toBe(true);
+  });
+  it("não-autor não edita observação de outro", () => {
+    expect(podeEditarObservacao({ userId: "u2", role: "OFICIAL_ESFO" }, { authorId: "u1" })).toBe(false);
+    expect(podeEditarObservacao({ userId: "u2", role: "COMANDANTE_ESFO" }, { authorId: "u1" })).toBe(false);
+  });
+  it("Administrador (exceção) edita qualquer observação", () => {
+    expect(podeEditarObservacao({ userId: "u2", role: "ADMINISTRADOR" }, { authorId: "u1" })).toBe(true);
+    expect(podeEditarObservacao({ userId: "u2", role: "PROTOCOLO", additionalRoles: "ADMINISTRADOR" }, { authorId: "u1" })).toBe(true);
   });
 });
 

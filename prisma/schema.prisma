@@ -32,6 +32,7 @@ model User {
   disciplinaryBooks DisciplinaryBook[]
   publishedBooks    DisciplinaryBook[] @relation("Publisher")
   student           Student?
+  authoredObservations StudentObservation[] @relation("ObservationAuthor")
 }
 
 model Course {
@@ -99,6 +100,7 @@ model Student {
   acknowledgements          StudentAcknowledgement[]
   defenses                  Defense[]
   disciplinaryBookItems     DisciplinaryBookItem[]
+  observations              StudentObservation[]
 
   @@index([courseId])
   @@index([platoonId])
@@ -414,6 +416,47 @@ model DisciplinaryBookItem {
   @@unique([disciplinaryBookId, communicationId])
   @@index([studentId])
   @@index([communicationId])
+}
+
+// Observações internas no histórico do aluno — registro de fatos relevantes que
+// NÃO geram comunicação (CPI/TD), positivos ou negativos. Restrito a Oficial de
+// escola para cima (+ Cmt/Subcmt APM, Chefe da Divisão Acadêmica, Administrador);
+// NUNCA sai no PDF do histórico nem é visível ao aluno. Ver lib/roles.ts
+// (OBSERVACAO_ROLES / canManageObservacoes).
+model StudentObservation {
+  id                 String    @id @default(cuid())
+  studentId          String
+  authorId           String
+  // Snapshot do papel do autor no momento do registro (auditoria/exibição).
+  authorRoleSnapshot String
+  // POSITIVA | NEGATIVA | NEUTRA
+  nature             String    @default("NEUTRA")
+  text               String
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  // Preenchido quando o autor (ou o Administrador) edita a observação.
+  editedAt           DateTime?
+
+  student     Student                 @relation(fields: [studentId], references: [id])
+  author      User                    @relation("ObservationAuthor", fields: [authorId], references: [id])
+  attachments ObservationAttachment[]
+
+  @@index([studentId])
+  @@index([authorId])
+}
+
+model ObservationAttachment {
+  id            String   @id @default(cuid())
+  observationId String
+  fileName      String
+  filePath      String
+  fileType      String?
+  uploadedBy    String
+  createdAt     DateTime @default(now())
+
+  observation StudentObservation @relation(fields: [observationId], references: [id])
+
+  @@index([observationId])
 }
 
 model AuditLog {

@@ -66,6 +66,35 @@ export function canChangeBookDecision(role: string, additionalRoles?: string) {
   return all.some((r) => (BOOK_DECISION_CHANGERS as string[]).includes(r));
 }
 
+// ── Observações no histórico do aluno ────────────────────────────────────
+// Registro interno de fatos relevantes que NÃO geram comunicação (positivos ou
+// negativos). Acesso do Oficial de cada escola para cima, mais Cmt/Subcmt APM
+// (topo da hierarquia), Chefe da Divisão Acadêmica e Administrador. NÃO inclui
+// Chefe de Curso nem Protocolo. Consulta/edição também respeitam o escopo de
+// escola do aluno (escolaNoEscopo), tratado nas telas/rotas.
+export const OBSERVACAO_ROLES: UserRole[] = [
+  "ADMINISTRADOR", "CHEFE_DIVISAO_ACADEMICA",
+  "COMANDANTE_APM", "SUBCOMANDANTE_APM",
+  "COMANDANTE_ESFO", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFO",
+  "COMANDANTE_ESFAP", "SUBCOMANDANTE_ESFAP", "OFICIAL_ESFAP",
+];
+
+export function canManageObservacoes(role: string, additionalRoles?: string) {
+  const all = effectiveRoles({ role, additionalRoles });
+  return all.some((r) => (OBSERVACAO_ROLES as string[]).includes(r));
+}
+
+// Editar uma observação: por regra só o AUTOR edita a própria observação. O
+// Administrador é exceção (acumula todas as atribuições) e pode editar qualquer
+// uma. A exclusão não é permitida a ninguém (registro permanente do histórico).
+export function podeEditarObservacao(
+  session: { userId: string; role: string; additionalRoles?: string },
+  observacao: { authorId: string },
+): boolean {
+  if (session.userId === observacao.authorId) return true;
+  return effectiveRoles(session).includes("ADMINISTRADOR");
+}
+
 // Retorna todos os roles efetivos de uma session (primário + adicionais)
 export function effectiveRoles(session: { role: string; additionalRoles?: string }): string[] {
   const extras = (session.additionalRoles ?? "").split(",").map((r) => r.trim()).filter(Boolean);

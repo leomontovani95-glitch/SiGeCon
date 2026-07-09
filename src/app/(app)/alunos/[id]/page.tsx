@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
-import { verifySession } from "@/lib/dal";
+import { verifySession, canManageObservacoes, escolaNoEscopo } from "@/lib/dal";
+import AlunoTabs from "./_components/AlunoTabs";
 import { calcularNotaPublicada, faixaNota, zonaDeRisco } from "@/lib/score";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -68,6 +69,11 @@ export default async function AlunoPage({
 
   // Alunos não podem ver a ficha cadastral de outros alunos (só a própria).
   if (session.role === "ALUNO" && aluno.userId !== session.userId) notFound();
+
+  // Aba "Observações": só para o grupo autorizado e dentro do escopo de escola.
+  const podeVerObservacoes =
+    canManageObservacoes(session.role, session.additionalRoles) &&
+    escolaNoEscopo(session, aluno.course.school);
 
   // Matrículas da mesma pessoa (mesmo RG) — atual + cursos anteriores (ascensão).
   // Cada matrícula tem histórico próprio; todas permanecem acessíveis.
@@ -163,6 +169,8 @@ export default async function AlunoPage({
           )}
         </div>
       </div>
+
+      <AlunoTabs studentId={aluno.id} active="perfil" showObservacoes={podeVerObservacoes} />
 
       <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
         <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Dados Cadastrais</h2>
