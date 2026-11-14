@@ -16,7 +16,11 @@ beforeAll(() => {
   for (const f of [TEST_DB, TEST_DB + "-wal", TEST_DB + "-shm"]) {
     if (fs.existsSync(f)) fs.rmSync(f);
   }
-  execSync('npx prisma db push --url "file:./prisma/test.db" --accept-data-loss', {
+  // O arquivo do banco de teste acabou de ser apagado, então o push sempre parte
+  // de um banco vazio: não há dado a perder e `--accept-data-loss` é dispensável
+  // (a partir do Prisma 7.10 essa opção é bloqueada quando quem executa é um
+  // agente de IA, o que fazia o `npm run check` falhar nesse contexto).
+  execSync('npx prisma db push --url "file:./prisma/test.db"', {
     stdio: "ignore",
   });
 }, 60000);
