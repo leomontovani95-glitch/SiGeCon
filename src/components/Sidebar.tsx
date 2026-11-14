@@ -9,7 +9,8 @@ type NavItem = {
   icon: string;
   roles?: string[];
   hasBadge?: boolean;
-  cfoOnly?: boolean;
+  // Item de CRIAÇÃO de comunicação: staff sempre; aluno só se for do CFO.
+  createComm?: boolean;
 };
 
 const COMANDANTES = [
@@ -34,13 +35,13 @@ const DESPACHOS_ROLES = [...COMANDANTES.filter((r) => r !== "ADMINISTRADOR"), ..
 
 const ROLE_LABELS: Record<string, string> = {
   ADMINISTRADOR:           "Administrador",
-  COMANDANTE_APM:          "Cmte da APM/ES",
-  SUBCOMANDANTE_APM:       "Sub-Cmte da APM/ES",
+  COMANDANTE_APM:          "Cmt da APM/ES",
+  SUBCOMANDANTE_APM:       "Subcmt da APM/ES",
   CHEFE_DIVISAO_ACADEMICA: "Chefe Div. Acadêmica",
-  COMANDANTE_ESFAP:        "Cmte da EsFAP",
-  COMANDANTE_ESFO:         "Cmte da EsFO",
-  SUBCOMANDANTE_ESFAP:     "Sub-Cmte EsFAP",
-  SUBCOMANDANTE_ESFO:      "Sub-Cmte EsFO",
+  COMANDANTE_ESFAP:        "Cmt da EsFAP",
+  COMANDANTE_ESFO:         "Cmt da EsFO",
+  SUBCOMANDANTE_ESFAP:     "Subcmt EsFAP",
+  SUBCOMANDANTE_ESFO:      "Subcmt EsFO",
   OFICIAL_ESFAP:           "Oficial EsFAP",
   OFICIAL_ESFO:            "Oficial EsFO",
   CHEFE_CURSO:             "Chefe de Curso",
@@ -50,9 +51,8 @@ const ROLE_LABELS: Record<string, string> = {
 
 const nav: NavItem[] = [
   { href: "/dashboard",    label: "Painel",               icon: "📊" },
-  { href: "/comunicacoes",             label: "Comunicações",         icon: "📋", hasBadge: true },
-  { href: "/comunicacoes/nova/cpi",       label: "Nova CPI",             icon: "📝", cfoOnly: true },
-  { href: "/comunicacoes/nova/referencia", label: "Nova Ref. Elogiosa",  icon: "⭐", cfoOnly: true },
+  { href: "/comunicacoes",             label: "Ver Comunicações",     icon: "📋", hasBadge: true },
+  { href: "/comunicacoes/nova",        label: "Nova Comunicação",     icon: "📝", createComm: true },
   { href: "/despachos",    label: "Despachos",            icon: "📨", roles: DESPACHOS_ROLES, hasBadge: true },
   { href: "/caderno",      label: "Caderno Disciplinar",  icon: "📖", roles: STAFF },
   { href: "/ranking",             label: "Ranking de Conduta",      icon: "🏆", roles: STAFF },
@@ -90,7 +90,7 @@ export default function Sidebar({
   const isUnrestricted = ["ADMINISTRADOR", "CHEFE_DIVISAO_ACADEMICA"].includes(role);
   const visibleNav = nav.filter((item) =>
     (isUnrestricted || !item.roles || item.roles.includes(role)) &&
-    (!item.cfoOnly || canCreateComm)
+    (!item.createComm || role !== "ALUNO" || canCreateComm)
   );
 
   // Estado da gaveta de menu no celular. No desktop (md+) a barra é fixa e este

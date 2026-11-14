@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 // Caminhos estáticos conhecidos → rótulo legível
 const LABELS: Record<string, string> = {
   "/comunicacoes":                     "Comunicações",
+  "/comunicacoes/nova":                "Nova Comunicação",
   "/comunicacoes/nova/cpi":            "Nova CPI",
   "/comunicacoes/nova/referencia":     "Nova Ref. Elogiosa",
   "/comunicacoes/nova/elogio-bi":      "Novo Elogio em BI",
