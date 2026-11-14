@@ -1,4 +1,4 @@
-"server-only";
+import "server-only";
 import { prisma } from "@/lib/db";
 import { comTransacaoRetry, adicionarAoCaderno } from "@/lib/caderno";
 

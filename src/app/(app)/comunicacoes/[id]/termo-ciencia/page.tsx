@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
+import { acessoComunicacao } from "@/lib/acesso";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -8,7 +9,7 @@ import { calcularPrazoDefesa } from "@/lib/prazos";
 import { escolaHeaderLabel } from "@/lib/utils";
 
 export default async function TermoCienciaPage({ params }: { params: Promise<{ id: string }> }) {
-  await verifySession();
+  const session = await verifySession();
   const { id } = await params;
 
   const comm = await prisma.communication.findUnique({
@@ -20,8 +21,11 @@ export default async function TermoCienciaPage({ params }: { params: Promise<{ i
     },
   });
   if (!comm) notFound();
+  // Mesma regra de acesso da página da comunicação (escopo de escola / aluno).
+  const acesso = await acessoComunicacao(session, comm);
+  if (!acesso.permitido) notFound();
 
-  const ack = comm.acknowledgements[0];
+  const ack =comm.acknowledgements[0];
   const prazo = comm.defenseDeadline
     ? new Date(comm.defenseDeadline)
     : ack

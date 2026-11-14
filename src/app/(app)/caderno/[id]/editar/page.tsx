@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { abreviarPelotao, platoonOrder, formatCadernoNumero } from "@/lib/utils";
 import { verifyRole, getSchoolFilter, escolaNoEscopo, CADERNO_MANAGERS } from "@/lib/dal";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import Link from "next/link";
@@ -56,9 +56,7 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
 
   // Escopo de escola: gestor só revisa/publica cadernos da(s) escola(s) a que
   // tem acesso (Administração/Div. Acadêmica acessam todas).
-  if (!escolaNoEscopo(session, caderno.course?.school ?? caderno.school)) {
-    redirect(`/caderno/${id}`);
-  }
+  if (!escolaNoEscopo(session, caderno.course?.school ?? caderno.school)) notFound();
 
   caderno.items.sort((a, b) => {
     const pa = platoonOrder(a.student.platoon?.name);
@@ -67,9 +65,13 @@ export default async function EditarCadernoPage({ params }: { params: Promise<{ 
     return (parseInt(a.studentCourseNumber, 10) || 0) - (parseInt(b.studentCourseNumber, 10) || 0);
   });
 
-  // Filtra pendentes: não deve incluir itens que já estão neste caderno
+  // Filtra pendentes: não deve incluir itens que já estão neste caderno nem
+  // comunicações de OUTRO curso — cada caderno pertence a um único curso, mesmo
+  // dentro da mesma escola (a action adicionarItem aplica a mesma regra).
   const itemIds = new Set(caderno.items.map((i) => i.communicationId));
-  const pendentesDisponiveis = pendentes.filter((c) => !itemIds.has(c.id));
+  const pendentesDisponiveis = pendentes.filter(
+    (c) => !itemIds.has(c.id) && (!caderno.courseId || c.courseId === caderno.courseId),
+  );
 
   const canPublish = caderno.status !== "PUBLICADO";
   const numero = formatCadernoNumero(caderno);

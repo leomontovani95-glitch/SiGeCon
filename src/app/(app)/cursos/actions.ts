@@ -1,17 +1,33 @@
 "use server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { verifyRole } from "@/lib/dal";
+import { verifyRole, escolaNoEscopo, type UserRole } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 import { CURSOS_POR_ESCOLA, ANOS_LETIVOS, gerarSiglaCurso, type BaseCurso } from "@/lib/cursos";
 
 type State = { error: string } | undefined;
 
+// Perfis que gerenciam cursos e pelotões.
+const CURSO_ROLES: UserRole[] = [
+  "ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA",
+  "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO",
+];
+
+const ERRO_OUTRA_ESCOLA = "Sem permissão para alterar curso de outra escola.";
+
+// Escopo de escola: usuário vinculado a uma escola (por função ou cadastro) só
+// altera cursos/pelotões da própria escola. Retorna false se o curso não existe.
+async function cursoNoEscopo(session: { role: string; escola?: string | null }, courseId: string): Promise<boolean> {
+  const curso = await prisma.course.findUnique({ where: { id: courseId }, select: { school: true } });
+  return !!curso && escolaNoEscopo(session, curso.school);
+}
+
 export async function adicionarPelotaoNoCurso(courseId: string, _prev: State, formData: FormData): Promise<State> {
-  const session = await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA", "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO");
+  const session = await verifyRole(...CURSO_ROLES);
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Nome do pelotão é obrigatório." };
+  if (!(await cursoNoEscopo(session, courseId))) return { error: ERRO_OUTRA_ESCOLA };
   try {
     const p = await prisma.platoon.create({ data: { courseId, name, active: true } });
     await auditLog(session.userId, "CREATE", "Platoon", p.id, name);
@@ -23,12 +39,14 @@ export async function adicionarPelotaoNoCurso(courseId: string, _prev: State, fo
 }
 
 export async function excluirPelotaoNoCurso(courseId: string, platoonId: string, _prev: State, _fd: FormData): Promise<State> {
-  const session = await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA", "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO");
+  const session = await verifyRole(...CURSO_ROLES);
   const pelotao = await prisma.platoon.findUnique({
     where: { id: platoonId },
     include: { _count: { select: { students: true } } },
   });
   if (!pelotao) return { error: "Pelotão não encontrado." };
+  // Escopo conferido pelo curso REAL do pelotão (não pelo courseId informado).
+  if (!(await cursoNoEscopo(session, pelotao.courseId))) return { error: ERRO_OUTRA_ESCOLA };
   if (pelotao._count.students > 0) return { error: `Não é possível excluir: pelotão possui ${pelotao._count.students} aluno(s).` };
   try {
     await prisma.platoon.delete({ where: { id: platoonId } });
@@ -41,12 +59,13 @@ export async function excluirPelotaoNoCurso(courseId: string, platoonId: string,
 }
 
 export async function excluirCurso(id: string, _prev: { error: string } | undefined, _fd: FormData): Promise<{ error: string } | undefined> {
-  const session = await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA", "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO");
+  const session = await verifyRole(...CURSO_ROLES);
   const curso = await prisma.course.findUnique({
     where: { id },
     include: { _count: { select: { students: true, communications: true } } },
   });
   if (!curso) return { error: "Curso não encontrado." };
+  if (!escolaNoEscopo(session, curso.school)) return { error: ERRO_OUTRA_ESCOLA };
   if (curso._count.students > 0) return { error: `Não é possível excluir: curso possui ${curso._count.students} aluno(s).` };
   if (curso._count.communications > 0) return { error: `Não é possível excluir: curso possui ${curso._count.communications} comunicação(ões).` };
   try {
@@ -61,14 +80,15 @@ export async function excluirCurso(id: string, _prev: { error: string } | undefi
 }
 
 export async function salvarCurso(id: string | null, _prev: State, formData: FormData): Promise<State> {
-  const session = await verifyRole("ADMINISTRADOR", "PROTOCOLO", "COMANDANTE_ESFAP", "COMANDANTE_ESFO", "CHEFE_DIVISAO_ACADEMICA", "SUBCOMANDANTE_ESFAP", "SUBCOMANDANTE_ESFO", "OFICIAL_ESFAP", "OFICIAL_ESFO");
+  const session = await verifyRole(...CURSO_ROLES);
   const description = String(formData.get("description") ?? "").trim();
   const active = formData.get("active") === "true";
 
   // ── Edição: identidade travada, altera apenas descrição/situação. ──
   if (id) {
-    const atual = await prisma.course.findUnique({ where: { id }, select: { active: true, name: true } });
+    const atual = await prisma.course.findUnique({ where: { id }, select: { active: true, name: true, school: true } });
     if (!atual) return { error: "Curso não encontrado." };
+    if (!escolaNoEscopo(session, atual.school)) return { error: ERRO_OUTRA_ESCOLA };
 
     // Inativação só é permitida se TODAS as comunicações já estiverem publicadas
     // no caderno disciplinar — evita que registros pendentes "se percam" num curso
@@ -127,6 +147,7 @@ export async function salvarCurso(id: string | null, _prev: State, formData: For
   const platoonCount = Math.max(0, parseInt(String(formData.get("platoonCount") ?? "0")) || 0);
 
   if (school !== "ESFO" && school !== "ESFAP") return { error: "Selecione uma escola válida." };
+  if (!escolaNoEscopo(session, school)) return { error: "Sem permissão para criar curso de outra escola." };
   const basesValidas = CURSOS_POR_ESCOLA[school].map((c) => c.value as string);
   if (!basesValidas.includes(baseCourse)) return { error: "Selecione um curso válido para a escola." };
   if (school === "ESFO" && !ANOS_LETIVOS.includes(academicYear as 1 | 2 | 3)) {

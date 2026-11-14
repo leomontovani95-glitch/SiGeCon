@@ -2,7 +2,7 @@
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
-import { verifyStaff, verifyRole, VIEWERS_APM, getSchoolFilter } from "@/lib/dal";
+import { verifyStaff, verifyRole, VIEWERS_APM, getSchoolFilter, escolaNoEscopo } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
 import { logger } from "@/lib/logger";
 import { formatCourseNumber, maskRG } from "@/lib/utils";
@@ -34,8 +34,10 @@ function rankDeAluno(courseName: string): string {
 
 export async function salvarAluno(id: string | null, _prev: State, formData: FormData): Promise<State> {
   const session = await verifyStaff();
-  if (id === null && (VIEWERS_APM as string[]).includes(session.role)) {
-    return { error: "Sem permissão para cadastrar novos alunos." };
+  // Cmt/Subcmt APM têm acesso de consulta: não cadastram nem editam alunos
+  // (a tela já esconde os botões; aqui a regra vale também para a action).
+  if ((VIEWERS_APM as string[]).includes(session.role)) {
+    return { error: "Sem permissão para cadastrar ou editar alunos." };
   }
 
   // Nomes padronizados em MAIÚSCULO para uniformizar abas e documentos.
@@ -65,6 +67,19 @@ export async function salvarAluno(id: string | null, _prev: State, formData: For
   const escopo = getSchoolFilter(session.role, session.escola);
   if (escopo && course.school !== escopo) {
     return { error: "Sem permissão para cadastrar alunos de outra escola." };
+  }
+  // Na edição, o aluno JÁ cadastrado também precisa ser da escola do usuário —
+  // senão bastaria informar um curso da própria escola para "puxar" um aluno de
+  // outra escola.
+  if (id) {
+    const atual = await prisma.student.findUnique({
+      where: { id },
+      select: { course: { select: { school: true } } },
+    });
+    if (!atual) return { error: "Aluno não encontrado." };
+    if (escopo && atual.course.school !== escopo) {
+      return { error: "Sem permissão para editar alunos de outra escola." };
+    }
   }
 
   const rank = rankDeAluno(course.name);
@@ -171,6 +186,7 @@ export async function salvarAluno(id: string | null, _prev: State, formData: For
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "";
     if (msg.includes("Unique") || msg.includes("unique")) return { error: "RG ou Número Funcional já cadastrado." };
+    logger.error("alunos: salvar aluno", e, { studentId: id });
     return { error: "Erro ao salvar aluno." };
   }
   redirect("/alunos");
@@ -362,12 +378,16 @@ export async function ascenderAluno(studentId: string, _prev: State, formData: F
 type ResetState = { error?: string; success?: string } | undefined;
 
 export async function criarContaAluno(studentId: string, _prev: ResetState, _fd: FormData): Promise<ResetState> {
-  await verifyRole("ADMINISTRADOR", "CHEFE_DIVISAO_ACADEMICA", "COMANDANTE_ESFAP", "COMANDANTE_ESFO");
+  const session = await verifyRole("ADMINISTRADOR", "CHEFE_DIVISAO_ACADEMICA", "COMANDANTE_ESFAP", "COMANDANTE_ESFO");
   const student = await prisma.student.findUnique({
     where: { id: studentId },
     include: { user: true, course: true },
   });
   if (!student) return { error: "Aluno não encontrado." };
+  // Comando de escola só atua sobre alunos da própria escola.
+  if (!escolaNoEscopo(session, student.course.school)) {
+    return { error: "Sem permissão para criar conta de aluno de outra escola." };
+  }
   if (student.userId) return { error: "Este aluno já possui conta de acesso cadastrada." };
   if (!student.functionalNumber) return { error: "Cadastre o Número Funcional antes de criar a conta de acesso." };
 
@@ -388,6 +408,8 @@ export async function criarContaAluno(studentId: string, _prev: ResetState, _fd:
       },
     });
     await prisma.student.update({ where: { id: studentId }, data: { userId: userAluno.id } });
+    await auditLog(session.userId, "CREATE", "User", userAluno.id, `Conta de acesso criada para o aluno ${student.warName}`)
+      .catch((e) => logger.error("alunos: auditLog criar conta", e, { studentId }));
     return { success: `Conta criada para ${student.warName}. Senha inicial: Nº Funcional + RG sem pontuação. O aluno deverá alterá-la no primeiro acesso.` };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "";
@@ -407,12 +429,16 @@ export async function criarContaAluno(studentId: string, _prev: ResetState, _fd:
 }
 
 export async function resetarSenhaAluno(studentId: string, _prev: ResetState, _fd: FormData): Promise<ResetState> {
-  await verifyRole("ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO");
+  const session = await verifyRole("ADMINISTRADOR", "COMANDANTE_ESFAP", "COMANDANTE_ESFO");
   const student = await prisma.student.findUnique({
     where: { id: studentId },
-    include: { user: true },
+    include: { user: true, course: { select: { school: true } } },
   });
   if (!student) return { error: "Aluno não encontrado." };
+  // Comando de escola só redefine senha de alunos da própria escola.
+  if (!escolaNoEscopo(session, student.course.school)) {
+    return { error: "Sem permissão para redefinir a senha de aluno de outra escola." };
+  }
   if (!student.userId || !student.user) return { error: "Este aluno não possui conta de acesso cadastrada." };
   if (!student.functionalNumber) return { error: "Número Funcional não cadastrado. Não é possível redefinir a senha automaticamente." };
   const novaSenha = senhaInicial(student.functionalNumber, student.rg);
@@ -420,5 +446,7 @@ export async function resetarSenhaAluno(studentId: string, _prev: ResetState, _f
     where: { id: student.userId },
     data: { passwordHash: await bcrypt.hash(novaSenha, 10), mustChangePassword: true },
   });
+  await auditLog(session.userId, "RESET_SENHA", "User", student.userId, `Senha redefinida — aluno ${student.warName}`)
+    .catch((e) => logger.error("alunos: auditLog reset de senha", e, { studentId }));
   return { success: `Senha de ${student.warName} redefinida para Nº Funcional + RG sem pontuação.` };
 }

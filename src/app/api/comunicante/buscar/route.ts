@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSession } from "@/lib/session";
-import { getSchoolFilter } from "@/lib/dal";
+import { verifySession, getSchoolFilter } from "@/lib/dal";
 
 export async function GET(req: NextRequest) {
-  const session = await getSession();
-  if (!session?.userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // verifySession reconsulta o banco: usuário desativado/rebaixado perde o
+  // acesso na hora (getSession só validaria o token, válido por até 8h).
+  const session = await verifySession();
 
   const q = (req.nextUrl.searchParams.get("q") ?? "").trim();
   if (!q || q.length < 2) return NextResponse.json({ results: [] });

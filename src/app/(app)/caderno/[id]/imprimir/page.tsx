@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { verifySession } from "@/lib/dal";
+import { verifySession, escolaNoEscopo } from "@/lib/dal";
 import { usuarioAtivoNaFuncao } from "@/lib/signatarios";
 import { platoonOrder, abreviarPelotao, escolaHeaderLabel, formatCadernoNumero } from "@/lib/utils";
 import { coresTipo } from "@/lib/coresComunicacao";
@@ -365,9 +365,13 @@ function AACPAnexo({ aacp, caderno, chefe }: { aacp: AacpData; caderno: CadernoM
 }
 
 export default async function ImprimirCadernoPage({ params }: { params: Promise<{ id: string }> }) {
-  await verifySession();
+  const session = await verifySession();
   const { id } = await params;
   const caderno = await fetchCaderno(id);
+  // Mesmo acesso da lista de cadernos: aluno não acessa; staff só a(s) escola(s)
+  // do seu escopo (404 para não revelar a existência do caderno).
+  if (session.role === "ALUNO") notFound();
+  if (!escolaNoEscopo(session, caderno.course?.school ?? caderno.school)) notFound();
 
   // Escola efetiva: campo direto do caderno ou herdado do curso vinculado
   const escolaEfetiva = caderno.school ?? caderno.course?.school ?? null;

@@ -47,10 +47,20 @@ export async function salvarUsuario(id: string | null, _prev: State, formData: F
   }
   // Se for edição, verifica se o ator pode gerir a função E a escola do usuário.
   if (id) {
-    const target = await prisma.user.findUnique({ where: { id }, select: { role: true, escola: true } });
+    const target = await prisma.user.findUnique({ where: { id }, select: { role: true, escola: true, active: true } });
     if (!target) return { error: "Usuário não encontrado." };
     if (!canManageUserScoped(session, target)) {
       return { error: "Você não tem permissão para editar usuários de outra escola." };
+    }
+    // O sistema não pode ficar sem administrador ativo: bloqueia rebaixar ou
+    // desativar o ÚLTIMO administrador ativo (a exclusão já tem essa trava).
+    if (target.role === "ADMINISTRADOR" && target.active && (role !== "ADMINISTRADOR" || !active)) {
+      const outrosAdmins = await prisma.user.count({
+        where: { role: "ADMINISTRADOR", active: true, id: { not: id } },
+      });
+      if (outrosAdmins === 0) {
+        return { error: "Não é possível rebaixar ou desativar o último administrador ativo." };
+      }
     }
   }
 
@@ -120,6 +130,8 @@ export async function resetarSenha(userId: string, _prev: ResetState, _fd: FormD
     where: { id: userId },
     data: { passwordHash: await bcrypt.hash(novaSenha, 10), mustChangePassword: true },
   });
+  await auditLog(session.userId, "RESET_SENHA", "User", userId, `Senha redefinida — ${user.fullName}`)
+    .catch((e) => logger.error("usuarios: auditLog reset de senha", e, { userId }));
   return { success: `Senha redefinida para: Nº Funcional + RG sem pontuação.` };
 }
 
@@ -132,8 +144,10 @@ export async function excluirUsuario(id: string, _prev: { error: string } | unde
     return { error: "Você não tem permissão para excluir usuários de outra escola." };
   }
   if (user.role === "ADMINISTRADOR") {
-    const adminCount = await prisma.user.count({ where: { role: "ADMINISTRADOR" } });
-    if (adminCount <= 1) return { error: "Não é possível excluir o último administrador." };
+    // Conta só administradores ATIVOS além deste: um admin desativado não
+    // mantém o sistema administrável.
+    const outrosAdmins = await prisma.user.count({ where: { role: "ADMINISTRADOR", active: true, id: { not: id } } });
+    if (outrosAdmins === 0) return { error: "Não é possível excluir o último administrador ativo." };
   }
   try {
     await prisma.user.delete({ where: { id } });

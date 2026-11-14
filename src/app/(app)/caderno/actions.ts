@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { verifyRole, getSchoolFilter, escolaNoEscopo, CADERNO_MANAGERS } from "@/lib/dal";
 import { auditLog } from "@/lib/audit";
+import { comTransacaoRetry } from "@/lib/caderno";
 
 export async function criarCaderno() {
   const session = await verifyRole(...CADERNO_MANAGERS);
@@ -88,19 +89,29 @@ export async function publicarCaderno(id: string) {
   // Escopo de escola: só publica cadernos da(s) escola(s) a que tem acesso.
   if (!escolaNoEscopo(session, caderno.course?.school ?? caderno.school)) return;
 
-  // Publica o caderno e atualiza todas as comunicações para PUBLICADA_CADERNO
-  await prisma.disciplinaryBook.update({
-    where: { id },
-    data: { status: "PUBLICADO", publicationDate: new Date(), publishedById: session.userId },
-  });
+  // Caderno já publicado não é republicado (preserva data e autor da publicação).
+  if (caderno.status === "PUBLICADO") redirect(`/caderno/${id}`);
 
+  // Publica o caderno e atualiza todas as comunicações para PUBLICADA_CADERNO,
+  // numa única transação. O updateMany condicionado ao status funciona como
+  // "claim": se outra requisição publicou antes (duplo clique), count=0 e nada
+  // é refeito.
   const commIds = caderno.items.map((i) => i.communicationId);
-  if (commIds.length > 0) {
-    await prisma.communication.updateMany({
-      where: { id: { in: commIds } },
-      data: { status: "PUBLICADA_CADERNO" },
+  const publicou = await comTransacaoRetry(async (tx) => {
+    const claim = await tx.disciplinaryBook.updateMany({
+      where: { id, status: { not: "PUBLICADO" } },
+      data: { status: "PUBLICADO", publicationDate: new Date(), publishedById: session.userId },
     });
-  }
+    if (claim.count === 0) return false;
+    if (commIds.length > 0) {
+      await tx.communication.updateMany({
+        where: { id: { in: commIds } },
+        data: { status: "PUBLICADA_CADERNO" },
+      });
+    }
+    return true;
+  });
+  if (!publicou) redirect(`/caderno/${id}`);
 
   await auditLog(session.userId, "PUBLICAR", "DisciplinaryBook", id, `${commIds.length} comunicação(ões) publicadas`);
   redirect(`/caderno/${id}`);
@@ -114,6 +125,20 @@ export async function adicionarItem(cadernoId: string, communicationId: string) 
   });
   if (!comm || comm.status !== "DECIDIDA") return;
   if (!escolaNoEscopo(session, comm.course?.school)) return;
+
+  // O caderno de destino precisa existir, estar em rascunho e ser da escola do
+  // usuário — nunca se acrescenta item a caderno já publicado (alteraria a nota
+  // do aluno sem nova publicação).
+  const caderno = await prisma.disciplinaryBook.findUnique({
+    where: { id: cadernoId },
+    select: { status: true, school: true, courseId: true, course: { select: { school: true } } },
+  });
+  if (!caderno || caderno.status === "PUBLICADO") return;
+  if (!escolaNoEscopo(session, caderno.course?.school ?? caderno.school)) return;
+  // Cada caderno pertence a UM curso (CFO 1, CFO 2, CFSd 2025, CFSd 2026... cada
+  // um tem o seu), mesmo dentro da mesma escola: só entram comunicações do
+  // próprio curso do caderno.
+  if (caderno.courseId && comm.courseId !== caderno.courseId) return;
 
   // Verifica se já está neste caderno
   const jaExiste = await prisma.disciplinaryBookItem.findFirst({

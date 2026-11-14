@@ -128,6 +128,10 @@ export default async function CadernoDetailPage({ params, searchParams }: { para
     },
   });
   if (!caderno) notFound();
+  // Mesmo acesso da lista de cadernos: aluno não acessa; staff só a(s) escola(s)
+  // do seu escopo (404 para não revelar a existência do caderno).
+  if (session.role === "ALUNO") notFound();
+  if (!escolaNoEscopo(session, caderno.course?.school ?? caderno.school)) notFound();
 
   const numero = formatCadernoNumero(caderno);
 

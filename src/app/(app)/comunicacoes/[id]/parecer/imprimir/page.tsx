@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { verifySession } from "@/lib/dal";
+import { acessoComunicacao } from "@/lib/acesso";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -7,7 +8,7 @@ import PrintLayout from "@/components/PrintLayout";
 import { escolaHeaderLabel } from "@/lib/utils";
 
 export default async function ImprimirParecerPage({ params }: { params: Promise<{ id: string }> }) {
-  await verifySession();
+  const session = await verifySession();
   const { id } = await params;
 
   const comm = await prisma.communication.findUnique({
@@ -20,6 +21,10 @@ export default async function ImprimirParecerPage({ params }: { params: Promise<
     },
   });
   if (!comm) notFound();
+  // Mesma regra da página da comunicação: fora do escopo → 404; vista restrita
+  // (aluno comunicante, Chefe de Curso, Protocolo) não acessa o parecer.
+  const acesso = await acessoComunicacao(session, comm);
+  if (!acesso.permitido || acesso.vistaRestrita) notFound();
 
   if (comm.opinions.length === 0) notFound();
   const opinion = comm.opinions[0];

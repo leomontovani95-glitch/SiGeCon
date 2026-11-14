@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getSession } from "@/lib/session";
-import { ESFO_CFO_RANK, cursosPermitidosParaCPI, getSchoolFilter } from "@/lib/dal";
+import { verifySession, ESFO_CFO_RANK, cursosPermitidosParaCPI, getSchoolFilter } from "@/lib/dal";
 import { formatCourseNumber } from "@/lib/utils";
 
 export async function GET(req: NextRequest) {
-  const session = await getSession();
-  if (!session?.userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // verifySession reconsulta o banco: usuário desativado/rebaixado perde o
+  // acesso na hora (getSession só validaria o token, válido por até 8h).
+  const session = await verifySession();
 
   const q        = (req.nextUrl.searchParams.get("q")        ?? "").trim();
   const courseId = (req.nextUrl.searchParams.get("courseId") ?? "").trim();

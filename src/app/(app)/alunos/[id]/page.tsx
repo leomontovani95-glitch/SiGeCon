@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
-import { verifySession, canManageObservacoes, escolaNoEscopo } from "@/lib/dal";
+import { verifySession, canManageObservacoes, escolaNoEscopo, VIEWERS_APM } from "@/lib/dal";
+import { staffPodeVerAluno } from "@/lib/acesso";
 import AlunoTabs from "./_components/AlunoTabs";
 import { calcularNotaPublicada, faixaNota, zonaDeRisco } from "@/lib/score";
 import { notFound } from "next/navigation";
@@ -69,6 +70,8 @@ export default async function AlunoPage({
 
   // Alunos não podem ver a ficha cadastral de outros alunos (só a própria).
   if (session.role === "ALUNO" && aluno.userId !== session.userId) notFound();
+  // Staff com escopo de escola só abre fichas de alunos da própria escola.
+  if (session.role !== "ALUNO" && !(await staffPodeVerAluno(session, aluno))) notFound();
 
   // Aba "Observações": só para o grupo autorizado e dentro do escopo de escola.
   const podeVerObservacoes =
@@ -164,7 +167,7 @@ export default async function AlunoPage({
           <Link href={`/alunos/${aluno.id}/historico/imprimir${adaptacao ? `?adaptacao=${adaptacao}` : ""}`} target="_blank" className="btn-secondary text-xs">
             Gerar PDF do Histórico
           </Link>
-          {session.role !== "ALUNO" && (
+          {session.role !== "ALUNO" && !(VIEWERS_APM as string[]).includes(session.role) && (
             <Link href={`/alunos/${currentId ?? aluno.id}/editar`} className="btn-secondary text-xs">Editar</Link>
           )}
         </div>

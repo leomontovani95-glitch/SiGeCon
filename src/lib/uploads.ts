@@ -1,4 +1,4 @@
-"server-only";
+import "server-only";
 import path from "path";
 
 // Diretório base dos anexos enviados pelos usuários (defesas, provas, pareceres,

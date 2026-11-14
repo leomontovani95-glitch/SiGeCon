@@ -1,4 +1,4 @@
-"server-only";
+import "server-only";
 
 // Limitador de tentativas em memória — proteção contra força bruta no login.
 // Suficiente para um único processo Node (cenário da implantação atual). Se o app

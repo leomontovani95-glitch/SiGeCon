@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { verifySession, temVistaRestritaComunicacao } from "@/lib/dal";
+import { staffPodeVerAluno } from "@/lib/acesso";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -60,6 +61,8 @@ export default async function HistoricoImprimirPage({
     const atual = await prisma.student.findFirst({ where: { userId: session.userId }, select: { rg: true } });
     if (!atual || atual.rg !== aluno.rg) notFound();
   }
+  // Staff com escopo de escola só abre o histórico de alunos da própria escola.
+  if (session.role !== "ALUNO" && !(await staffPodeVerAluno(session, aluno))) notFound();
 
   const adaptacaoWhere =
     adaptacao === "nao" ? { adaptationPeriod: false } :

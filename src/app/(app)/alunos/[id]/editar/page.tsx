@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { verifySession, getSchoolFilter } from "@/lib/dal";
+import { verifySession, getSchoolFilter, VIEWERS_APM } from "@/lib/dal";
 import { redirect } from "next/navigation";
 import { notFound } from "next/navigation";
 import { platoonOrder } from "@/lib/utils";
@@ -20,6 +20,8 @@ const PODE_MOVER_CURSO = [
 export default async function EditarAlunoPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await verifySession();
   if (session.role === "ALUNO") redirect("/acesso-negado");
+  // Cmt/Subcmt APM têm acesso de consulta: não editam alunos.
+  if ((VIEWERS_APM as string[]).includes(session.role)) redirect("/acesso-negado");
 
   const { id } = await params;
   const aluno = await prisma.student.findUnique({
